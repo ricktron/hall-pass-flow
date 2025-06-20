@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, UserCheck } from "lucide-react";
+import { ArrowLeft, UserCheck } from "lucide-react";
 import { BathroomRecord } from "@/lib/types";
 import { getAllRecords, updateReturnTime } from "@/lib/dataManager";
 import { useToast } from "@/hooks/use-toast";
@@ -18,16 +17,23 @@ const AmIStillOut = ({ onBack }: AmIStillOutProps) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [currentRecord, setCurrentRecord] = useState<BathroomRecord | null>(null);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [elapsedTime, setElapsedTime] = useState("00:00");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasReturned, setHasReturned] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    if (currentRecord && !hasReturned) {
+      const interval = setInterval(() => {
+        const now = new Date();
+        const elapsed = now.getTime() - currentRecord.timeOut.getTime();
+        const minutes = Math.floor(elapsed / (1000 * 60));
+        const seconds = Math.floor((elapsed % (1000 * 60)) / 1000);
+        setElapsedTime(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [currentRecord, hasReturned]);
 
   const checkStatus = async () => {
     if (!firstName.trim() || !lastName.trim()) {
@@ -45,7 +51,6 @@ const AmIStillOut = ({ onBack }: AmIStillOutProps) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Find the most recent record for this student today that doesn't have a return time
       const openRecord = records.find(record => 
         record.firstName.toLowerCase() === firstName.toLowerCase() &&
         record.lastName.toLowerCase() === lastName.toLowerCase() &&
@@ -54,6 +59,7 @@ const AmIStillOut = ({ onBack }: AmIStillOutProps) => {
       );
 
       setCurrentRecord(openRecord || null);
+      setHasReturned(false);
     } catch (error) {
       console.error("Error checking status:", error);
       toast({
@@ -79,11 +85,11 @@ const AmIStillOut = ({ onBack }: AmIStillOutProps) => {
       );
 
       if (success) {
+        setHasReturned(true);
         toast({
           title: "Successfully Returned",
-          description: "You have been marked as returned to class.",
+          description: "You are now marked as returned.",
         });
-        setCurrentRecord(null);
       } else {
         toast({
           title: "Error",
@@ -103,19 +109,9 @@ const AmIStillOut = ({ onBack }: AmIStillOutProps) => {
     }
   };
 
-  const getElapsedMinutes = (timeOut: Date) => {
-    return Math.floor((currentTime.getTime() - timeOut.getTime()) / (1000 * 60));
-  };
-
-  const getElapsedColor = (minutes: number) => {
-    if (minutes < 5) return "text-green-600";
-    if (minutes <= 10) return "text-yellow-600";
-    return "text-red-600";
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-2xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg">
         <div className="flex items-center mb-6">
           <Button
             variant="ghost"
@@ -125,110 +121,102 @@ const AmIStillOut = ({ onBack }: AmIStillOutProps) => {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back
           </Button>
-          <h1 className="text-3xl font-bold text-gray-800">Am I Still Out?</h1>
         </div>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Check Your Status</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="Enter your first name"
-                  className="text-lg p-4"
-                />
-              </div>
-              <div>
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Enter your last name"
-                  className="text-lg p-4"
-                />
-              </div>
-            </div>
-            <Button
-              onClick={checkStatus}
-              disabled={isLoading}
-              className="w-full text-lg py-6"
-            >
-              {isLoading ? "Checking..." : "Check Status"}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {currentRecord ? (
-          <Card className="bg-orange-50 border-orange-200">
-            <CardHeader>
-              <CardTitle className="text-orange-800 flex items-center">
-                <Clock className="w-5 h-5 mr-2" />
-                You Are Currently Out
-              </CardTitle>
+        {!currentRecord && !hasReturned ? (
+          <Card className="shadow-lg">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">Check Your Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+              <div className="space-y-4">
                 <div>
-                  <Label className="text-sm text-gray-600">Student</Label>
-                  <p className="text-lg font-semibold">
-                    {currentRecord.firstName} {currentRecord.lastName}
-                  </p>
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Enter your first name"
+                    className="text-lg p-4"
+                  />
                 </div>
                 <div>
-                  <Label className="text-sm text-gray-600">Period</Label>
-                  <div>
-                    <Badge variant="outline" className="text-lg px-3 py-1">
-                      Period {currentRecord.period}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-sm text-gray-600">Destination</Label>
-                  <p className="text-lg font-semibold">{currentRecord.destination}</p>
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Enter your last name"
+                    className="text-lg p-4"
+                  />
                 </div>
               </div>
-
-              <div className="text-center py-4 border-t">
-                <Label className="text-sm text-gray-600">Time Out</Label>
-                <p className="text-lg font-semibold mb-2">
-                  {currentRecord.timeOut.toLocaleTimeString()}
-                </p>
-                <Label className="text-sm text-gray-600">Elapsed Time</Label>
-                <div className={`text-2xl font-bold ${getElapsedColor(getElapsedMinutes(currentRecord.timeOut))}`}>
-                  {getElapsedMinutes(currentRecord.timeOut)} minutes
-                </div>
-              </div>
-
               <Button
-                onClick={handleReturn}
+                onClick={checkStatus}
                 disabled={isLoading}
-                className="w-full text-lg py-6 bg-green-600 hover:bg-green-700"
+                className="w-full text-lg py-6"
               >
-                <UserCheck className="w-5 h-5 mr-2" />
-                {isLoading ? "Marking Return..." : "Mark Return"}
+                {isLoading ? "Checking..." : "Check Status"}
               </Button>
             </CardContent>
           </Card>
-        ) : firstName && lastName && !isLoading ? (
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="text-center py-8">
-              <UserCheck className="w-16 h-16 mx-auto mb-4 text-green-600" />
-              <h3 className="text-xl font-semibold text-green-800 mb-2">
-                You're not currently signed out.
-              </h3>
-              <p className="text-green-600">
-                You don't have any active bathroom passes today.
-              </p>
+        ) : hasReturned ? (
+          <Card className="bg-green-50 border-green-200 shadow-lg">
+            <CardContent className="text-center py-12">
+              <UserCheck className="w-24 h-24 mx-auto mb-6 text-green-600" />
+              <h2 className="text-3xl font-bold text-green-800 mb-4">
+                You are now marked as returned.
+              </h2>
+              <Button
+                onClick={() => {
+                  setCurrentRecord(null);
+                  setHasReturned(false);
+                  setFirstName("");
+                  setLastName("");
+                }}
+                className="text-lg py-4 px-8"
+              >
+                Check Another Status
+              </Button>
             </CardContent>
           </Card>
-        ) : null}
+        ) : currentRecord ? (
+          <Card className="shadow-lg">
+            <CardContent className="text-center py-12">
+              <h2 className="text-4xl font-bold text-gray-800 mb-8">
+                {currentRecord.firstName} {currentRecord.lastName.charAt(0)} has been out for:
+              </h2>
+              <div className="text-6xl font-mono font-bold text-blue-600 mb-12">
+                {elapsedTime}
+              </div>
+              <Button
+                onClick={handleReturn}
+                disabled={isLoading}
+                size="lg"
+                className="text-2xl py-8 px-16 bg-green-600 hover:bg-green-700"
+              >
+                {isLoading ? "Processing..." : "Returned"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-gray-50 border-gray-200 shadow-lg">
+            <CardContent className="text-center py-12">
+              <h2 className="text-3xl font-bold text-gray-600 mb-4">
+                You're not currently signed out.
+              </h2>
+              <Button
+                onClick={() => {
+                  setFirstName("");
+                  setLastName("");
+                }}
+                className="text-lg py-4 px-8"
+              >
+                Check Another Status
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
