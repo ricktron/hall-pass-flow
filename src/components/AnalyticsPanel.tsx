@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Clock, Users, BarChart3 } from "lucide-react";
@@ -17,9 +16,7 @@ const AnalyticsPanel = ({ analytics }: AnalyticsPanelProps) => {
       {/* Most Frequent Leavers */}
       <Card>
         <CardHeader>
-          <Car
-
-dTitle className="flex items-center">
+          <CardTitle className="flex items-center">
             <TrendingUp className="w-5 h-5 mr-2" />
             Most Frequent Leavers
           </CardTitle>
