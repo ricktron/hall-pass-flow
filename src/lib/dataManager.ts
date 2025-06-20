@@ -48,7 +48,8 @@ export const addBathroomRecord = async (record: Omit<BathroomRecord, 'id'>): Pro
 
 // Update return time for a student
 export const updateReturnTime = async (
-  studentName: string, 
+  firstName: string,
+  lastName: string, 
   period: string, 
   returnTime: Date
 ): Promise<boolean> => {
@@ -58,7 +59,8 @@ export const updateReturnTime = async (
   
   // Find the most recent record for this student and period today that doesn't have a return time
   const recordIndex = records.findIndex(record => 
-    record.studentName === studentName &&
+    record.firstName === firstName &&
+    record.lastName === lastName &&
     record.period === period &&
     !record.timeIn &&
     record.timeOut >= today
@@ -93,11 +95,13 @@ export const getAnalytics = async (): Promise<Analytics> => {
   const weekFrequency: { [key: string]: number } = {};
   
   todayRecords.forEach(record => {
-    todayFrequency[record.studentName] = (todayFrequency[record.studentName] || 0) + 1;
+    const fullName = `${record.firstName} ${record.lastName}`;
+    todayFrequency[fullName] = (todayFrequency[fullName] || 0) + 1;
   });
   
   weekRecords.forEach(record => {
-    weekFrequency[record.studentName] = (weekFrequency[record.studentName] || 0) + 1;
+    const fullName = `${record.firstName} ${record.lastName}`;
+    weekFrequency[fullName] = (weekFrequency[fullName] || 0) + 1;
   });
 
   const mostFrequentToday = Object.entries(todayFrequency)
@@ -119,7 +123,7 @@ export const getAnalytics = async (): Promise<Analytics> => {
       const duration = record.timeIn.getTime() - record.timeOut.getTime();
       if (duration > longestTrip) {
         longestTrip = duration;
-        longestTripStudent = record.studentName;
+        longestTripStudent = `${record.firstName} ${record.lastName}`;
       }
     }
   });

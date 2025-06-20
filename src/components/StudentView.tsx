@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -13,24 +14,31 @@ interface StudentViewProps {
   onBack: () => void;
 }
 
-const STUDENTS = [
-  "Alex Johnson", "Bailey Smith", "Casey Brown", "Drew Wilson", "Ellis Davis",
-  "Finley Miller", "Gray Anderson", "Harper Taylor", "Iris Jackson", "Jordan White",
-  "Kai Thompson", "Logan Garcia", "Morgan Martinez", "Noah Robinson", "Olive Clark",
-  "Parker Lewis", "Quinn Lee", "River Walker", "Sage Hall", "Taylor Young"
-];
-
 const PERIODS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
+const DESTINATIONS = [
+  "Bathroom",
+  "Locker", 
+  "Counselor",
+  "Dean of Students",
+  "Dean of Academics",
+  "Nurse",
+  "Early Dismissal",
+  "Football Meeting",
+  "Other"
+];
+
 const StudentView = ({ onBack }: StudentViewProps) => {
-  const [selectedStudent, setSelectedStudent] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
+  const [selectedDestination, setSelectedDestination] = useState("");
   const [action, setAction] = useState<"leaving" | "returning" | "">("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async () => {
-    if (!selectedStudent || !selectedPeriod || !action) {
+    if (!firstName.trim() || !lastName.trim() || !selectedPeriod || !selectedDestination || !action) {
       toast({
         title: "Missing Information",
         description: "Please fill in all fields before submitting.",
@@ -46,36 +54,40 @@ const StudentView = ({ onBack }: StudentViewProps) => {
       
       if (action === "leaving") {
         await addBathroomRecord({
-          studentName: selectedStudent,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           period: selectedPeriod,
+          destination: selectedDestination,
           timeOut: now,
           timeIn: null,
         });
         
         toast({
           title: "Signed Out",
-          description: `${selectedStudent} has been signed out successfully.`,
+          description: `${firstName} ${lastName} has been signed out successfully.`,
         });
       } else {
-        const success = await updateReturnTime(selectedStudent, selectedPeriod, now);
+        const success = await updateReturnTime(firstName.trim(), lastName.trim(), selectedPeriod, now);
         
         if (success) {
           toast({
             title: "Signed In",
-            description: `${selectedStudent} has been signed back in successfully.`,
+            description: `${firstName} ${lastName} has been signed back in successfully.`,
           });
         } else {
           toast({
             title: "No Record Found",
-            description: "No active bathroom pass found for this student and period today.",
+            description: "No active pass found for this student and period today.",
             variant: "destructive",
           });
         }
       }
 
       // Reset form
-      setSelectedStudent("");
+      setFirstName("");
+      setLastName("");
       setSelectedPeriod("");
+      setSelectedDestination("");
       setAction("");
     } catch (error) {
       toast({
@@ -107,24 +119,31 @@ const StudentView = ({ onBack }: StudentViewProps) => {
           <CardHeader>
             <CardTitle className="flex items-center text-xl">
               <Clock className="w-5 h-5 mr-2 text-blue-600" />
-              Bathroom Pass
+              Hall Pass
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="student">Student Name</Label>
-              <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select your name" />
-                </SelectTrigger>
-                <SelectContent>
-                  {STUDENTS.map((student) => (
-                    <SelectItem key={student} value={student}>
-                      {student}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="Enter first name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  type="text"
+                  placeholder="Enter last name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -143,6 +162,22 @@ const StudentView = ({ onBack }: StudentViewProps) => {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="destination">Destination</Label>
+              <Select value={selectedDestination} onValueChange={setSelectedDestination}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select destination" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DESTINATIONS.map((destination) => (
+                    <SelectItem key={destination} value={destination}>
+                      {destination}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-3">
               <Label>Action</Label>
               <RadioGroup value={action} onValueChange={(value) => setAction(value as "leaving" | "returning")}>
@@ -150,14 +185,14 @@ const StudentView = ({ onBack }: StudentViewProps) => {
                   <RadioGroupItem value="leaving" id="leaving" />
                   <Label htmlFor="leaving" className="flex-1 cursor-pointer">
                     <div className="font-medium">Leaving</div>
-                    <div className="text-sm text-gray-500">I'm going to the bathroom</div>
+                    <div className="text-sm text-gray-500">I'm leaving the classroom</div>
                   </Label>
                 </div>
                 <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50">
                   <RadioGroupItem value="returning" id="returning" />
                   <Label htmlFor="returning" className="flex-1 cursor-pointer">
                     <div className="font-medium">Returning</div>
-                    <div className="text-sm text-gray-500">I'm back from the bathroom</div>
+                    <div className="text-sm text-gray-500">I'm back to the classroom</div>
                   </Label>
                 </div>
               </RadioGroup>
@@ -166,7 +201,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
             <Button 
               className="w-full py-3 text-lg" 
               onClick={handleSubmit}
-              disabled={isSubmitting || !selectedStudent || !selectedPeriod || !action}
+              disabled={isSubmitting || !firstName.trim() || !lastName.trim() || !selectedPeriod || !selectedDestination || !action}
             >
               {isSubmitting ? "Processing..." : "Submit"}
             </Button>

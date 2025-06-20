@@ -1,8 +1,10 @@
 
 export interface BathroomRecord {
   id: string;
-  studentName: string;
+  firstName: string;
+  lastName: string;
   period: string;
+  destination: string;
   timeOut: Date;
   timeIn: Date | null;
 }
