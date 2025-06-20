@@ -8,7 +8,7 @@ import { BathroomRecord } from "@/lib/types";
 
 interface CurrentlyOutTableProps {
   records: BathroomRecord[];
-  onMarkReturn: (studentName: string, period: string) => void;
+  onMarkReturn: (firstName: string, lastName: string, period: string) => void;
 }
 
 const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) => {
@@ -51,7 +51,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
         </CardContent>
       </Card>
     );
-  }
+  };
 
   return (
     <Card className="mb-6">
@@ -91,7 +91,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                       className={`border-b hover:bg-gray-50 ${isOverLimit ? 'bg-red-50' : ''}`}
                     >
                       <td className="py-3 px-2 font-medium">
-                        {record.studentName}
+                        {record.firstName} {record.lastName}
                         {isOverLimit && (
                           <AlertTriangle className="w-4 h-4 text-red-500 inline ml-2" />
                         )}
@@ -114,7 +114,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                         <Button
                           size="sm"
                           variant={isOverLimit ? "destructive" : "outline"}
-                          onClick={() => onMarkReturn(record.studentName, record.period)}
+                          onClick={() => onMarkReturn(record.firstName, record.lastName, record.period)}
                         >
                           <UserCheck className="w-4 h-4 mr-1" />
                           Mark Returned

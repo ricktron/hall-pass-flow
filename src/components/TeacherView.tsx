@@ -39,12 +39,12 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleMarkReturn = async (studentName: string, period: string) => {
-    const success = await updateReturnTime(studentName, period, new Date());
+  const handleMarkReturn = async (firstName: string, lastName: string, period: string) => {
+    const success = await updateReturnTime(firstName, lastName, period, new Date());
     if (success) {
       toast({
         title: "Student Marked Returned",
-        description: `${studentName} has been marked as returned.`,
+        description: `${firstName} ${lastName} has been marked as returned.`,
       });
       loadData();
     } else {
@@ -61,7 +61,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const filteredOut = currentlyOut.filter(record => {
     const periodMatch = filterPeriod === "all" || record.period === filterPeriod;
     const studentMatch = filterStudent === "" || 
-      record.studentName.toLowerCase().includes(filterStudent.toLowerCase());
+      `${record.firstName} ${record.lastName}`.toLowerCase().includes(filterStudent.toLowerCase());
     return periodMatch && studentMatch;
   });
 
