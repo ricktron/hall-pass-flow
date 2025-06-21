@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addBathroomRecord, updateReturnTime } from "@/lib/dataManager";
+import PostSignoutConfirmation from "./PostSignoutConfirmation";
 
 interface StudentViewProps {
   onBack: () => void;
@@ -35,6 +36,8 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [selectedDestination, setSelectedDestination] = useState("");
   const [action, setAction] = useState<"leaving" | "returning" | "">("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [signoutTime, setSignoutTime] = useState<Date | null>(null);
   const { toast } = useToast();
 
   const handleSubmit = async () => {
@@ -62,10 +65,9 @@ const StudentView = ({ onBack }: StudentViewProps) => {
           timeIn: null,
         });
         
-        toast({
-          title: "Signed Out",
-          description: `${firstName} ${lastName} has been signed out successfully.`,
-        });
+        // Store signout time and show confirmation screen
+        setSignoutTime(now);
+        setShowConfirmation(true);
       } else {
         const success = await updateReturnTime(firstName.trim(), lastName.trim(), selectedPeriod, now);
         
@@ -83,12 +85,14 @@ const StudentView = ({ onBack }: StudentViewProps) => {
         }
       }
 
-      // Reset form
-      setFirstName("");
-      setLastName("");
-      setSelectedPeriod("");
-      setSelectedDestination("");
-      setAction("");
+      // Reset form if not showing confirmation
+      if (action === "returning") {
+        setFirstName("");
+        setLastName("");
+        setSelectedPeriod("");
+        setSelectedDestination("");
+        setAction("");
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -99,6 +103,30 @@ const StudentView = ({ onBack }: StudentViewProps) => {
       setIsSubmitting(false);
     }
   };
+
+  const handleConfirmationComplete = () => {
+    setShowConfirmation(false);
+    setSignoutTime(null);
+    // Reset form
+    setFirstName("");
+    setLastName("");
+    setSelectedPeriod("");
+    setSelectedDestination("");
+    setAction("");
+  };
+
+  // Show confirmation screen after sign-out
+  if (showConfirmation && signoutTime) {
+    return (
+      <PostSignoutConfirmation
+        firstName={firstName}
+        lastName={lastName}
+        period={selectedPeriod}
+        timeOut={signoutTime}
+        onComplete={handleConfirmationComplete}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
