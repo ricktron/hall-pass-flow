@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateReturnTime } from "@/lib/dataManager";
+import { updateReturnTime, getAllRecords } from "@/lib/dataManager";
+import { BathroomRecord } from "@/lib/types";
 
 interface PostSignoutConfirmationProps {
   firstName: string;
@@ -24,6 +25,11 @@ const PostSignoutConfirmation = ({
   const [elapsedTime, setElapsedTime] = useState("00:00");
   const [isReturned, setIsReturned] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [weeklyStats, setWeeklyStats] = useState({
+    tripCount: 0,
+    totalMinutes: 0,
+    averageMinutes: 0
+  });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -40,6 +46,55 @@ const PostSignoutConfirmation = ({
 
     return () => clearInterval(interval);
   }, [timeOut]);
+
+  useEffect(() => {
+    const calculateWeeklyStats = async () => {
+      try {
+        const records = await getAllRecords();
+        
+        // Get start of current week (Monday)
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        const dayOfWeek = now.getDay();
+        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, so Sunday needs to go back 6 days
+        startOfWeek.setDate(now.getDate() - daysToMonday);
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        // Filter records for this student this week where both timeOut and timeIn exist
+        const studentWeeklyRecords = records.filter((record: BathroomRecord) => 
+          record.firstName === firstName &&
+          record.lastName === lastName &&
+          record.timeOut >= startOfWeek &&
+          record.timeIn !== null
+        );
+
+        const tripCount = studentWeeklyRecords.length;
+        let totalMinutes = 0;
+
+        if (tripCount > 0) {
+          totalMinutes = studentWeeklyRecords.reduce((sum: number, record: BathroomRecord) => {
+            if (record.timeIn) {
+              const duration = record.timeIn.getTime() - record.timeOut.getTime();
+              return sum + (duration / (1000 * 60)); // Convert to minutes
+            }
+            return sum;
+          }, 0);
+        }
+
+        const averageMinutes = tripCount > 0 ? Math.round(totalMinutes / tripCount) : 0;
+
+        setWeeklyStats({
+          tripCount,
+          totalMinutes: Math.round(totalMinutes),
+          averageMinutes
+        });
+      } catch (error) {
+        console.error("Error calculating weekly stats:", error);
+      }
+    };
+
+    calculateWeeklyStats();
+  }, [firstName, lastName]);
 
   const handleReturn = async () => {
     setIsProcessing(true);
@@ -109,12 +164,21 @@ const PostSignoutConfirmation = ({
           
           <Button 
             size="lg"
-            className="text-2xl py-8 px-16 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl shadow-lg transform hover:scale-105 transition-all duration-200"
+            className="text-2xl py-8 px-16 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl shadow-lg transform hover:scale-105 transition-all duration-200 mb-12"
             onClick={handleReturn}
             disabled={isProcessing}
           >
             {isProcessing ? "Processing..." : "Returned"}
           </Button>
+
+          <div className="text-sm text-gray-500 space-y-2">
+            <p>
+              You've been out {weeklyStats.tripCount} times for a total of {weeklyStats.totalMinutes} minutes this week.
+            </p>
+            <p>
+              The average time out was {weeklyStats.averageMinutes} minutes.
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
