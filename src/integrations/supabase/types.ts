@@ -9,7 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      Hall_Passes: {
+        Row: {
+          dayOfWeek: string | null
+          duration: number | null
+          id: string
+          period: string | null
+          studentName: string | null
+          timeIn: string | null
+          timeOut: string | null
+        }
+        Insert: {
+          dayOfWeek?: string | null
+          duration?: number | null
+          id?: string
+          period?: string | null
+          studentName?: string | null
+          timeIn?: string | null
+          timeOut?: string | null
+        }
+        Update: {
+          dayOfWeek?: string | null
+          duration?: number | null
+          id?: string
+          period?: string | null
+          studentName?: string | null
+          timeIn?: string | null
+          timeOut?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

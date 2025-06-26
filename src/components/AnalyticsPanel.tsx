@@ -1,7 +1,19 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Clock, Users, BarChart3 } from "lucide-react";
-import { Analytics } from "@/lib/types";
+
+interface Analytics {
+  totalTripsToday: number;
+  mostFrequentToday: { name: string; count: number }[];
+  mostFrequentWeek: { name: string; count: number }[];
+  longestTripToday: {
+    duration: number;
+    student: string;
+  };
+  tripsPerPeriod: { [period: string]: number };
+  averageDuration: number;
+}
 
 interface AnalyticsPanelProps {
   analytics: Analytics;

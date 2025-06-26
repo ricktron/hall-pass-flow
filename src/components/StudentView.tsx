@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { addBathroomRecord } from "@/lib/dataManager";
+import { addHallPassRecord } from "@/lib/supabaseDataManager";
 import PostSignoutConfirmation from "./PostSignoutConfirmation";
 
 interface StudentViewProps {
@@ -26,6 +26,10 @@ const DESTINATIONS = [
   "Early Dismissal",
   "Football Meeting",
   "Other"
+];
+
+const DAYS_OF_WEEK = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 ];
 
 const StudentView = ({ onBack }: StudentViewProps) => {
@@ -52,19 +56,28 @@ const StudentView = ({ onBack }: StudentViewProps) => {
 
     try {
       const now = new Date();
+      const studentName = `${firstName.trim()} ${lastName.trim()}`;
+      const dayOfWeek = DAYS_OF_WEEK[now.getDay()];
       
-      await addBathroomRecord({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+      const success = await addHallPassRecord({
+        studentName,
         period: selectedPeriod,
-        destination: selectedDestination,
         timeOut: now,
         timeIn: null,
+        duration: null,
+        dayOfWeek
       });
-      
-      // Store signout time and show confirmation screen
-      setSignoutTime(now);
-      setShowConfirmation(true);
+
+      if (success) {
+        setSignoutTime(now);
+        setShowConfirmation(true);
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to sign out. Please try again.",
+          variant: "destructive",
+        });
+      }
     } catch (error) {
       toast({
         title: "Error",
@@ -88,10 +101,10 @@ const StudentView = ({ onBack }: StudentViewProps) => {
 
   // Show confirmation screen after sign-out
   if (showConfirmation && signoutTime) {
+    const studentName = `${firstName.trim()} ${lastName.trim()}`;
     return (
       <PostSignoutConfirmation
-        firstName={firstName}
-        lastName={lastName}
+        studentName={studentName}
         period={selectedPeriod}
         timeOut={signoutTime}
         onComplete={handleConfirmationComplete}

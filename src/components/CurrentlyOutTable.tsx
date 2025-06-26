@@ -4,11 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCheck, AlertTriangle } from "lucide-react";
-import { BathroomRecord } from "@/lib/types";
+import { HallPassRecord } from "@/lib/supabaseDataManager";
 
 interface CurrentlyOutTableProps {
-  records: BathroomRecord[];
-  onMarkReturn: (firstName: string, lastName: string, period: string) => void;
+  records: HallPassRecord[];
+  onMarkReturn: (studentName: string, period: string) => void;
 }
 
 const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) => {
@@ -35,6 +35,12 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
     if (minutes < 5) return "default";
     if (minutes <= 10) return "secondary";
     return "destructive";
+  };
+
+  const getRowColor = (minutes: number) => {
+    if (minutes < 5) return "";
+    if (minutes <= 10) return "bg-yellow-50";
+    return "bg-red-50";
   };
 
   if (records.length === 0) {
@@ -88,10 +94,10 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                   return (
                     <tr 
                       key={record.id} 
-                      className={`border-b hover:bg-gray-50 ${isOverLimit ? 'bg-red-50' : ''}`}
+                      className={`border-b hover:bg-gray-50 ${getRowColor(elapsed)}`}
                     >
                       <td className="py-3 px-2 font-medium">
-                        {record.firstName} {record.lastName}
+                        {record.studentName}
                         {isOverLimit && (
                           <AlertTriangle className="w-4 h-4 text-red-500 inline ml-2" />
                         )}
@@ -114,7 +120,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                         <Button
                           size="sm"
                           variant={isOverLimit ? "destructive" : "outline"}
-                          onClick={() => onMarkReturn(record.firstName, record.lastName, record.period)}
+                          onClick={() => onMarkReturn(record.studentName, record.period)}
                         >
                           <UserCheck className="w-4 h-4 mr-1" />
                           Mark Returned

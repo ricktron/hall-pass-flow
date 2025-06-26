@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Users, Clock, TrendingUp, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getAllRecords, updateReturnTime, getAnalytics } from "@/lib/dataManager";
-import { BathroomRecord, Analytics } from "@/lib/types";
+import { getCurrentlyOutRecords, updateReturnTime, getAnalytics } from "@/lib/supabaseDataManager";
+import { HallPassRecord } from "@/lib/supabaseDataManager";
 import CurrentlyOutTable from "@/components/CurrentlyOutTable";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
 
@@ -15,8 +15,20 @@ interface TeacherViewProps {
   onBack: () => void;
 }
 
+interface Analytics {
+  totalTripsToday: number;
+  mostFrequentToday: { name: string; count: number }[];
+  mostFrequentWeek: { name: string; count: number }[];
+  longestTripToday: {
+    duration: number;
+    student: string;
+  };
+  tripsPerPeriod: { [period: string]: number };
+  averageDuration: number;
+}
+
 const TeacherView = ({ onBack }: TeacherViewProps) => {
-  const [records, setRecords] = useState<BathroomRecord[]>([]);
+  const [records, setRecords] = useState<HallPassRecord[]>([]);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [filterPeriod, setFilterPeriod] = useState("all");
   const [filterStudent, setFilterStudent] = useState("");
@@ -24,9 +36,9 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
   const loadData = async () => {
     try {
-      const allRecords = await getAllRecords();
+      const currentlyOut = await getCurrentlyOutRecords();
       const analyticsData = await getAnalytics();
-      setRecords(allRecords);
+      setRecords(currentlyOut);
       setAnalytics(analyticsData);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -39,12 +51,12 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleMarkReturn = async (firstName: string, lastName: string, period: string) => {
-    const success = await updateReturnTime(firstName, lastName, period, new Date());
+  const handleMarkReturn = async (studentName: string, period: string) => {
+    const success = await updateReturnTime(studentName, period);
     if (success) {
       toast({
         title: "Student Marked Returned",
-        description: `${firstName} ${lastName} has been marked as returned.`,
+        description: `${studentName} has been marked as returned.`,
       });
       loadData();
     } else {
@@ -57,11 +69,10 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   };
 
   // Filter currently out students
-  const currentlyOut = records.filter(record => !record.timeIn);
-  const filteredOut = currentlyOut.filter(record => {
+  const filteredOut = records.filter(record => {
     const periodMatch = filterPeriod === "all" || record.period === filterPeriod;
     const studentMatch = filterStudent === "" || 
-      `${record.firstName} ${record.lastName}`.toLowerCase().includes(filterStudent.toLowerCase());
+      record.studentName.toLowerCase().includes(filterStudent.toLowerCase());
     return periodMatch && studentMatch;
   });
 
@@ -89,7 +100,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 <Users className="w-8 h-8 text-blue-500 mr-3" />
                 <div>
                   <p className="text-sm font-medium text-gray-600">Currently Out</p>
-                  <p className="text-2xl font-bold">{currentlyOut.length}</p>
+                  <p className="text-2xl font-bold">{records.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -102,7 +113,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Over 10 Min</p>
                   <p className="text-2xl font-bold text-red-600">
-                    {currentlyOut.filter(record => {
+                    {records.filter(record => {
                       const elapsed = Date.now() - record.timeOut.getTime();
                       return elapsed > 10 * 60 * 1000;
                     }).length}

@@ -4,20 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateReturnTime, getAllRecords } from "@/lib/dataManager";
-import { BathroomRecord } from "@/lib/types";
+import { updateReturnTime, getWeeklyStats } from "@/lib/supabaseDataManager";
 
 interface PostSignoutConfirmationProps {
-  firstName: string;
-  lastName: string;
+  studentName: string;
   period: string;
   timeOut: Date;
   onComplete: () => void;
 }
 
 const PostSignoutConfirmation = ({ 
-  firstName, 
-  lastName, 
+  studentName, 
   period, 
   timeOut, 
   onComplete 
@@ -50,56 +47,20 @@ const PostSignoutConfirmation = ({
   useEffect(() => {
     const calculateWeeklyStats = async () => {
       try {
-        const records = await getAllRecords();
-        
-        // Get start of current week (Monday)
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        const dayOfWeek = now.getDay();
-        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Sunday = 0, so Sunday needs to go back 6 days
-        startOfWeek.setDate(now.getDate() - daysToMonday);
-        startOfWeek.setHours(0, 0, 0, 0);
-
-        // Filter records for this student this week where both timeOut and timeIn exist
-        const studentWeeklyRecords = records.filter((record: BathroomRecord) => 
-          record.firstName === firstName &&
-          record.lastName === lastName &&
-          record.timeOut >= startOfWeek &&
-          record.timeIn !== null
-        );
-
-        const tripCount = studentWeeklyRecords.length;
-        let totalMinutes = 0;
-
-        if (tripCount > 0) {
-          totalMinutes = studentWeeklyRecords.reduce((sum: number, record: BathroomRecord) => {
-            if (record.timeIn) {
-              const duration = record.timeIn.getTime() - record.timeOut.getTime();
-              return sum + (duration / (1000 * 60)); // Convert to minutes
-            }
-            return sum;
-          }, 0);
-        }
-
-        const averageMinutes = tripCount > 0 ? Math.round(totalMinutes / tripCount) : 0;
-
-        setWeeklyStats({
-          tripCount,
-          totalMinutes: Math.round(totalMinutes),
-          averageMinutes
-        });
+        const stats = await getWeeklyStats(studentName);
+        setWeeklyStats(stats);
       } catch (error) {
         console.error("Error calculating weekly stats:", error);
       }
     };
 
     calculateWeeklyStats();
-  }, [firstName, lastName]);
+  }, [studentName]);
 
   const handleReturn = async () => {
     setIsProcessing(true);
     try {
-      const success = await updateReturnTime(firstName, lastName, period, new Date());
+      const success = await updateReturnTime(studentName, period);
       
       if (success) {
         setIsReturned(true);
@@ -130,6 +91,8 @@ const PostSignoutConfirmation = ({
     }
   };
 
+  const firstName = studentName.split(' ')[0];
+  const lastName = studentName.split(' ').slice(1).join(' ');
   const lastInitial = lastName.charAt(0).toUpperCase();
 
   if (isReturned) {
