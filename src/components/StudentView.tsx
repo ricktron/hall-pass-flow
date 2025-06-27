@@ -26,25 +26,27 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [showForm, setShowForm] = useState(true);
 
   // Load currently out students on component mount and periodically
-  useEffect(() => {
-    const loadCurrentStudents = async () => {
-      const records = await getCurrentlyOutRecords();
-      const studentRecords = records.map(record => ({
-        studentName: record.studentName,
-        period: record.period,
-        timeOut: record.timeOut,
-        destination: record.destination || 'Unknown'
-      }));
-      setCurrentStudents(studentRecords);
-    };
+  const loadCurrentStudents = async () => {
+    const records = await getCurrentlyOutRecords();
+    const studentRecords = records.map(record => ({
+      studentName: record.studentName,
+      period: record.period,
+      timeOut: record.timeOut,
+      destination: record.destination || 'Unknown'
+    }));
+    setCurrentStudents(studentRecords);
+    return studentRecords;
+  };
 
+  useEffect(() => {
     loadCurrentStudents();
     const interval = setInterval(loadCurrentStudents, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
   }, []);
 
-  const handleSignOut = (studentRecord: StudentRecord) => {
-    setCurrentStudents(prev => [...prev, studentRecord]);
+  const handleSignOut = async (studentRecord: StudentRecord) => {
+    // Reload the current students to get the most up-to-date list
+    const updatedStudents = await loadCurrentStudents();
     setShowForm(false);
   };
 
@@ -59,10 +61,9 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     setShowForm(true);
   };
 
-  const handleStudentReturn = (studentName: string, period: string) => {
-    setCurrentStudents(prev => 
-      prev.filter(s => !(s.studentName === studentName && s.period === period))
-    );
+  const handleStudentReturn = async (studentName: string, period: string) => {
+    // Reload students after return to get accurate list
+    await loadCurrentStudents();
   };
 
   const handleSignOutAnother = () => {

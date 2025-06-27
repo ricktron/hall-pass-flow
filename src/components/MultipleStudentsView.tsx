@@ -28,6 +28,7 @@ const DESTINATION_COLORS = {
 const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsViewProps) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [weeklyAverage, setWeeklyAverage] = useState(0);
+  const [currentAverage, setCurrentAverage] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -36,6 +37,20 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Calculate current average of students who are out right now
+  useEffect(() => {
+    if (records.length > 0) {
+      const totalMinutes = records.reduce((sum, record) => {
+        const elapsedMinutes = getElapsedMinutes(record.timeOut);
+        return sum + elapsedMinutes;
+      }, 0);
+      const average = Math.round(totalMinutes / records.length);
+      setCurrentAverage(average);
+    } else {
+      setCurrentAverage(0);
+    }
+  }, [records, currentTime]);
 
   const loadWeeklyAverage = async () => {
     try {
@@ -120,12 +135,17 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     }
   };
 
+  // Fix the name formatting - don't over-abbreviate
   const formatStudentName = (fullName: string) => {
-    const parts = fullName.split(' ');
-    if (parts.length > 1) {
-      return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+    const parts = fullName.trim().split(' ');
+    if (parts.length === 1) {
+      return fullName; // Just first name
     }
-    return fullName;
+    if (parts.length === 2) {
+      return fullName; // First and last name, show both
+    }
+    // For 3+ names, show first name and last initial
+    return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
   };
 
   return (
@@ -187,10 +207,15 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
             {records.length > 0 && (
               <div className="text-center p-4 bg-gray-50 rounded-lg mt-6">
                 <div className="text-lg font-semibold text-gray-700">
-                  Average Time Out: {weeklyAverage} minutes
+                  Current Average Time Out: {currentAverage} minutes
                   <div className="text-sm text-gray-500 mt-1">
-                    (Based on completed trips from past 7 days)
+                    (Average of students currently out)
                   </div>
+                  {weeklyAverage > 0 && (
+                    <div className="text-sm text-gray-500 mt-2">
+                      Weekly average from completed trips: {weeklyAverage} minutes
+                    </div>
+                  )}
                 </div>
               </div>
             )}
