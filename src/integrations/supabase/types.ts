@@ -12,6 +12,7 @@ export type Database = {
       Hall_Passes: {
         Row: {
           dayOfWeek: string | null
+          destination: string | null
           duration: number | null
           id: string
           period: string | null
@@ -21,6 +22,7 @@ export type Database = {
         }
         Insert: {
           dayOfWeek?: string | null
+          destination?: string | null
           duration?: number | null
           id?: string
           period?: string | null
@@ -30,6 +32,7 @@ export type Database = {
         }
         Update: {
           dayOfWeek?: string | null
+          destination?: string | null
           duration?: number | null
           id?: string
           period?: string | null
