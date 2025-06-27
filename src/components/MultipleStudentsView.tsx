@@ -31,6 +31,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
   const [currentAverage, setCurrentAverage] = useState(0);
   const { toast } = useToast();
 
+  // Update current time every second for real-time calculations
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(new Date());
@@ -38,11 +39,13 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate current average of students who are out right now
+  // Calculate real-time average of students currently out
   useEffect(() => {
     if (records.length > 0) {
+      const now = new Date();
       const totalMinutes = records.reduce((sum, record) => {
-        const elapsedMinutes = getElapsedMinutes(record.timeOut);
+        const elapsedMs = calculateElapsedTime(record.timeOut, now);
+        const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
         return sum + elapsedMinutes;
       }, 0);
       const average = Math.round(totalMinutes / records.length);
@@ -52,6 +55,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     }
   }, [records, currentTime]);
 
+  // Load historical weekly average from completed trips
   const loadWeeklyAverage = async () => {
     try {
       const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -80,7 +84,6 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
       }
 
       const durations = pastTrips.map(trip => {
-        // Use stored duration, but ensure it's a positive number
         const durationMinutes = Math.abs(Number(trip.duration) || 0);
         return Math.max(0, Math.round(durationMinutes));
       });
@@ -101,7 +104,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
 
   useEffect(() => {
     loadWeeklyAverage();
-  }, [records]); // Recalculate when records change
+  }, [records]);
 
   const getDurationColor = (minutes: number) => {
     if (minutes < 5) return "text-green-600";
@@ -125,7 +128,6 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
         description: `${studentName} has been marked as returned.`,
       });
       onRefresh();
-      // Recalculate average after marking return
       loadWeeklyAverage();
     } else {
       toast({
@@ -136,7 +138,6 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     }
   };
 
-  // Format student name properly - don't over-abbreviate
   const formatStudentName = (fullName: string) => {
     if (!fullName || fullName.trim() === '') {
       return 'Unknown Student';
@@ -144,19 +145,16 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     
     const trimmedName = fullName.trim();
     
-    // If it's already a short name or single word, return as is
     if (trimmedName.length <= 15 || !trimmedName.includes(' ')) {
       return trimmedName;
     }
     
     const parts = trimmedName.split(' ');
     
-    // For names with 2 parts, show full name if reasonable length
     if (parts.length === 2 && trimmedName.length <= 25) {
       return trimmedName;
     }
     
-    // Only abbreviate if the name is very long
     if (trimmedName.length > 25) {
       return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
     }
@@ -187,8 +185,8 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
           </CardHeader>
           <CardContent className="space-y-4">
             {records.map((record) => {
-              const elapsedMs = calculateElapsedTime(record.timeOut);
-              const elapsedMinutes = getElapsedMinutes(record.timeOut);
+              const elapsedMs = calculateElapsedTime(record.timeOut, currentTime);
+              const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
               const studentName = formatStudentName(record.studentName);
               
               return (
@@ -228,7 +226,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
                 <div className="text-lg font-semibold text-gray-700">
                   Current Average Time Out: {currentAverage} minutes
                   <div className="text-sm text-gray-500 mt-1">
-                    (Average of students currently out)
+                    (Real-time average of students currently out)
                   </div>
                   {weeklyAverage > 0 && (
                     <div className="text-sm text-gray-500 mt-2">

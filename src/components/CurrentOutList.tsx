@@ -1,10 +1,11 @@
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateReturnTime } from "@/lib/supabaseDataManager";
-import { getElapsedMinutes } from "@/lib/timeUtils";
+import { getElapsedMinutes, calculateElapsedTime } from "@/lib/timeUtils";
 import OutTimer from "./OutTimer";
 
 interface StudentRecord {
@@ -21,7 +22,16 @@ interface CurrentOutListProps {
 }
 
 const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: CurrentOutListProps) => {
+  const [currentTime, setCurrentTime] = useState(new Date());
   const { toast } = useToast();
+
+  // Update current time every second for real-time calculations
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleMarkReturn = async (studentName: string, period: string) => {
     const success = await updateReturnTime(studentName, period);
@@ -41,7 +51,8 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
   };
 
   const getBackgroundColor = (timeOut: Date) => {
-    const elapsedMinutes = getElapsedMinutes(timeOut);
+    const elapsedMs = calculateElapsedTime(timeOut, currentTime);
+    const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
     if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';
     if (elapsedMinutes < 10) return 'bg-yellow-100 border-yellow-300';
     return 'bg-red-100 border-red-300';
@@ -51,7 +62,8 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
     if (students.length === 0) return 0;
     
     const totalMinutes = students.reduce((sum, student) => {
-      const elapsed = getElapsedMinutes(student.timeOut);
+      const elapsedMs = calculateElapsedTime(student.timeOut, currentTime);
+      const elapsed = Math.floor(elapsedMs / (1000 * 60));
       return sum + elapsed;
     }, 0);
     
@@ -59,7 +71,6 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
     return average;
   };
 
-  // Format student name properly
   const formatStudentName = (fullName: string) => {
     if (!fullName || fullName.trim() === '') {
       return 'Unknown Student';
@@ -67,19 +78,16 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
     
     const trimmedName = fullName.trim();
     
-    // If it's already a short name or single word, return as is
     if (trimmedName.length <= 15 || !trimmedName.includes(' ')) {
       return trimmedName;
     }
     
     const parts = trimmedName.split(' ');
     
-    // For names with 2 parts, show full name if reasonable length
     if (parts.length === 2 && trimmedName.length <= 25) {
       return trimmedName;
     }
     
-    // Only abbreviate if the name is very long
     if (trimmedName.length > 25) {
       return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
     }
@@ -136,6 +144,9 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
           <div className="text-center p-4 bg-gray-50 rounded-lg">
             <div className="text-lg font-semibold text-gray-700">
               Average Time Out: {getAverageTime()} minutes
+              <div className="text-sm text-gray-500 mt-1">
+                (Real-time average of students currently out)
+              </div>
             </div>
           </div>
         )}

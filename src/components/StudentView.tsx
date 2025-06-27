@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -24,7 +25,6 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
   const [showForm, setShowForm] = useState(true);
 
-  // Load currently out students on component mount and periodically
   const loadCurrentStudents = async () => {
     const records = await getCurrentlyOutRecords();
     const studentRecords = records.map(record => ({
@@ -39,7 +39,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
 
   useEffect(() => {
     loadCurrentStudents();
-    const interval = setInterval(loadCurrentStudents, 5000); // Refresh every 5 seconds
+    const interval = setInterval(loadCurrentStudents, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -47,11 +47,14 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     // Reload the current students to get the most up-to-date list
     const updatedStudents = await loadCurrentStudents();
     
-    // Keep the form visible if there are multiple students or if this is the first student
-    if (updatedStudents.length >= 2) {
-      setShowForm(false); // Hide form for multi-student view
-    } else {
-      setShowForm(false); // Hide form for solo view
+    // Don't hide the form immediately - let the user see the updated list
+    // and decide if they want to sign out another student
+    if (updatedStudents.length === 1) {
+      // If this is the first student, show solo view
+      setShowForm(false);
+    } else if (updatedStudents.length >= 2) {
+      // If multiple students, show the list view
+      setShowForm(false);
     }
   };
 
@@ -70,10 +73,14 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     // Reload students after return to get accurate list
     const updatedStudents = await loadCurrentStudents();
     
-    // If no students are left out, show the form
+    // Adjust view based on remaining students
     if (updatedStudents.length === 0) {
       setShowForm(true);
+    } else if (updatedStudents.length === 1) {
+      // Switch to solo view if only one student remains
+      setShowForm(false);
     }
+    // If multiple students remain, stay in list view
   };
 
   const handleSignOutAnother = () => {
