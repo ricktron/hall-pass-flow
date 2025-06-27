@@ -1,3 +1,4 @@
+
 // Utility functions for consistent time handling throughout the app
 
 /**
@@ -8,36 +9,37 @@
  */
 export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | string | null): number => {
   try {
-    // Ensure we're working with proper UTC timestamps
-    const startTime = typeof timeOut === 'string' ? new Date(timeOut) : new Date(timeOut);
-    const endTime = timeIn ? (typeof timeIn === 'string' ? new Date(timeIn) : new Date(timeIn)) : new Date();
+    // Convert timeOut to UTC timestamp (milliseconds)
+    const startTime = new Date(timeOut).getTime(); // This automatically handles UTC conversion
     
-    console.log("calculateElapsedTime debug:", {
+    // Use current UTC time or provided timeIn
+    const endTime = timeIn ? new Date(timeIn).getTime() : Date.now();
+    
+    console.log("calculateElapsedTime UTC debug:", {
       timeOut,
       timeIn,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      startTimeValid: !isNaN(startTime.getTime()),
-      endTimeValid: !isNaN(endTime.getTime()),
-      startTimeMs: startTime.getTime(),
-      endTimeMs: endTime.getTime()
+      startTimeMs: startTime,
+      endTimeMs: endTime,
+      startTimeUTC: new Date(startTime).toISOString(),
+      endTimeUTC: new Date(endTime).toISOString(),
+      isValidStart: !isNaN(startTime),
+      isValidEnd: !isNaN(endTime)
     });
     
-    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+    if (isNaN(startTime) || isNaN(endTime)) {
       console.warn("Invalid date provided to calculateElapsedTime", { timeOut, timeIn });
       return 0;
     }
     
-    // Calculate elapsed time - endTime should be after startTime for positive result
-    const elapsed = endTime.getTime() - startTime.getTime();
-    console.log("Raw calculated elapsed time:", elapsed, "ms");
+    // Calculate elapsed time in milliseconds
+    const elapsed = endTime - startTime;
+    console.log("Raw calculated elapsed time (UTC):", elapsed, "ms");
     
-    // If we get a negative result, it means the timeOut is in the future
-    // This could happen due to server/client time differences
+    // If we get a negative result, something is wrong with the data
     if (elapsed < 0) {
-      console.warn("Negative elapsed time detected - timeOut appears to be in the future:", {
-        timeOut: startTime.toISOString(),
-        now: endTime.toISOString(),
+      console.warn("Negative elapsed time detected:", {
+        timeOut: new Date(startTime).toISOString(),
+        now: new Date(endTime).toISOString(),
         difference: elapsed
       });
       return 0;
