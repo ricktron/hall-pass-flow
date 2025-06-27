@@ -19,22 +19,48 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
   const getElapsedTime = () => {
     try {
       if (!timeOut || isNaN(timeOut.getTime())) {
+        console.warn("Invalid timeOut provided to OutTimer:", timeOut);
         return 0;
       }
-      return Math.abs(currentTime.getTime() - timeOut.getTime());
+      
+      // Convert both times to Central Time for accurate calculation
+      const centralTimeOptions: Intl.DateTimeFormatOptions = {
+        timeZone: "America/Chicago",
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      
+      const currentCentral = new Date(currentTime.toLocaleString("en-US", centralTimeOptions));
+      const timeOutCentral = new Date(timeOut.toLocaleString("en-US", centralTimeOptions));
+      
+      return Math.abs(currentCentral.getTime() - timeOutCentral.getTime());
     } catch (error) {
-      console.error("Error calculating elapsed time:", error);
+      console.error("Error calculating elapsed time:", error, { timeOut, currentTime });
       return 0;
     }
   };
 
   const formatElapsedTime = (milliseconds: number): string => {
-    const totalSeconds = Math.floor(Math.abs(milliseconds) / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
+    if (!milliseconds || milliseconds < 0) {
+      return "00:00:00";
+    }
     
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    try {
+      const totalSeconds = Math.floor(milliseconds / 1000);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    } catch (error) {
+      console.error("Error formatting elapsed time:", error);
+      return "00:00:00";
+    }
   };
 
   const elapsedMs = getElapsedTime();

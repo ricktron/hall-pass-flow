@@ -140,9 +140,17 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
     setIsSubmitting(true);
 
     try {
+      // Create timestamp in Central Time
       const now = new Date();
+      const centralTimeOptions: Intl.DateTimeFormatOptions = {
+        timeZone: "America/Chicago"
+      };
+      const centralTime = new Date(now.toLocaleString("en-US", centralTimeOptions));
+      
       const studentName = `${firstName.trim()} ${lastName.trim()}`;
-      const dayOfWeek = DAYS_OF_WEEK[now.getDay()];
+      const dayOfWeek = DAYS_OF_WEEK[centralTime.getDay()];
+      
+      // Infer early dismissal from destination
       const isEarlyDismissal = selectedDestination === 'Early Dismissal';
       
       // Check for duplicate entry only if not early dismissal
@@ -166,7 +174,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
       const success = await addHallPassRecord({
         studentName,
         period: selectedPeriod,
-        timeOut: now,
+        timeOut: centralTime,
         timeIn: null,
         duration: null,
         dayOfWeek,
@@ -183,7 +191,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
           onSignOut({
             studentName,
             period: selectedPeriod,
-            timeOut: now,
+            timeOut: centralTime,
             destination: selectedDestination
           });
           resetForm();
