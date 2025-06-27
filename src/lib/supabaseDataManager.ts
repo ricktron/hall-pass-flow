@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface HallPassRecord {
@@ -84,7 +85,7 @@ export const getAllHallPassRecords = async (): Promise<HallPassRecord[]> => {
       return [];
     }
 
-    return data.map(record => ({
+    return (data || []).map(record => ({
       id: record.id,
       studentName: record.studentName || '',
       period: record.period || '',
@@ -180,7 +181,7 @@ export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
       return [];
     }
 
-    return data.map(record => ({
+    return (data || []).map(record => ({
       id: record.id,
       studentName: record.studentName || '',
       period: record.period || '',
@@ -210,7 +211,7 @@ export const getStudentNames = async (): Promise<string[]> => {
     }
 
     // Get unique student names
-    const uniqueNames = [...new Set(data.map(record => record.studentName).filter(Boolean))];
+    const uniqueNames = [...new Set((data || []).map(record => record.studentName).filter(Boolean))];
     return uniqueNames;
   } catch (error) {
     console.error("Error fetching student names:", error);
@@ -245,9 +246,9 @@ export const getWeeklyStats = async (studentName: string): Promise<{
       return { tripCount: 0, totalMinutes: 0, averageMinutes: 0 };
     }
 
-    const tripCount = data.length;
+    const tripCount = (data || []).length;
     // Recalculate duration for each record to ensure accuracy
-    const totalMinutes = data.reduce((sum, record) => {
+    const totalMinutes = (data || []).reduce((sum, record) => {
       if (record.timeIn && record.timeOut) {
         const timeOut = new Date(record.timeOut);
         const timeIn = new Date(record.timeIn);
@@ -295,13 +296,15 @@ export const getAnalytics = async () => {
       };
     }
 
+    const records = allRecords || [];
+
     // Filter records for today and this week
-    const todayRecords = allRecords.filter(record => {
+    const todayRecords = records.filter(record => {
       const recordDate = new Date(record.timeOut);
       return recordDate >= today && recordDate <= todayEnd;
     });
 
-    const weekRecords = allRecords.filter(record => {
+    const weekRecords = records.filter(record => {
       const recordDate = new Date(record.timeOut);
       return recordDate >= startOfWeek;
     });
@@ -311,11 +314,15 @@ export const getAnalytics = async () => {
     const weekFrequency: { [key: string]: number } = {};
 
     todayRecords.forEach(record => {
-      todayFrequency[record.studentName] = (todayFrequency[record.studentName] || 0) + 1;
+      if (record.studentName) {
+        todayFrequency[record.studentName] = (todayFrequency[record.studentName] || 0) + 1;
+      }
     });
 
     weekRecords.forEach(record => {
-      weekFrequency[record.studentName] = (weekFrequency[record.studentName] || 0) + 1;
+      if (record.studentName) {
+        weekFrequency[record.studentName] = (weekFrequency[record.studentName] || 0) + 1;
+      }
     });
 
     const mostFrequentToday = Object.entries(todayFrequency)
@@ -347,11 +354,13 @@ export const getAnalytics = async () => {
     // Calculate trips per period
     const tripsPerPeriod: { [key: string]: number } = {};
     todayRecords.forEach(record => {
-      tripsPerPeriod[record.period] = (tripsPerPeriod[record.period] || 0) + 1;
+      if (record.period) {
+        tripsPerPeriod[record.period] = (tripsPerPeriod[record.period] || 0) + 1;
+      }
     });
 
     // Calculate average duration for completed records - recalculate for accuracy
-    const completedRecords = allRecords.filter(record => record.timeIn && record.timeOut);
+    const completedRecords = records.filter(record => record.timeIn && record.timeOut);
     const averageDuration = completedRecords.length > 0 
       ? completedRecords.reduce((sum, record) => {
           const duration = Math.abs((new Date(record.timeIn!).getTime() - new Date(record.timeOut).getTime()) / (1000 * 60));

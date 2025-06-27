@@ -14,6 +14,7 @@ export type Database = {
           dayOfWeek: string | null
           destination: string | null
           duration: number | null
+          earlyDismissal: boolean | null
           id: string
           period: string | null
           studentName: string | null
@@ -24,6 +25,7 @@ export type Database = {
           dayOfWeek?: string | null
           destination?: string | null
           duration?: number | null
+          earlyDismissal?: boolean | null
           id?: string
           period?: string | null
           studentName?: string | null
@@ -34,6 +36,7 @@ export type Database = {
           dayOfWeek?: string | null
           destination?: string | null
           duration?: number | null
+          earlyDismissal?: boolean | null
           id?: string
           period?: string | null
           studentName?: string | null
