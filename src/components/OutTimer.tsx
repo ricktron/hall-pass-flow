@@ -11,33 +11,44 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
   const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
+    console.log("OutTimer useEffect triggered with timeOut:", timeOut);
+    
     const updateElapsed = () => {
       const now = new Date();
       const timeOutDate = new Date(timeOut);
       
-      console.log("OutTimer Debug:", {
+      console.log("OutTimer updateElapsed called:", {
         timeOut,
-        timeOutDate,
-        now,
+        timeOutDate: timeOutDate.toISOString(),
+        now: now.toISOString(),
         timeOutType: typeof timeOut,
         isValidTimeOut: !isNaN(timeOutDate.getTime()),
         isValidNow: !isNaN(now.getTime())
       });
       
       const elapsed = calculateElapsedTime(timeOut);
-      console.log("Calculated elapsed:", elapsed, "ms");
+      console.log("OutTimer - Calculated elapsed:", elapsed, "ms");
       
       setElapsedMs(elapsed);
     };
 
-    // Calculate immediately
+    // Calculate immediately on mount
+    console.log("OutTimer - Setting up initial calculation and interval");
     updateElapsed();
 
     // Set up interval to update every second
-    const interval = setInterval(updateElapsed, 1000);
+    const interval = setInterval(() => {
+      console.log("OutTimer - Interval tick");
+      updateElapsed();
+    }, 1000);
+
+    console.log("OutTimer - Interval set with ID:", interval);
 
     // Cleanup interval on unmount or when timeOut changes
-    return () => clearInterval(interval);
+    return () => {
+      console.log("OutTimer - Cleaning up interval:", interval);
+      clearInterval(interval);
+    };
   }, [timeOut]);
 
   const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
@@ -49,6 +60,7 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
   };
 
   console.log("OutTimer render:", {
+    timeOut,
     elapsedMs,
     elapsedMinutes,
     formattedTime: formatElapsedTime(elapsedMs)

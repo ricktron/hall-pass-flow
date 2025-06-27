@@ -1,4 +1,3 @@
-
 // Utility functions for consistent time handling throughout the app
 
 /**
@@ -9,14 +8,15 @@
  */
 export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | string | null): number => {
   try {
-    const startTime = new Date(timeOut);
-    const endTime = timeIn ? new Date(timeIn) : new Date();
+    // Ensure we're working with proper UTC timestamps
+    const startTime = typeof timeOut === 'string' ? new Date(timeOut) : new Date(timeOut);
+    const endTime = timeIn ? (typeof timeIn === 'string' ? new Date(timeIn) : new Date(timeIn)) : new Date();
     
     console.log("calculateElapsedTime debug:", {
       timeOut,
       timeIn,
-      startTime,
-      endTime,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
       startTimeValid: !isNaN(startTime.getTime()),
       endTimeValid: !isNaN(endTime.getTime()),
       startTimeMs: startTime.getTime(),
@@ -28,11 +28,22 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
       return 0;
     }
     
+    // Calculate elapsed time - endTime should be after startTime for positive result
     const elapsed = endTime.getTime() - startTime.getTime();
-    console.log("Calculated elapsed time:", elapsed, "ms");
+    console.log("Raw calculated elapsed time:", elapsed, "ms");
     
-    // Ensure we never return negative time
-    return Math.max(0, elapsed);
+    // If we get a negative result, it means the timeOut is in the future
+    // This could happen due to server/client time differences
+    if (elapsed < 0) {
+      console.warn("Negative elapsed time detected - timeOut appears to be in the future:", {
+        timeOut: startTime.toISOString(),
+        now: endTime.toISOString(),
+        difference: elapsed
+      });
+      return 0;
+    }
+    
+    return elapsed;
   } catch (error) {
     console.error("Error calculating elapsed time:", error);
     return 0;
