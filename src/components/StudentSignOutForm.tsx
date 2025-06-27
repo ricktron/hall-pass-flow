@@ -229,7 +229,7 @@ const StudentSignOutForm = ({ onSignOut }: StudentSignOutFormProps) => {
           <Checkbox 
             id="earlyDismissal" 
             checked={isEarlyDismissal}
-            onCheckedChange={setIsEarlyDismissal}
+            onCheckedChange={(checked) => setIsEarlyDismissal(checked === true)}
           />
           <Label htmlFor="earlyDismissal" className="text-sm font-medium">
             Early Dismissal (no return required)
