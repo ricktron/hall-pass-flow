@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCheck, AlertTriangle, Trash2 } from "lucide-react";
 import { HallPassRecord } from "@/lib/supabaseDataManager";
-import { calculateElapsedTime, formatElapsedTime, formatTorontoTime, getElapsedMinutes } from "@/lib/timeUtils";
+import { calculateElapsedTime, formatElapsedTime, formatLocalTime, getElapsedMinutes } from "@/lib/timeUtils";
 
 interface CurrentlyOutTableProps {
   records: HallPassRecord[];
@@ -78,7 +77,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
                 <th className="text-left py-2 px-2">Student</th>
                 <th className="text-left py-2 px-2">Period</th>
                 <th className="text-left py-2 px-2">Destination</th>
-                <th className="text-left py-2 px-2">Time Out (Toronto)</th>
+                <th className="text-left py-2 px-2">Time Out (Local)</th>
                 <th className="text-left py-2 px-2">Elapsed (HH:MM:SS)</th>
                 <th className="text-left py-2 px-2">Actions</th>
               </tr>
@@ -109,7 +108,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
                         <Badge variant="secondary">{record.destination || 'Unknown'}</Badge>
                       </td>
                       <td className="py-3 px-2 text-sm text-gray-600">
-                        {formatTorontoTime(record.timeOut)}
+                        {formatLocalTime(record.timeOut)}
                       </td>
                       <td className="py-3 px-2">
                         <Badge 
