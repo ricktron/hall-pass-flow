@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { formatElapsedTime, calculateElapsedTime } from "@/lib/timeUtils";
 
 interface OutTimerProps {
@@ -9,45 +9,22 @@ interface OutTimerProps {
 
 const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
   const [elapsedMs, setElapsedMs] = useState(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const mountedRef = useRef(true);
-  const timeOutRef = useRef(timeOut);
-
-  // Update timeOut ref when prop changes
-  useEffect(() => {
-    timeOutRef.current = timeOut;
-  }, [timeOut]);
 
   useEffect(() => {
-    mountedRef.current = true;
-    
     const updateElapsed = () => {
-      if (!mountedRef.current) return;
-      
-      try {
-        const elapsed = calculateElapsedTime(timeOutRef.current);
-        setElapsedMs(elapsed);
-      } catch (error) {
-        console.error("OutTimer - Error calculating elapsed time:", error);
-      }
+      const elapsed = calculateElapsedTime(timeOut);
+      setElapsedMs(elapsed);
     };
 
     // Calculate immediately
     updateElapsed();
 
-    // Set up interval - only create if we don't have one
-    if (!intervalRef.current) {
-      intervalRef.current = setInterval(updateElapsed, 1000);
-    }
+    // Set up interval to update every second
+    const interval = setInterval(updateElapsed, 1000);
 
-    return () => {
-      mountedRef.current = false;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, []); // Empty dependency array - we handle timeOut changes via ref
+    // Cleanup interval on unmount or when timeOut changes
+    return () => clearInterval(interval);
+  }, [timeOut]); // Include timeOut in dependency array so timer resets when it changes
 
   const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
 
