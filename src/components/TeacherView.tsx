@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Users, Clock, TrendingUp, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentlyOutRecords, updateReturnTime, getAnalytics, formatDurationMinutes, deleteHallPassRecord } from "@/lib/supabaseDataManager";
+import { getCurrentlyOutRecords, updateReturnTime, getAnalytics, deleteHallPassRecord } from "@/lib/supabaseDataManager";
+import { formatElapsedTime } from "@/lib/timeUtils";
 import { HallPassRecord } from "@/lib/supabaseDataManager";
 import CurrentlyOutTable from "@/components/CurrentlyOutTable";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
@@ -159,7 +159,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Avg Duration</p>
                   <p className="text-2xl font-bold">
-                    {analytics?.averageDuration ? formatDurationMinutes(analytics.averageDuration) : '00:00:00'}
+                    {analytics?.averageDuration ? formatElapsedTime(analytics.averageDuration * 60 * 1000) : '00:00:00'}
                   </p>
                 </div>
               </div>

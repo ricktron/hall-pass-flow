@@ -1,8 +1,7 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Clock, Users, BarChart3 } from "lucide-react";
-import { formatDurationMinutes } from "@/lib/supabaseDataManager";
+import { formatElapsedTime } from "@/lib/timeUtils";
 
 interface Analytics {
   totalTripsToday: number;
@@ -120,7 +119,7 @@ const AnalyticsPanel = ({ analytics }: AnalyticsPanelProps) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <div className="text-2xl font-bold text-blue-600">
-                {formatDurationMinutes(analytics.longestTripToday.duration)}
+                {formatElapsedTime(analytics.longestTripToday.duration * 60 * 1000)}
               </div>
               <div className="text-sm text-gray-600">Longest Trip Today</div>
               {analytics.longestTripToday.student && (
@@ -132,7 +131,7 @@ const AnalyticsPanel = ({ analytics }: AnalyticsPanelProps) => {
             
             <div className="text-center p-4 bg-gray-50 rounded-lg">
               <div className="text-2xl font-bold text-green-600">
-                {formatDurationMinutes(analytics.averageDuration)}
+                {formatElapsedTime(analytics.averageDuration * 60 * 1000)}
               </div>
               <div className="text-sm text-gray-600">Average Duration</div>
             </div>
