@@ -40,6 +40,27 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother, onComplet
     }
   };
 
+  const getElapsedMinutes = (timeOut: Date) => {
+    const now = new Date();
+    const elapsed = Math.abs(now.getTime() - timeOut.getTime());
+    return Math.floor(elapsed / (1000 * 60));
+  };
+
+  const getBackgroundColor = (timeOut: Date) => {
+    const elapsedMinutes = getElapsedMinutes(timeOut);
+    if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';
+    if (elapsedMinutes <= 10) return 'bg-yellow-100 border-yellow-300';
+    return 'bg-red-100 border-red-300';
+  };
+
+  const getAverageTime = () => {
+    if (students.length === 0) return 0;
+    const totalMinutes = students.reduce((sum, student) => {
+      return sum + getElapsedMinutes(student.timeOut);
+    }, 0);
+    return Math.round(totalMinutes / students.length);
+  };
+
   if (students.length === 0) {
     return null;
   }
@@ -55,18 +76,10 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother, onComplet
       <CardContent className="space-y-6">
         <div className="space-y-4">
           {students.map((student, index) => {
-            const elapsedMinutes = Math.floor(
-              (new Date().getTime() - student.timeOut.getTime()) / (1000 * 60)
-            );
-            
             return (
               <div 
                 key={`${student.studentName}-${student.period}-${index}`}
-                className={`p-4 rounded-lg border-2 ${
-                  elapsedMinutes > 10 ? 'bg-red-50 border-red-300' :
-                  elapsedMinutes > 5 ? 'bg-yellow-50 border-yellow-300' :
-                  'bg-green-50 border-green-300'
-                }`}
+                className={`p-4 rounded-lg border-2 ${getBackgroundColor(student.timeOut)}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
@@ -92,6 +105,14 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother, onComplet
             );
           })}
         </div>
+
+        {students.length > 1 && (
+          <div className="text-center p-4 bg-gray-50 rounded-lg">
+            <div className="text-lg font-semibold text-gray-700">
+              Average Time Out: {getAverageTime()} minutes
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-4 pt-4">
           <Button

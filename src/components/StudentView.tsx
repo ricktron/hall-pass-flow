@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import StudentSignOutForm from "./StudentSignOutForm";
 import CurrentOutList from "./CurrentOutList";
+import SoloStudentView from "./SoloStudentView";
+import HaveAGreatDayMessage from "./HaveAGreatDayMessage";
 
 interface StudentViewProps {
   onBack: () => void;
@@ -18,9 +20,21 @@ interface StudentRecord {
 
 const StudentView = ({ onBack }: StudentViewProps) => {
   const [currentStudents, setCurrentStudents] = useState<StudentRecord[]>([]);
+  const [showGreatDayMessage, setShowGreatDayMessage] = useState(false);
+  const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
 
   const handleSignOut = (studentRecord: StudentRecord) => {
     setCurrentStudents(prev => [...prev, studentRecord]);
+  };
+
+  const handleEarlyDismissal = (studentName: string) => {
+    setEarlyDismissalStudent(studentName);
+    setShowGreatDayMessage(true);
+  };
+
+  const handleGreatDayComplete = () => {
+    setShowGreatDayMessage(false);
+    setEarlyDismissalStudent("");
   };
 
   const handleStudentReturn = (studentName: string, period: string) => {
@@ -36,6 +50,28 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const handleComplete = () => {
     setCurrentStudents([]);
   };
+
+  // Show "Have a Great Day" message for early dismissals
+  if (showGreatDayMessage) {
+    return (
+      <HaveAGreatDayMessage 
+        studentName={earlyDismissalStudent}
+        onComplete={handleGreatDayComplete}
+      />
+    );
+  }
+
+  // Show solo view for single student
+  if (currentStudents.length === 1) {
+    return (
+      <SoloStudentView
+        student={currentStudents[0]}
+        onStudentReturn={handleStudentReturn}
+        onSignOutAnother={handleSignOutAnother}
+        onComplete={handleComplete}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
@@ -53,7 +89,10 @@ const StudentView = ({ onBack }: StudentViewProps) => {
         </div>
 
         <div className="space-y-6">
-          <StudentSignOutForm onSignOut={handleSignOut} />
+          <StudentSignOutForm 
+            onSignOut={handleSignOut} 
+            onEarlyDismissal={handleEarlyDismissal}
+          />
           <CurrentOutList 
             students={currentStudents}
             onStudentReturn={handleStudentReturn}

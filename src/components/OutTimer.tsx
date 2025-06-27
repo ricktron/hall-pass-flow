@@ -1,6 +1,5 @@
 
 import { useState, useEffect } from "react";
-import { getTorontoElapsedTime, formatElapsedTime } from "@/lib/supabaseDataManager";
 
 interface OutTimerProps {
   timeOut: Date;
@@ -22,11 +21,20 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
       if (!timeOut || isNaN(timeOut.getTime())) {
         return 0;
       }
-      return getTorontoElapsedTime(timeOut);
+      return Math.abs(currentTime.getTime() - timeOut.getTime());
     } catch (error) {
       console.error("Error calculating elapsed time:", error);
       return 0;
     }
+  };
+
+  const formatElapsedTime = (milliseconds: number): string => {
+    const totalSeconds = Math.floor(Math.abs(milliseconds) / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const elapsedMs = getElapsedTime();

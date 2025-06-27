@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { addHallPassRecord, getStudentNames } from "@/lib/supabaseDataManager";
+import { addHallPassRecord, getStudentNames, getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 
 interface StudentSignOutFormProps {
   onSignOut: (studentRecord: {
@@ -17,6 +17,7 @@ interface StudentSignOutFormProps {
     timeOut: Date;
     destination: string;
   }) => void;
+  onEarlyDismissal: (studentName: string) => void;
 }
 
 const PERIODS = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -36,7 +37,7 @@ const DAYS_OF_WEEK = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 ];
 
-const StudentSignOutForm = ({ onSignOut }: StudentSignOutFormProps) => {
+const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormProps) => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
@@ -83,6 +84,11 @@ const StudentSignOutForm = ({ onSignOut }: StudentSignOutFormProps) => {
     setIsEarlyDismissal(false);
   };
 
+  const checkForDuplicateEntry = async (studentName: string) => {
+    const currentlyOut = await getCurrentlyOutRecords();
+    return currentlyOut.some(record => record.studentName === studentName);
+  };
+
   const handleSubmit = async () => {
     if (!firstName.trim() || !lastName.trim() || !selectedPeriod || !selectedDestination) {
       toast({
@@ -100,6 +106,18 @@ const StudentSignOutForm = ({ onSignOut }: StudentSignOutFormProps) => {
       const studentName = `${firstName.trim()} ${lastName.trim()}`;
       const dayOfWeek = DAYS_OF_WEEK[now.getDay()];
       
+      // Check for duplicate entry
+      const isDuplicate = await checkForDuplicateEntry(studentName);
+      if (isDuplicate) {
+        toast({
+          title: "Student Already Out",
+          description: `${studentName} is already signed out. Please mark them as returned first.`,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+      
       const success = await addHallPassRecord({
         studentName,
         period: selectedPeriod,
@@ -113,10 +131,7 @@ const StudentSignOutForm = ({ onSignOut }: StudentSignOutFormProps) => {
 
       if (success) {
         if (isEarlyDismissal) {
-          toast({
-            title: "Early Dismissal Recorded",
-            description: `${studentName} has been marked for early dismissal.`,
-          });
+          onEarlyDismissal(studentName);
           resetForm();
         } else {
           // Pass the student record to parent for tracking
