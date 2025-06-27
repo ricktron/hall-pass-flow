@@ -1,149 +1,217 @@
 
 import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle } from "lucide-react";
+import { Clock, CheckCircle, UserPlus, GraduationCap } from "lucide-react";
+import { formatElapsedTime, getTorontoElapsedTime, updateReturnTime, addHallPassRecord } from "@/lib/supabaseDataManager";
 import { useToast } from "@/hooks/use-toast";
-import { updateReturnTime, getWeeklyStats, formatDurationMinutes } from "@/lib/supabaseDataManager";
+
+interface StudentRecord {
+  studentName: string;
+  period: string;
+  timeOut: Date;
+  destination: string;
+}
 
 interface PostSignoutConfirmationProps {
   studentName: string;
   period: string;
   timeOut: Date;
+  destination: string;
   onComplete: () => void;
+  onSignOutAnother: (students: StudentRecord[]) => void;
 }
+
+const DAYS_OF_WEEK = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+];
 
 const PostSignoutConfirmation = ({ 
   studentName, 
   period, 
   timeOut, 
-  onComplete 
+  destination,
+  onComplete,
+  onSignOutAnother
 }: PostSignoutConfirmationProps) => {
-  const [elapsedTime, setElapsedTime] = useState("00:00");
-  const [isReturned, setIsReturned] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [weeklyStats, setWeeklyStats] = useState({
-    tripCount: 0,
-    totalMinutes: 0,
-    averageMinutes: 0
-  });
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [students, setStudents] = useState<StudentRecord[]>([{ studentName, period, timeOut, destination }]);
   const { toast } = useToast();
 
   useEffect(() => {
-    const updateElapsedTime = () => {
-      const now = new Date();
-      const elapsed = now.getTime() - timeOut.getTime();
-      const minutes = Math.floor(elapsed / (1000 * 60));
-      const seconds = Math.floor((elapsed % (1000 * 60)) / 1000);
-      setElapsedTime(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
-    };
-
-    updateElapsedTime();
-    const interval = setInterval(updateElapsedTime, 1000);
-
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
     return () => clearInterval(interval);
-  }, [timeOut]);
+  }, []);
 
-  useEffect(() => {
-    const calculateWeeklyStats = async () => {
-      try {
-        const stats = await getWeeklyStats(studentName);
-        setWeeklyStats(stats);
-      } catch (error) {
-        console.error("Error calculating weekly stats:", error);
-      }
-    };
-
-    calculateWeeklyStats();
-  }, [studentName]);
-
-  const handleReturn = async () => {
-    setIsProcessing(true);
-    try {
-      const success = await updateReturnTime(studentName, period);
+  const handleMarkReturn = async (studentName: string, period: string) => {
+    const success = await updateReturnTime(studentName, period);
+    if (success) {
+      toast({
+        title: "Student Returned",
+        description: `${studentName} has been marked as returned.`,
+      });
       
+      // Remove student from the list
+      const updatedStudents = students.filter(s => !(s.studentName === studentName && s.period === period));
+      setStudents(updatedStudents);
+      
+      // If no students left, complete
+      if (updatedStudents.length === 0) {
+        onComplete();
+      }
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not mark student as returned.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEarlyDismissal = async (studentName: string, period: string) => {
+    try {
+      const now = new Date();
+      const dayOfWeek = DAYS_OF_WEEK[now.getDay()];
+      
+      const success = await addHallPassRecord({
+        studentName,
+        period,
+        timeOut: now,
+        timeIn: null,
+        duration: null,
+        dayOfWeek,
+        destination: "Early Dismissal",
+        earlyDismissal: true
+      });
+
       if (success) {
-        setIsReturned(true);
         toast({
-          title: "Success",
-          description: "You are now marked as returned.",
+          title: "Early Dismissal Recorded",
+          description: `${studentName} has been marked for early dismissal.`,
         });
         
-        // Auto-return to main screen after 2 seconds
-        setTimeout(() => {
+        // Remove student from the list
+        const updatedStudents = students.filter(s => !(s.studentName === studentName && s.period === period));
+        setStudents(updatedStudents);
+        
+        // If no students left, complete
+        if (updatedStudents.length === 0) {
           onComplete();
-        }, 2000);
+        }
       } else {
         toast({
           title: "Error",
-          description: "Could not mark return. Please try again.",
+          description: "Failed to record early dismissal.",
           variant: "destructive",
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Something went wrong. Please try again.",
+        description: "Something went wrong with early dismissal.",
         variant: "destructive",
       });
-    } finally {
-      setIsProcessing(false);
     }
   };
 
-  const firstName = studentName.split(' ')[0];
-  const lastName = studentName.split(' ').slice(1).join(' ');
-  const lastInitial = lastName.charAt(0).toUpperCase();
+  const handleAnotherOut = () => {
+    onSignOutAnother(students);
+  };
 
-  if (isReturned) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-2xl shadow-2xl">
-          <CardContent className="text-center py-16 px-8">
-            <CheckCircle className="w-24 h-24 text-green-500 mx-auto mb-8" />
-            <h1 className="text-4xl font-bold text-gray-800 mb-4">
-              You're now marked as returned.
-            </h1>
-            <p className="text-xl text-gray-600">
-              Returning to main screen...
-            </p>
+  const getElapsedTime = (timeOut: Date) => {
+    return getTorontoElapsedTime(timeOut);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto">
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center text-xl">
+              <Clock className="w-5 h-5 mr-2 text-blue-600" />
+              Students Currently Out ({students.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Student rows */}
+            <div className="space-y-4">
+              {students.map((student, index) => {
+                const elapsedMs = getElapsedTime(student.timeOut);
+                const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+                
+                return (
+                  <div 
+                    key={`${student.studentName}-${student.period}-${index}`}
+                    className={`p-4 rounded-lg border-2 ${
+                      elapsedMinutes > 10 ? 'bg-red-50 border-red-300' :
+                      elapsedMinutes > 5 ? 'bg-yellow-50 border-yellow-300' :
+                      'bg-green-50 border-green-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-4">
+                          <div className="font-bold text-lg">{student.studentName}</div>
+                          <div className="text-sm text-gray-600">Period {student.period}</div>
+                          <div className="text-sm text-gray-600">{student.destination}</div>
+                          <div className={`font-mono text-lg font-bold ${
+                            elapsedMinutes > 10 ? 'text-red-600' :
+                            elapsedMinutes > 5 ? 'text-yellow-600' :
+                            'text-green-600'
+                          }`}>
+                            {formatElapsedTime(elapsedMs)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="lg"
+                          className="bg-green-600 hover:bg-green-700 text-white px-6 py-3"
+                          onClick={() => handleMarkReturn(student.studentName, student.period)}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Returned
+                        </Button>
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="px-6 py-3"
+                          onClick={() => handleEarlyDismissal(student.studentName, student.period)}
+                        >
+                          <GraduationCap className="w-4 h-4 mr-2" />
+                          Early Dismissal
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex gap-4 pt-4">
+              <Button
+                size="lg"
+                variant="outline"
+                className="flex-1 py-3"
+                onClick={handleAnotherOut}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Another Out
+              </Button>
+              <Button
+                size="lg"
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700"
+                onClick={onComplete}
+              >
+                Done
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-3xl shadow-2xl">
-        <CardContent className="text-center py-16 px-8">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-800 mb-12 leading-tight">
-            {firstName} {lastInitial}. has been out for:
-          </h1>
-          
-          <div className="text-8xl md:text-9xl font-mono font-bold text-blue-600 mb-16">
-            {elapsedTime}
-          </div>
-          
-          <Button 
-            size="lg"
-            className="text-2xl py-8 px-16 bg-green-600 hover:bg-green-700 text-white font-bold rounded-2xl shadow-lg transform hover:scale-105 transition-all duration-200 mb-12"
-            onClick={handleReturn}
-            disabled={isProcessing}
-          >
-            {isProcessing ? "Processing..." : "Returned"}
-          </Button>
-
-          <div className="text-sm text-gray-500 space-y-2">
-            <p>
-              You've been out {weeklyStats.tripCount} times for a total of {formatDurationMinutes(weeklyStats.totalMinutes)} this week.
-            </p>
-            <p>
-              The average time out was {formatDurationMinutes(weeklyStats.averageMinutes)}.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

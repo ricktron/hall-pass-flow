@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,13 @@ import PostSignoutConfirmation from "./PostSignoutConfirmation";
 
 interface StudentViewProps {
   onBack: () => void;
+}
+
+interface StudentRecord {
+  studentName: string;
+  period: string;
+  timeOut: Date;
+  destination: string;
 }
 
 const PERIODS = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -39,7 +45,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [selectedDestination, setSelectedDestination] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [signoutTime, setSignoutTime] = useState<Date | null>(null);
+  const [currentStudents, setCurrentStudents] = useState<StudentRecord[]>([]);
   const [studentNames, setStudentNames] = useState<string[]>([]);
   const [filteredNames, setFilteredNames] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -113,7 +119,14 @@ const StudentView = ({ onBack }: StudentViewProps) => {
           setSelectedPeriod("");
           setSelectedDestination("");
         } else {
-          setSignoutTime(now);
+          // Add to current students and show confirmation
+          const newStudent: StudentRecord = {
+            studentName,
+            period: selectedPeriod,
+            timeOut: now,
+            destination: selectedDestination
+          };
+          setCurrentStudents([newStudent]);
           setShowConfirmation(true);
         }
       } else {
@@ -134,9 +147,19 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     }
   };
 
+  const handleSignOutAnother = (existingStudents: StudentRecord[]) => {
+    setCurrentStudents(existingStudents);
+    setShowConfirmation(false);
+    // Reset form
+    setFirstName("");
+    setLastName("");
+    setSelectedPeriod("");
+    setSelectedDestination("");
+  };
+
   const handleConfirmationComplete = () => {
     setShowConfirmation(false);
-    setSignoutTime(null);
+    setCurrentStudents([]);
     // Reset form
     setFirstName("");
     setLastName("");
@@ -145,14 +168,16 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   };
 
   // Show confirmation screen after sign-out
-  if (showConfirmation && signoutTime) {
-    const studentName = `${firstName.trim()} ${lastName.trim()}`;
+  if (showConfirmation && currentStudents.length > 0) {
+    const firstStudent = currentStudents[0];
     return (
       <PostSignoutConfirmation
-        studentName={studentName}
-        period={selectedPeriod}
-        timeOut={signoutTime}
+        studentName={firstStudent.studentName}
+        period={firstStudent.period}
+        timeOut={firstStudent.timeOut}
+        destination={firstStudent.destination}
         onComplete={handleConfirmationComplete}
+        onSignOutAnother={handleSignOutAnother}
       />
     );
   }
