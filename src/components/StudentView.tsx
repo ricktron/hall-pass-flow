@@ -1,11 +1,12 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import StudentSignOutForm from "./StudentSignOutForm";
 import CurrentOutList from "./CurrentOutList";
 import SoloStudentView from "./SoloStudentView";
 import HaveAGreatDayMessage from "./HaveAGreatDayMessage";
+import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 
 interface StudentViewProps {
   onBack: () => void;
@@ -23,6 +24,24 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [showGreatDayMessage, setShowGreatDayMessage] = useState(false);
   const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
   const [showForm, setShowForm] = useState(true);
+
+  // Load currently out students on component mount and periodically
+  useEffect(() => {
+    const loadCurrentStudents = async () => {
+      const records = await getCurrentlyOutRecords();
+      const studentRecords = records.map(record => ({
+        studentName: record.studentName,
+        period: record.period,
+        timeOut: record.timeOut,
+        destination: record.destination || 'Unknown'
+      }));
+      setCurrentStudents(studentRecords);
+    };
+
+    loadCurrentStudents();
+    const interval = setInterval(loadCurrentStudents, 5000); // Refresh every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSignOut = (studentRecord: StudentRecord) => {
     setCurrentStudents(prev => [...prev, studentRecord]);

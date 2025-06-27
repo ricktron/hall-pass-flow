@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { addHallPassRecord, getStudentNames, getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
+import { addHallPassRecord, getStudentNames, getCurrentlyOutRecords, updateReturnTime } from "@/lib/supabaseDataManager";
+import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 
 interface StudentSignOutFormProps {
   onSignOut: (studentRecord: {
@@ -17,6 +18,13 @@ interface StudentSignOutFormProps {
     destination: string;
   }) => void;
   onEarlyDismissal: (studentName: string) => void;
+}
+
+interface StudentRecord {
+  studentName: string;
+  period: string;
+  timeOut: Date;
+  destination: string;
 }
 
 const PERIODS = ["A", "B", "C", "D", "E", "F", "G", "H"];
@@ -46,6 +54,8 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   const [studentNames, setStudentNames] = useState<string[]>([]);
   const [filteredNames, setFilteredNames] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [currentlyOutStudents, setCurrentlyOutStudents] = useState<StudentRecord[]>([]);
+  const [showCurrentlyOut, setShowCurrentlyOut] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -68,6 +78,18 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
     }
   }, [firstName, studentNames]);
 
+  const loadCurrentlyOutStudents = async () => {
+    const records = await getCurrentlyOutRecords();
+    const studentRecords = records.map(record => ({
+      studentName: record.studentName,
+      period: record.period,
+      timeOut: record.timeOut,
+      destination: record.destination || 'Unknown'
+    }));
+    setCurrentlyOutStudents(studentRecords);
+    return studentRecords;
+  };
+
   const handleNameSelect = (fullName: string) => {
     const parts = fullName.split(' ');
     setFirstName(parts[0] || '');
@@ -85,6 +107,24 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   const checkForDuplicateEntry = async (studentName: string) => {
     const currentlyOut = await getCurrentlyOutRecords();
     return currentlyOut.some(record => record.studentName === studentName);
+  };
+
+  const handleStudentReturn = async (studentName: string, period: string) => {
+    const success = await updateReturnTime(studentName, period);
+    if (success) {
+      toast({
+        title: "Student Returned",
+        description: `${studentName} has been marked as returned.`,
+      });
+      // Refresh the currently out list
+      await loadCurrentlyOutStudents();
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not mark student as returned.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -109,9 +149,13 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
       if (!isEarlyDismissal) {
         const isDuplicate = await checkForDuplicateEntry(studentName);
         if (isDuplicate) {
+          // Load and show currently out students
+          await loadCurrentlyOutStudents();
+          setShowCurrentlyOut(true);
+          
           toast({
             title: "Student Already Out",
-            description: `${studentName} is already signed out. Please mark them as returned first.`,
+            description: `${studentName} is already signed out. See currently out students below.`,
             variant: "destructive",
           });
           setIsSubmitting(false);
@@ -144,6 +188,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
           });
           resetForm();
         }
+        setShowCurrentlyOut(false);
       } else {
         toast({
           title: "Error",
@@ -163,93 +208,103 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   };
 
   return (
-    <Card className="shadow-lg">
-      <CardHeader>
-        <CardTitle className="flex items-center text-xl">
-          <Clock className="w-5 h-5 mr-2 text-blue-600" />
-          Hall Pass
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2 relative">
-            <Label htmlFor="firstName">First Name</Label>
-            <Input
-              id="firstName"
-              type="text"
-              placeholder="Enter first name"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              onFocus={() => firstName.trim().length > 1 && setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            />
-            {showSuggestions && (
-              <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto">
-                {filteredNames.map((name, index) => (
-                  <div
-                    key={index}
-                    className="px-3 py-2 cursor-pointer hover:bg-gray-100"
-                    onClick={() => handleNameSelect(name)}
-                  >
-                    {name}
-                  </div>
-                ))}
-              </div>
-            )}
+    <div className="space-y-6">
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center text-xl">
+            <Clock className="w-5 h-5 mr-2 text-blue-600" />
+            Hall Pass
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2 relative">
+              <Label htmlFor="firstName">First Name</Label>
+              <Input
+                id="firstName"
+                type="text"
+                placeholder="Enter first name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                onFocus={() => firstName.trim().length > 1 && setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              />
+              {showSuggestions && (
+                <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                  {filteredNames.map((name, index) => (
+                    <div
+                      key={index}
+                      className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleNameSelect(name)}
+                    >
+                      {name}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name</Label>
+              <Input
+                id="lastName"
+                type="text"
+                placeholder="Enter last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </div>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="lastName">Last Name</Label>
-            <Input
-              id="lastName"
-              type="text"
-              placeholder="Enter last name"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-            />
+            <Label htmlFor="period">Class Period</Label>
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIODS.map((period) => (
+                  <SelectItem key={period} value={period}>
+                    Period {period}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="period">Class Period</Label>
-          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIODS.map((period) => (
-                <SelectItem key={period} value={period}>
-                  Period {period}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="destination">Destination</Label>
+            <Select value={selectedDestination} onValueChange={setSelectedDestination}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select destination" />
+              </SelectTrigger>
+              <SelectContent>
+                {DESTINATIONS.map((destination) => (
+                  <SelectItem key={destination} value={destination}>
+                    {destination}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="destination">Destination</Label>
-          <Select value={selectedDestination} onValueChange={setSelectedDestination}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select destination" />
-            </SelectTrigger>
-            <SelectContent>
-              {DESTINATIONS.map((destination) => (
-                <SelectItem key={destination} value={destination}>
-                  {destination}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          <Button 
+            className="w-full py-3 text-lg" 
+            onClick={handleSubmit}
+            disabled={isSubmitting || !firstName.trim() || !lastName.trim() || !selectedPeriod || !selectedDestination}
+          >
+            {isSubmitting ? "Processing..." : "Sign Out"}
+          </Button>
+        </CardContent>
+      </Card>
 
-        <Button 
-          className="w-full py-3 text-lg" 
-          onClick={handleSubmit}
-          disabled={isSubmitting || !firstName.trim() || !lastName.trim() || !selectedPeriod || !selectedDestination}
-        >
-          {isSubmitting ? "Processing..." : "Sign Out"}
-        </Button>
-      </CardContent>
-    </Card>
+      {showCurrentlyOut && currentlyOutStudents.length > 0 && (
+        <CurrentlyOutDisplay
+          students={currentlyOutStudents}
+          onStudentReturn={handleStudentReturn}
+          onClose={() => setShowCurrentlyOut(false)}
+        />
+      )}
+    </div>
   );
 };
 
