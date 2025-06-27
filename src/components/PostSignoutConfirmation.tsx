@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateReturnTime, getWeeklyStats } from "@/lib/supabaseDataManager";
+import { updateReturnTime, getWeeklyStats, formatDurationMinutes } from "@/lib/supabaseDataManager";
 
 interface PostSignoutConfirmationProps {
   studentName: string;
@@ -136,10 +136,10 @@ const PostSignoutConfirmation = ({
 
           <div className="text-sm text-gray-500 space-y-2">
             <p>
-              You've been out {weeklyStats.tripCount} times for a total of {weeklyStats.totalMinutes} minutes this week.
+              You've been out {weeklyStats.tripCount} times for a total of {formatDurationMinutes(weeklyStats.totalMinutes)} this week.
             </p>
             <p>
-              The average time out was {weeklyStats.averageMinutes} minutes.
+              The average time out was {formatDurationMinutes(weeklyStats.averageMinutes)}.
             </p>
           </div>
         </CardContent>

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface HallPassRecord {
@@ -127,7 +126,7 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
       .from('Hall_Passes')
       .update({ 
         timeIn: timeIn.toISOString(), 
-        duration: duration 
+        duration: Math.abs(duration) // Ensure duration is always positive
       })
       .eq('id', record.id);
 
@@ -199,7 +198,8 @@ export const getWeeklyStats = async (studentName: string): Promise<{
     }
 
     const tripCount = data.length;
-    const totalMinutes = data.reduce((sum, record) => sum + (record.duration || 0), 0);
+    // Ensure all durations are positive by taking absolute value
+    const totalMinutes = data.reduce((sum, record) => sum + Math.abs(record.duration || 0), 0);
     const averageMinutes = tripCount > 0 ? Math.round(totalMinutes / tripCount) : 0;
 
     return { tripCount, totalMinutes, averageMinutes };
