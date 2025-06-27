@@ -12,6 +12,8 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
     const startTime = new Date(timeOut);
     const endTime = timeIn ? new Date(timeIn) : new Date();
     
+    console.log("calculateElapsedTime - Input timeOut:", timeOut);
+    console.log("calculateElapsedTime - Input timeIn:", timeIn);
     console.log("calculateElapsedTime - startTime:", startTime);
     console.log("calculateElapsedTime - endTime:", endTime);
     console.log("calculateElapsedTime - startTime.getTime():", startTime.getTime());
@@ -24,7 +26,20 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
     
     const elapsed = endTime.getTime() - startTime.getTime();
     console.log("calculateElapsedTime - elapsed:", elapsed);
-    return Math.max(0, elapsed); // Ensure never negative
+    
+    // If elapsed is negative, it might be a timezone issue - log it but return 0
+    if (elapsed < 0) {
+      console.warn("calculateElapsedTime - Negative elapsed time detected:", {
+        timeOut,
+        timeIn: timeIn || 'now',
+        elapsed,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString()
+      });
+      return 0;
+    }
+    
+    return elapsed;
   } catch (error) {
     console.error("Error calculating elapsed time:", error);
     return 0;
@@ -40,6 +55,7 @@ export const formatElapsedTime = (milliseconds: number): string => {
   console.log("formatElapsedTime - input milliseconds:", milliseconds);
   
   if (!milliseconds || milliseconds < 0) {
+    console.log("formatElapsedTime - returning 00:00:00 for invalid input");
     return "00:00:00";
   }
   
@@ -92,7 +108,7 @@ export const calculateDurationMinutes = (timeOut: Date | string, timeIn: Date | 
 export const getElapsedMinutes = (timeOut: Date | string): number => {
   const elapsedMs = calculateElapsedTime(timeOut);
   const minutes = Math.floor(elapsedMs / (1000 * 60));
-  console.log("getElapsedMinutes - timeOut:", timeOut, "minutes:", minutes);
+  console.log("getElapsedMinutes - timeOut:", timeOut, "elapsedMs:", elapsedMs, "minutes:", minutes);
   return minutes;
 };
 

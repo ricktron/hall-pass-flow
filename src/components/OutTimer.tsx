@@ -1,9 +1,9 @@
 
 import { useState, useEffect } from "react";
-import { calculateElapsedTime, formatElapsedTime, getElapsedMinutes } from "@/lib/timeUtils";
+import { formatElapsedTime } from "@/lib/timeUtils";
 
 interface OutTimerProps {
-  timeOut: Date;
+  timeOut: Date | string;
   className?: string;
 }
 
@@ -14,14 +14,49 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
     // Add debugging
     console.log("OutTimer - Raw timeOut:", timeOut);
     console.log("OutTimer - timeOut type:", typeof timeOut);
-    console.log("OutTimer - timeOut as Date:", new Date(timeOut));
+    
+    // Ensure we have a valid timeOut value
+    if (!timeOut) {
+      console.warn("OutTimer - No timeOut provided");
+      return;
+    }
     
     const calculateAndSetElapsed = () => {
-      const outTime = new Date(timeOut);
-      const now = new Date();
-      const elapsed = now.getTime() - outTime.getTime();
-      console.log("OutTimer - Calculated elapsed ms:", elapsed);
-      setElapsedMs(Math.max(0, elapsed));
+      try {
+        // Convert timeOut to Date, handling both string and Date inputs
+        let outTime: Date;
+        if (typeof timeOut === 'string') {
+          outTime = new Date(timeOut);
+        } else {
+          outTime = new Date(timeOut);
+        }
+        
+        console.log("OutTimer - Parsed outTime:", outTime);
+        console.log("OutTimer - outTime.getTime():", outTime.getTime());
+        
+        // Check if date is valid
+        if (isNaN(outTime.getTime())) {
+          console.warn("OutTimer - Invalid date:", timeOut);
+          setElapsedMs(0);
+          return;
+        }
+        
+        const now = new Date();
+        console.log("OutTimer - Current time:", now);
+        console.log("OutTimer - now.getTime():", now.getTime());
+        
+        const elapsed = now.getTime() - outTime.getTime();
+        console.log("OutTimer - Raw elapsed ms:", elapsed);
+        
+        // Ensure we never show negative time (could happen with timezone issues)
+        const positiveElapsed = Math.max(0, elapsed);
+        console.log("OutTimer - Final elapsed ms:", positiveElapsed);
+        
+        setElapsedMs(positiveElapsed);
+      } catch (error) {
+        console.error("OutTimer - Error calculating elapsed time:", error);
+        setElapsedMs(0);
+      }
     };
 
     // Calculate immediately
