@@ -12,12 +12,18 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
     const startTime = new Date(timeOut);
     const endTime = timeIn ? new Date(timeIn) : new Date();
     
+    console.log("calculateElapsedTime - startTime:", startTime);
+    console.log("calculateElapsedTime - endTime:", endTime);
+    console.log("calculateElapsedTime - startTime.getTime():", startTime.getTime());
+    console.log("calculateElapsedTime - endTime.getTime():", endTime.getTime());
+    
     if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
       console.warn("Invalid date provided to calculateElapsedTime", { timeOut, timeIn });
       return 0;
     }
     
     const elapsed = endTime.getTime() - startTime.getTime();
+    console.log("calculateElapsedTime - elapsed:", elapsed);
     return Math.max(0, elapsed); // Ensure never negative
   } catch (error) {
     console.error("Error calculating elapsed time:", error);
@@ -31,6 +37,8 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
  * @returns Formatted time string
  */
 export const formatElapsedTime = (milliseconds: number): string => {
+  console.log("formatElapsedTime - input milliseconds:", milliseconds);
+  
   if (!milliseconds || milliseconds < 0) {
     return "00:00:00";
   }
@@ -41,7 +49,9 @@ export const formatElapsedTime = (milliseconds: number): string => {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    console.log("formatElapsedTime - formatted:", formatted);
+    return formatted;
   } catch (error) {
     console.error("Error formatting elapsed time:", error);
     return "00:00:00";
@@ -81,7 +91,9 @@ export const calculateDurationMinutes = (timeOut: Date | string, timeIn: Date | 
  */
 export const getElapsedMinutes = (timeOut: Date | string): number => {
   const elapsedMs = calculateElapsedTime(timeOut);
-  return Math.floor(elapsedMs / (1000 * 60));
+  const minutes = Math.floor(elapsedMs / (1000 * 60));
+  console.log("getElapsedMinutes - timeOut:", timeOut, "minutes:", minutes);
+  return minutes;
 };
 
 /**

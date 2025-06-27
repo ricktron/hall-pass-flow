@@ -8,18 +8,32 @@ interface OutTimerProps {
 }
 
 const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    // Add debugging
+    console.log("OutTimer - Raw timeOut:", timeOut);
+    console.log("OutTimer - timeOut type:", typeof timeOut);
+    console.log("OutTimer - timeOut as Date:", new Date(timeOut));
+    
+    const calculateAndSetElapsed = () => {
+      const outTime = new Date(timeOut);
+      const now = new Date();
+      const elapsed = now.getTime() - outTime.getTime();
+      console.log("OutTimer - Calculated elapsed ms:", elapsed);
+      setElapsedMs(Math.max(0, elapsed));
+    };
 
-  // Calculate elapsed time using UTC timestamps
-  const elapsedMs = calculateElapsedTime(timeOut);
-  const elapsedMinutes = getElapsedMinutes(timeOut);
+    // Calculate immediately
+    calculateAndSetElapsed();
+
+    // Then update every second
+    const interval = setInterval(calculateAndSetElapsed, 1000);
+    
+    return () => clearInterval(interval);
+  }, [timeOut]);
+
+  const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
 
   const getColorClass = () => {
     if (elapsedMinutes >= 10) return 'text-red-600';
