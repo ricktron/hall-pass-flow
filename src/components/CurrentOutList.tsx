@@ -40,8 +40,10 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
   };
 
   const getElapsedMinutes = (timeOut: Date) => {
+    // timeOut from Supabase is in UTC, calculate elapsed time directly
     const now = new Date();
-    const elapsed = Math.abs(now.getTime() - timeOut.getTime());
+    const timeOutUTC = new Date(timeOut);
+    const elapsed = Math.abs(now.getTime() - timeOutUTC.getTime());
     return Math.floor(elapsed / (1000 * 60));
   };
 

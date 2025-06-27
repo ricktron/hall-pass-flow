@@ -23,22 +23,12 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
         return 0;
       }
       
-      // Convert both times to Central Time for accurate calculation
-      const centralTimeOptions: Intl.DateTimeFormatOptions = {
-        timeZone: "America/Chicago",
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      };
+      // timeOut from Supabase is in UTC, convert to Central Time for calculation
+      const now = new Date();
+      const timeOutUTC = new Date(timeOut);
       
-      const currentCentral = new Date(currentTime.toLocaleString("en-US", centralTimeOptions));
-      const timeOutCentral = new Date(timeOut.toLocaleString("en-US", centralTimeOptions));
-      
-      return Math.abs(currentCentral.getTime() - timeOutCentral.getTime());
+      // Calculate elapsed time in milliseconds
+      return Math.abs(now.getTime() - timeOutUTC.getTime());
     } catch (error) {
       console.error("Error calculating elapsed time:", error, { timeOut, currentTime });
       return 0;
