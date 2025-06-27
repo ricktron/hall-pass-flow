@@ -1,51 +1,34 @@
-
 // Utility functions for consistent time handling throughout the app
 
 /**
- * Calculate elapsed time in milliseconds from a UTC timestamp
+ * Calculate elapsed time in seconds from a UTC timestamp
  * @param timeOut UTC timestamp from Supabase
- * @param timeIn Optional UTC timestamp for return time, defaults to now
- * @returns Elapsed time in milliseconds
+ * @returns Elapsed time in seconds
  */
-export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | string | null): number => {
+export const calculateElapsedTime = (timeOut: Date | string): number => {
   try {
-    // Convert timeOut to UTC timestamp (milliseconds)
-    const startTime = new Date(timeOut).getTime(); // This automatically handles UTC conversion
+    const startTime = new Date(timeOut).getTime(); // UTC milliseconds
+    const now = Date.now(); // Current UTC milliseconds
     
-    // Use current UTC time or provided timeIn
-    const endTime = timeIn ? new Date(timeIn).getTime() : Date.now();
-    
-    console.log("calculateElapsedTime UTC debug:", {
+    console.log("calculateElapsedTime:", {
       timeOut,
-      timeIn,
-      startTimeMs: startTime,
-      endTimeMs: endTime,
-      startTimeUTC: new Date(startTime).toISOString(),
-      endTimeUTC: new Date(endTime).toISOString(),
-      isValidStart: !isNaN(startTime),
-      isValidEnd: !isNaN(endTime)
+      startTime,
+      now,
+      startUTC: new Date(startTime).toISOString(),
+      nowUTC: new Date(now).toISOString()
     });
     
-    if (isNaN(startTime) || isNaN(endTime)) {
-      console.warn("Invalid date provided to calculateElapsedTime", { timeOut, timeIn });
+    if (isNaN(startTime)) {
+      console.warn("Invalid start time:", timeOut);
       return 0;
     }
     
-    // Calculate elapsed time in milliseconds
-    const elapsed = endTime - startTime;
-    console.log("Raw calculated elapsed time (UTC):", elapsed, "ms");
+    const diffMs = now - startTime;
+    const elapsedSeconds = Math.max(0, Math.floor(diffMs / 1000));
     
-    // If we get a negative result, something is wrong with the data
-    if (elapsed < 0) {
-      console.warn("Negative elapsed time detected:", {
-        timeOut: new Date(startTime).toISOString(),
-        now: new Date(endTime).toISOString(),
-        difference: elapsed
-      });
-      return 0;
-    }
+    console.log("Elapsed calculation:", { diffMs, elapsedSeconds });
     
-    return elapsed;
+    return elapsedSeconds;
   } catch (error) {
     console.error("Error calculating elapsed time:", error);
     return 0;
@@ -53,29 +36,20 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
 };
 
 /**
- * Format elapsed time in HH:MM:SS format
- * @param milliseconds Elapsed time in milliseconds
+ * Format elapsed seconds in HH:MM:SS format
+ * @param seconds Elapsed time in seconds
  * @returns Formatted time string
  */
-export const formatElapsedTime = (milliseconds: number): string => {
-  if (!milliseconds || milliseconds < 0) {
+export const formatElapsedTime = (seconds: number): string => {
+  if (!seconds || seconds < 0) {
     return "00:00:00";
   }
   
-  try {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    
-    const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    console.log("formatElapsedTime:", { milliseconds, totalSeconds, hours, minutes, seconds, formatted });
-    
-    return formatted;
-  } catch (error) {
-    console.error("Error formatting elapsed time:", error);
-    return "00:00:00";
-  }
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
 /**

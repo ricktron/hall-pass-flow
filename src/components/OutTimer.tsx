@@ -8,50 +8,31 @@ interface OutTimerProps {
 }
 
 const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
-  const [elapsedMs, setElapsedMs] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
-    console.log("OutTimer useEffect triggered with timeOut:", timeOut);
+    console.log("OutTimer mounted with timeOut:", timeOut);
     
-    const updateElapsed = () => {
-      const now = new Date();
-      const timeOutDate = new Date(timeOut);
-      
-      console.log("OutTimer updateElapsed called:", {
-        timeOut,
-        timeOutDate: timeOutDate.toISOString(),
-        now: now.toISOString(),
-        timeOutType: typeof timeOut,
-        isValidTimeOut: !isNaN(timeOutDate.getTime()),
-        isValidNow: !isNaN(now.getTime())
-      });
-      
-      const elapsed = calculateElapsedTime(timeOut);
-      console.log("OutTimer - Calculated elapsed:", elapsed, "ms");
-      
-      setElapsedMs(elapsed);
+    const updateTimer = () => {
+      const seconds = calculateElapsedTime(timeOut);
+      console.log("OutTimer update - elapsed seconds:", seconds);
+      setElapsedSeconds(seconds);
     };
 
-    // Calculate immediately on mount
-    console.log("OutTimer - Setting up initial calculation and interval");
-    updateElapsed();
+    // Calculate immediately
+    updateTimer();
 
     // Set up interval to update every second
-    const interval = setInterval(() => {
-      console.log("OutTimer - Interval tick");
-      updateElapsed();
-    }, 1000);
+    const interval = setInterval(updateTimer, 1000);
+    console.log("OutTimer interval started:", interval);
 
-    console.log("OutTimer - Interval set with ID:", interval);
-
-    // Cleanup interval on unmount or when timeOut changes
     return () => {
-      console.log("OutTimer - Cleaning up interval:", interval);
+      console.log("OutTimer cleanup, clearing interval:", interval);
       clearInterval(interval);
     };
   }, [timeOut]);
 
-  const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
 
   const getColorClass = () => {
     if (elapsedMinutes >= 10) return 'text-red-600';
@@ -61,14 +42,14 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
 
   console.log("OutTimer render:", {
     timeOut,
-    elapsedMs,
+    elapsedSeconds,
     elapsedMinutes,
-    formattedTime: formatElapsedTime(elapsedMs)
+    formattedTime: formatElapsedTime(elapsedSeconds)
   });
 
   return (
     <div className={`font-mono text-lg font-bold ${getColorClass()} ${className}`}>
-      {formatElapsedTime(elapsedMs)}
+      {formatElapsedTime(elapsedSeconds)}
     </div>
   );
 };
