@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCheck, AlertTriangle } from "lucide-react";
-import { HallPassRecord } from "@/lib/supabaseDataManager";
+import { HallPassRecord, formatElapsedTime } from "@/lib/supabaseDataManager";
 
 interface CurrentlyOutTableProps {
   records: HallPassRecord[];
@@ -20,6 +20,10 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const getElapsedMilliseconds = (timeOut: Date) => {
+    return currentTime.getTime() - timeOut.getTime();
+  };
 
   const getElapsedMinutes = (timeOut: Date) => {
     return Math.floor((currentTime.getTime() - timeOut.getTime()) / (1000 * 60));
@@ -80,7 +84,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                 <th className="text-left py-2 px-2">Student</th>
                 <th className="text-left py-2 px-2">Period</th>
                 <th className="text-left py-2 px-2">Time Out</th>
-                <th className="text-left py-2 px-2">Elapsed</th>
+                <th className="text-left py-2 px-2">Elapsed (HH:MM:SS)</th>
                 <th className="text-left py-2 px-2">Action</th>
               </tr>
             </thead>
@@ -88,13 +92,14 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
               {records
                 .sort((a, b) => getElapsedMinutes(b.timeOut) - getElapsedMinutes(a.timeOut))
                 .map((record) => {
-                  const elapsed = getElapsedMinutes(record.timeOut);
-                  const isOverLimit = elapsed > 10;
+                  const elapsedMinutes = getElapsedMinutes(record.timeOut);
+                  const elapsedMilliseconds = getElapsedMilliseconds(record.timeOut);
+                  const isOverLimit = elapsedMinutes > 10;
                   
                   return (
                     <tr 
                       key={record.id} 
-                      className={`border-b hover:bg-gray-50 ${getRowColor(elapsed)}`}
+                      className={`border-b hover:bg-gray-50 ${getRowColor(elapsedMinutes)}`}
                     >
                       <td className="py-3 px-2 font-medium">
                         {record.studentName}
@@ -110,10 +115,10 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                       </td>
                       <td className="py-3 px-2">
                         <Badge 
-                          variant={getElapsedBadge(elapsed)}
-                          className={getElapsedColor(elapsed)}
+                          variant={getElapsedBadge(elapsedMinutes)}
+                          className={getElapsedColor(elapsedMinutes)}
                         >
-                          {elapsed} min
+                          {formatElapsedTime(elapsedMilliseconds)}
                         </Badge>
                       </td>
                       <td className="py-3 px-2">

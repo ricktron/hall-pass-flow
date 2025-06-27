@@ -13,6 +13,40 @@ export interface HallPassRecord {
 
 export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
   try {
+    // First, check if the student already has an open trip
+    const { data: existingRecords, error: checkError } = await supabase
+      .from('Hall_Passes')
+      .select('*')
+      .eq('studentName', record.studentName)
+      .is('timeIn', null);
+
+    if (checkError) {
+      console.error("Error checking existing records:", checkError);
+      return false;
+    }
+
+    // If there's an existing open trip, close it first
+    if (existingRecords && existingRecords.length > 0) {
+      const openRecord = existingRecords[0];
+      const timeIn = new Date();
+      const timeOut = new Date(openRecord.timeOut);
+      const duration = Math.round((timeIn.getTime() - timeOut.getTime()) / (1000 * 60)); // duration in minutes
+
+      const { error: updateError } = await supabase
+        .from('Hall_Passes')
+        .update({ 
+          timeIn: timeIn.toISOString(), 
+          duration: duration 
+        })
+        .eq('id', openRecord.id);
+
+      if (updateError) {
+        console.error("Error closing existing record:", updateError);
+        return false;
+      }
+    }
+
+    // Now create the new record
     const { error } = await supabase
       .from('Hall_Passes')
       .insert([{
@@ -258,8 +292,8 @@ export const getAnalytics = async () => {
       tripsPerPeriod[record.period] = (tripsPerPeriod[record.period] || 0) + 1;
     });
 
-    // Calculate average duration
-    const completedRecords = allRecords.filter(record => record.duration !== null);
+    // Calculate average duration for completed records
+    const completedRecords = allRecords.filter(record => record.duration !== null && record.duration > 0);
     const averageDuration = completedRecords.length > 0 
       ? completedRecords.reduce((sum, record) => sum + (record.duration || 0), 0) / completedRecords.length
       : 0;
@@ -283,4 +317,23 @@ export const getAnalytics = async () => {
       averageDuration: 0
     };
   }
+};
+
+// Utility function to format time in HH:MM:SS
+export const formatElapsedTime = (milliseconds: number): string => {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  
+  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
+
+// Utility function to format duration in minutes to HH:MM:SS
+export const formatDurationMinutes = (minutes: number): string => {
+  const hours = Math.floor(minutes / 60);
+  const mins = Math.floor(minutes % 60);
+  const secs = Math.floor((minutes % 1) * 60);
+  
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
