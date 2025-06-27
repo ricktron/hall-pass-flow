@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,8 +50,8 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
   };
 
   const getBackgroundColor = (timeOut: Date) => {
-    const elapsedMs = calculateElapsedTime(timeOut, currentTime);
-    const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+    const elapsedSeconds = calculateElapsedTime(timeOut.toISOString());
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
     if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';
     if (elapsedMinutes < 10) return 'bg-yellow-100 border-yellow-300';
     return 'bg-red-100 border-red-300';
@@ -61,10 +60,9 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
   const getCurrentAverage = () => {
     if (students.length === 0) return 0;
     
-    const now = new Date();
     const totalMinutes = students.reduce((sum, student) => {
-      const elapsedMs = calculateElapsedTime(student.timeOut, now);
-      const elapsed = Math.floor(elapsedMs / (1000 * 60));
+      const elapsedSeconds = calculateElapsedTime(student.timeOut.toISOString());
+      const elapsed = Math.floor(elapsedSeconds / 60);
       return sum + elapsed;
     }, 0);
     
@@ -163,6 +161,27 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
       </CardContent>
     </Card>
   );
+};
+
+const formatStudentName = (fullName: string) => {
+  if (!fullName || fullName.trim() === '') {
+    return 'Unknown Student';
+  }
+  
+  const trimmedName = fullName.trim();
+  
+  // Always return full name unless it's extremely long
+  if (trimmedName.length <= 30) {
+    return trimmedName;
+  }
+  
+  // Only abbreviate if really necessary
+  const parts = trimmedName.split(' ');
+  if (parts.length >= 2) {
+    return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+  }
+  
+  return trimmedName;
 };
 
 export default CurrentOutList;

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     if (records.length > 0) {
       const now = new Date();
       const totalMinutes = records.reduce((sum, record) => {
-        const elapsedMs = calculateElapsedTime(record.timeOut, now);
+        const elapsedMs = calculateElapsedTime(record.timeOut);
         const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
         return sum + elapsedMinutes;
       }, 0);
@@ -185,7 +184,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
           </CardHeader>
           <CardContent className="space-y-4">
             {records.map((record) => {
-              const elapsedMs = calculateElapsedTime(record.timeOut, currentTime);
+              const elapsedMs = calculateElapsedTime(record.timeOut);
               const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
               const studentName = formatStudentName(record.studentName);
               
@@ -241,6 +240,108 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
       </div>
     </div>
   );
+};
+
+const loadWeeklyAverage = async () => {
+  try {
+    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    
+    console.log("Loading weekly average for completed trips since:", oneWeekAgo);
+    
+    const { data: pastTrips, error } = await supabase
+      .from('Hall_Passes')
+      .select('timeOut, timeIn, duration')
+      .gte('timeOut', oneWeekAgo)
+      .not('timeIn', 'is', null)
+      .not('duration', 'is', null)
+      .gt('duration', 0)
+      .eq('earlyDismissal', false);
+
+    if (error) {
+      console.error("Error fetching past trips:", error);
+      return;
+    }
+
+    console.log("Past trips found:", pastTrips?.length || 0);
+
+    if (!pastTrips || pastTrips.length === 0) {
+      setWeeklyAverage(0);
+      return;
+    }
+
+    const durations = pastTrips.map(trip => {
+      const durationMinutes = Math.abs(Number(trip.duration) || 0);
+      return Math.max(0, Math.round(durationMinutes));
+    });
+
+    console.log("Trip durations (minutes):", durations);
+
+    const average = durations.length > 0 
+      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+      : 0;
+
+    console.log("Calculated weekly average:", average, "minutes");
+    setWeeklyAverage(average);
+  } catch (error) {
+    console.error("Error calculating weekly average:", error);
+    setWeeklyAverage(0);
+  }
+};
+
+const getDurationColor = (minutes: number) => {
+  if (minutes < 5) return "text-green-600";
+  if (minutes <= 10) return "text-yellow-600";
+  return "text-red-600";
+};
+
+const getRowColor = (minutes: number, destination: string) => {
+  const destinationColor = DESTINATION_COLORS[destination as keyof typeof DESTINATION_COLORS] || "bg-gray-100 border-gray-300";
+  
+  if (minutes > 10) return `${destinationColor} border-l-4 border-l-red-500`;
+  if (minutes > 5) return `${destinationColor} border-l-4 border-l-yellow-500`;
+  return `${destinationColor} border-l-4 border-l-green-500`;
+};
+
+const handleMarkReturn = async (studentName: string, period: string) => {
+  const success = await updateReturnTime(studentName, period);
+  if (success) {
+    toast({
+      title: "Student Returned",
+      description: `${studentName} has been marked as returned.`,
+      });
+    onRefresh();
+    loadWeeklyAverage();
+  } else {
+    toast({
+      title: "Error",
+      description: "Could not mark student as returned.",
+      variant: "destructive",
+    });
+  }
+};
+
+const formatStudentName = (fullName: string) => {
+  if (!fullName || fullName.trim() === '') {
+    return 'Unknown Student';
+  }
+  
+  const trimmedName = fullName.trim();
+  
+  if (trimmedName.length <= 15 || !trimmedName.includes(' ')) {
+    return trimmedName;
+  }
+  
+  const parts = trimmedName.split(' ');
+  
+  if (parts.length === 2 && trimmedName.length <= 25) {
+    return trimmedName;
+  }
+  
+  if (trimmedName.length > 25) {
+    return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+  }
+  
+  return trimmedName;
 };
 
 export default MultipleStudentsView;
