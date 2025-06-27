@@ -12,30 +12,31 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
     const startTime = new Date(timeOut);
     const endTime = timeIn ? new Date(timeIn) : new Date();
     
-    console.log("calculateElapsedTime - Input timeOut:", timeOut);
-    console.log("calculateElapsedTime - Input timeIn:", timeIn);
-    console.log("calculateElapsedTime - startTime:", startTime);
-    console.log("calculateElapsedTime - endTime:", endTime);
-    console.log("calculateElapsedTime - startTime.getTime():", startTime.getTime());
-    console.log("calculateElapsedTime - endTime.getTime():", endTime.getTime());
-    
     if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
       console.warn("Invalid date provided to calculateElapsedTime", { timeOut, timeIn });
       return 0;
     }
     
     const elapsed = endTime.getTime() - startTime.getTime();
-    console.log("calculateElapsedTime - elapsed:", elapsed);
     
-    // If elapsed is negative, it might be a timezone issue - log it but return 0
+    // If elapsed is negative, try timezone adjustment
     if (elapsed < 0) {
-      console.warn("calculateElapsedTime - Negative elapsed time detected:", {
+      console.warn("calculateElapsedTime - Negative elapsed time, attempting timezone fix:", {
         timeOut,
         timeIn: timeIn || 'now',
         elapsed,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString()
       });
+      
+      // Try treating startTime as local time
+      const adjustedStartTime = new Date(startTime.getTime() - (startTime.getTimezoneOffset() * 60000));
+      const adjustedElapsed = endTime.getTime() - adjustedStartTime.getTime();
+      
+      if (adjustedElapsed >= 0) {
+        return adjustedElapsed;
+      }
+      
       return 0;
     }
     
@@ -52,10 +53,7 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
  * @returns Formatted time string
  */
 export const formatElapsedTime = (milliseconds: number): string => {
-  console.log("formatElapsedTime - input milliseconds:", milliseconds);
-  
   if (!milliseconds || milliseconds < 0) {
-    console.log("formatElapsedTime - returning 00:00:00 for invalid input");
     return "00:00:00";
   }
   
@@ -65,9 +63,7 @@ export const formatElapsedTime = (milliseconds: number): string => {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     
-    const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    console.log("formatElapsedTime - formatted:", formatted);
-    return formatted;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   } catch (error) {
     console.error("Error formatting elapsed time:", error);
     return "00:00:00";
@@ -108,7 +104,6 @@ export const calculateDurationMinutes = (timeOut: Date | string, timeIn: Date | 
 export const getElapsedMinutes = (timeOut: Date | string): number => {
   const elapsedMs = calculateElapsedTime(timeOut);
   const minutes = Math.floor(elapsedMs / (1000 * 60));
-  console.log("getElapsedMinutes - timeOut:", timeOut, "elapsedMs:", elapsedMs, "minutes:", minutes);
   return minutes;
 };
 

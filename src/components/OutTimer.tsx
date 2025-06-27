@@ -11,10 +11,6 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
   const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
-    // Add debugging
-    console.log("OutTimer - Raw timeOut:", timeOut);
-    console.log("OutTimer - timeOut type:", typeof timeOut);
-    
     // Ensure we have a valid timeOut value
     if (!timeOut) {
       console.warn("OutTimer - No timeOut provided");
@@ -31,9 +27,6 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
           outTime = new Date(timeOut);
         }
         
-        console.log("OutTimer - Parsed outTime:", outTime);
-        console.log("OutTimer - outTime.getTime():", outTime.getTime());
-        
         // Check if date is valid
         if (isNaN(outTime.getTime())) {
           console.warn("OutTimer - Invalid date:", timeOut);
@@ -42,16 +35,29 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
         }
         
         const now = new Date();
-        console.log("OutTimer - Current time:", now);
-        console.log("OutTimer - now.getTime():", now.getTime());
-        
         const elapsed = now.getTime() - outTime.getTime();
-        console.log("OutTimer - Raw elapsed ms:", elapsed);
         
-        // Ensure we never show negative time (could happen with timezone issues)
+        // For debugging timezone issues
+        if (elapsed < 0) {
+          console.warn("OutTimer - Negative elapsed time, likely timezone issue:", {
+            timeOut: timeOut,
+            outTime: outTime.toISOString(),
+            now: now.toISOString(),
+            elapsed: elapsed
+          });
+          
+          // Try treating the timeOut as if it's already in local time
+          const localOutTime = new Date(outTime.getTime() - (outTime.getTimezoneOffset() * 60000));
+          const adjustedElapsed = now.getTime() - localOutTime.getTime();
+          
+          if (adjustedElapsed >= 0) {
+            setElapsedMs(adjustedElapsed);
+            return;
+          }
+        }
+        
+        // Ensure we never show negative time
         const positiveElapsed = Math.max(0, elapsed);
-        console.log("OutTimer - Final elapsed ms:", positiveElapsed);
-        
         setElapsedMs(positiveElapsed);
       } catch (error) {
         console.error("OutTimer - Error calculating elapsed time:", error);

@@ -50,16 +50,12 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
   const getAverageTime = () => {
     if (students.length === 0) return 0;
     
-    console.log("CurrentOutList - Calculating average for students:", students);
-    
     const totalMinutes = students.reduce((sum, student) => {
       const elapsed = getElapsedMinutes(student.timeOut);
-      console.log(`Student ${student.studentName} elapsed minutes:`, elapsed);
       return sum + elapsed;
     }, 0);
     
     const average = Math.round(totalMinutes / students.length);
-    console.log("CurrentOutList - Average minutes:", average);
     return average;
   };
 
