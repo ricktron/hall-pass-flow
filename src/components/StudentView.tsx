@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -47,7 +46,13 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const handleSignOut = async (studentRecord: StudentRecord) => {
     // Reload the current students to get the most up-to-date list
     const updatedStudents = await loadCurrentStudents();
-    setShowForm(false);
+    
+    // Keep the form visible if there are multiple students or if this is the first student
+    if (updatedStudents.length >= 2) {
+      setShowForm(false); // Hide form for multi-student view
+    } else {
+      setShowForm(false); // Hide form for solo view
+    }
   };
 
   const handleEarlyDismissal = (studentName: string) => {
@@ -63,7 +68,12 @@ const StudentView = ({ onBack }: StudentViewProps) => {
 
   const handleStudentReturn = async (studentName: string, period: string) => {
     // Reload students after return to get accurate list
-    await loadCurrentStudents();
+    const updatedStudents = await loadCurrentStudents();
+    
+    // If no students are left out, show the form
+    if (updatedStudents.length === 0) {
+      setShowForm(true);
+    }
   };
 
   const handleSignOutAnother = () => {
@@ -113,7 +123,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
               onEarlyDismissal={handleEarlyDismissal}
             />
           )}
-          {currentStudents.length >= 2 && (
+          {currentStudents.length >= 2 && !showForm && (
             <CurrentOutList 
               students={currentStudents}
               onStudentReturn={handleStudentReturn}

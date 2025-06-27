@@ -59,6 +59,34 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
     return average;
   };
 
+  // Format student name properly
+  const formatStudentName = (fullName: string) => {
+    if (!fullName || fullName.trim() === '') {
+      return 'Unknown Student';
+    }
+    
+    const trimmedName = fullName.trim();
+    
+    // If it's already a short name or single word, return as is
+    if (trimmedName.length <= 15 || !trimmedName.includes(' ')) {
+      return trimmedName;
+    }
+    
+    const parts = trimmedName.split(' ');
+    
+    // For names with 2 parts, show full name if reasonable length
+    if (parts.length === 2 && trimmedName.length <= 25) {
+      return trimmedName;
+    }
+    
+    // Only abbreviate if the name is very long
+    if (trimmedName.length > 25) {
+      return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+    }
+    
+    return trimmedName;
+  };
+
   if (students.length === 0) {
     return null;
   }
@@ -74,6 +102,8 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
       <CardContent className="space-y-6">
         <div className="space-y-4">
           {students.map((student, index) => {
+            const studentName = formatStudentName(student.studentName);
+            
             return (
               <div 
                 key={`${student.studentName}-${student.period}-${index}`}
@@ -82,7 +112,7 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-4">
-                      <div className="font-bold text-lg">{student.studentName}</div>
+                      <div className="font-bold text-lg">{studentName}</div>
                       <div className="text-sm text-gray-600">Period {student.period}</div>
                       <div className="text-sm text-gray-600">{student.destination}</div>
                       <OutTimer timeOut={student.timeOut} />

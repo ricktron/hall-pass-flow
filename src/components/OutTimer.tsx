@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { formatElapsedTime } from "@/lib/timeUtils";
+import { formatElapsedTime, calculateElapsedTime } from "@/lib/timeUtils";
 
 interface OutTimerProps {
   timeOut: Date | string;
@@ -17,48 +17,10 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
       return;
     }
     
-    const calculateAndSetElapsed = () => {
+    const calculateAndUpdateElapsed = () => {
       try {
-        // Convert timeOut to Date, handling both string and Date inputs
-        let outTime: Date;
-        if (typeof timeOut === 'string') {
-          outTime = new Date(timeOut);
-        } else {
-          outTime = new Date(timeOut);
-        }
-        
-        // Check if date is valid
-        if (isNaN(outTime.getTime())) {
-          console.warn("OutTimer - Invalid date:", timeOut);
-          setElapsedMs(0);
-          return;
-        }
-        
-        const now = new Date();
-        const elapsed = now.getTime() - outTime.getTime();
-        
-        // For debugging timezone issues
-        if (elapsed < 0) {
-          console.warn("OutTimer - Negative elapsed time, likely timezone issue:", {
-            timeOut: timeOut,
-            outTime: outTime.toISOString(),
-            now: now.toISOString(),
-            elapsed: elapsed
-          });
-          
-          // Try treating the timeOut as if it's already in local time
-          const localOutTime = new Date(outTime.getTime() - (outTime.getTimezoneOffset() * 60000));
-          const adjustedElapsed = now.getTime() - localOutTime.getTime();
-          
-          if (adjustedElapsed >= 0) {
-            setElapsedMs(adjustedElapsed);
-            return;
-          }
-        }
-        
-        // Ensure we never show negative time
-        const positiveElapsed = Math.max(0, elapsed);
-        setElapsedMs(positiveElapsed);
+        const elapsed = calculateElapsedTime(timeOut);
+        setElapsedMs(elapsed);
       } catch (error) {
         console.error("OutTimer - Error calculating elapsed time:", error);
         setElapsedMs(0);
@@ -66,10 +28,10 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
     };
 
     // Calculate immediately
-    calculateAndSetElapsed();
+    calculateAndUpdateElapsed();
 
     // Then update every second
-    const interval = setInterval(calculateAndSetElapsed, 1000);
+    const interval = setInterval(calculateAndUpdateElapsed, 1000);
     
     return () => clearInterval(interval);
   }, [timeOut]);

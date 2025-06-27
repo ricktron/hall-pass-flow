@@ -19,28 +19,8 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
     
     const elapsed = endTime.getTime() - startTime.getTime();
     
-    // If elapsed is negative, try timezone adjustment
-    if (elapsed < 0) {
-      console.warn("calculateElapsedTime - Negative elapsed time, attempting timezone fix:", {
-        timeOut,
-        timeIn: timeIn || 'now',
-        elapsed,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString()
-      });
-      
-      // Try treating startTime as local time
-      const adjustedStartTime = new Date(startTime.getTime() - (startTime.getTimezoneOffset() * 60000));
-      const adjustedElapsed = endTime.getTime() - adjustedStartTime.getTime();
-      
-      if (adjustedElapsed >= 0) {
-        return adjustedElapsed;
-      }
-      
-      return 0;
-    }
-    
-    return elapsed;
+    // Ensure we never return negative time
+    return Math.max(0, elapsed);
   } catch (error) {
     console.error("Error calculating elapsed time:", error);
     return 0;
@@ -108,19 +88,18 @@ export const getElapsedMinutes = (timeOut: Date | string): number => {
 };
 
 /**
- * Format a UTC timestamp for display in Toronto timezone
+ * Format a UTC timestamp for display in local timezone
  * @param date UTC date to format
- * @returns Formatted date string in Toronto timezone
+ * @returns Formatted date string in local timezone
  */
-export const formatTorontoTime = (date: Date | string): string => {
+export const formatLocalTime = (date: Date | string): string => {
   try {
     const dateObj = new Date(date);
     if (isNaN(dateObj.getTime())) {
       return "Invalid Date";
     }
     
-    return dateObj.toLocaleString("en-CA", { 
-      timeZone: "America/Toronto",
+    return dateObj.toLocaleString("en-US", { 
       hour12: false,
       year: 'numeric',
       month: '2-digit',
@@ -130,7 +109,7 @@ export const formatTorontoTime = (date: Date | string): string => {
       second: '2-digit'
     });
   } catch (error) {
-    console.error("Error formatting Toronto time:", error);
+    console.error("Error formatting local time:", error);
     return "Invalid Date";
   }
 };

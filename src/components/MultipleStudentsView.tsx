@@ -60,9 +60,11 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
       
       const { data: pastTrips, error } = await supabase
         .from('Hall_Passes')
-        .select('timeOut, timeIn')
+        .select('timeOut, timeIn, duration')
         .gte('timeOut', oneWeekAgo)
         .not('timeIn', 'is', null)
+        .not('duration', 'is', null)
+        .gt('duration', 0)
         .eq('earlyDismissal', false);
 
       if (error) {
@@ -78,10 +80,9 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
       }
 
       const durations = pastTrips.map(trip => {
-        const outTime = new Date(trip.timeOut).getTime();
-        const inTime = new Date(trip.timeIn).getTime();
-        const durationMinutes = Math.round((inTime - outTime) / 60000);
-        return Math.max(0, durationMinutes); // Ensure non-negative
+        // Use stored duration, but ensure it's a positive number
+        const durationMinutes = Math.abs(Number(trip.duration) || 0);
+        return Math.max(0, Math.round(durationMinutes));
       });
 
       console.log("Trip durations (minutes):", durations);
@@ -135,17 +136,32 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     }
   };
 
-  // Fix the name formatting - don't over-abbreviate
+  // Format student name properly - don't over-abbreviate
   const formatStudentName = (fullName: string) => {
-    const parts = fullName.trim().split(' ');
-    if (parts.length === 1) {
-      return fullName; // Just first name
+    if (!fullName || fullName.trim() === '') {
+      return 'Unknown Student';
     }
-    if (parts.length === 2) {
-      return fullName; // First and last name, show both
+    
+    const trimmedName = fullName.trim();
+    
+    // If it's already a short name or single word, return as is
+    if (trimmedName.length <= 15 || !trimmedName.includes(' ')) {
+      return trimmedName;
     }
-    // For 3+ names, show first name and last initial
-    return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+    
+    const parts = trimmedName.split(' ');
+    
+    // For names with 2 parts, show full name if reasonable length
+    if (parts.length === 2 && trimmedName.length <= 25) {
+      return trimmedName;
+    }
+    
+    // Only abbreviate if the name is very long
+    if (trimmedName.length > 25) {
+      return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
+    }
+    
+    return trimmedName;
   };
 
   return (
@@ -184,6 +200,9 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
                     <div className="flex-1">
                       <div className="flex items-center space-x-4">
                         <div className="font-bold text-lg">{studentName}</div>
+                        <div className="text-sm text-gray-600">
+                          Period {record.period}
+                        </div>
                         <div className="text-sm text-gray-600">
                           {record.destination || 'Unknown'}
                         </div>
