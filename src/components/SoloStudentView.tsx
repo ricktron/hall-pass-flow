@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateReturnTime, getWeeklyStats } from "@/lib/supabaseDataManager";
+import OutTimer from "./OutTimer";
 
 interface StudentRecord {
   studentName: string;
@@ -20,16 +21,8 @@ interface SoloStudentViewProps {
 }
 
 const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStudentViewProps) => {
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [weeklyAverage, setWeeklyAverage] = useState(0);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     const loadWeeklyStats = async () => {
@@ -56,7 +49,7 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
     }
   };
 
-  const getElapsedTime = () => {
+  const getElapsedMinutes = () => {
     try {
       if (!student.timeOut || isNaN(student.timeOut.getTime())) {
         console.warn("Invalid timeOut in SoloStudentView:", student.timeOut);
@@ -67,39 +60,15 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
       const now = new Date();
       const timeOutUTC = new Date(student.timeOut);
       
-      return Math.abs(now.getTime() - timeOutUTC.getTime());
+      const elapsed = Math.abs(now.getTime() - timeOutUTC.getTime());
+      return Math.floor(elapsed / (1000 * 60));
     } catch (error) {
       console.error("Error calculating elapsed time in SoloStudentView:", error);
       return 0;
     }
   };
 
-  const formatElapsedTime = (milliseconds: number): string => {
-    if (!milliseconds || milliseconds < 0) {
-      return "00:00:00";
-    }
-    
-    try {
-      const totalSeconds = Math.floor(milliseconds / 1000);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-      
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    } catch (error) {
-      console.error("Error formatting elapsed time in SoloStudentView:", error);
-      return "00:00:00";
-    }
-  };
-
-  const elapsedMs = getElapsedTime();
-  const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
-
-  const getColorClass = () => {
-    if (elapsedMinutes >= 10) return 'text-red-600';
-    if (elapsedMinutes >= 5) return 'text-yellow-600';
-    return 'text-green-600';
-  };
+  const elapsedMinutes = getElapsedMinutes();
 
   const getBackgroundColor = () => {
     if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';
@@ -123,8 +92,8 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
                 <div className="text-4xl font-bold text-gray-800">{student.studentName}</div>
                 <div className="text-xl text-gray-600">Period {student.period}</div>
                 <div className="text-lg text-gray-600">{student.destination}</div>
-                <div className={`text-8xl font-mono font-bold ${getColorClass()}`}>
-                  {formatElapsedTime(elapsedMs)}
+                <div className="text-center">
+                  <OutTimer timeOut={student.timeOut} className="text-8xl" />
                 </div>
                 <div className="text-lg text-gray-600 mt-4">
                   {student.studentName} has been out for {elapsedMinutes} minutes. 

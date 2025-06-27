@@ -91,16 +91,14 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
                       <OutTimer timeOut={student.timeOut} />
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      size="lg"
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-3"
-                      onClick={() => handleMarkReturn(student.studentName, student.period)}
-                    >
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Returned
-                    </Button>
-                  </div>
+                  <Button
+                    size="lg"
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-3"
+                    onClick={() => handleMarkReturn(student.studentName, student.period)}
+                  >
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Returned
+                  </Button>
                 </div>
               </div>
             );

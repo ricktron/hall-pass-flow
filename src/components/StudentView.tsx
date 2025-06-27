@@ -63,10 +63,6 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     setCurrentStudents(prev => 
       prev.filter(s => !(s.studentName === studentName && s.period === period))
     );
-    // If no students left, show the form
-    if (currentStudents.length === 1) {
-      setShowForm(true);
-    }
   };
 
   const handleSignOutAnother = () => {
@@ -83,7 +79,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     );
   }
 
-  // Show solo view for single student (when form is not showing)
+  // Show solo view for single student (when form is not showing and exactly 1 student)
   if (currentStudents.length === 1 && !showForm) {
     return (
       <SoloStudentView
@@ -110,13 +106,13 @@ const StudentView = ({ onBack }: StudentViewProps) => {
         </div>
 
         <div className="space-y-6">
-          {showForm && (
+          {(showForm || currentStudents.length === 0) && (
             <StudentSignOutForm 
               onSignOut={handleSignOut} 
               onEarlyDismissal={handleEarlyDismissal}
             />
           )}
-          {currentStudents.length > 1 && (
+          {currentStudents.length >= 2 && (
             <CurrentOutList 
               students={currentStudents}
               onStudentReturn={handleStudentReturn}
