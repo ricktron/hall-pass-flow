@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { HallPassRecord, formatElapsedTime, getTorontoElapsedTime, updateReturnTime } from "@/lib/supabaseDataManager";
+import { HallPassRecord, updateReturnTime } from "@/lib/supabaseDataManager";
+import { calculateElapsedTime, formatElapsedTime, getElapsedMinutes } from "@/lib/timeUtils";
 import { useToast } from "@/hooks/use-toast";
 
 interface MultipleStudentsViewProps {
@@ -33,11 +34,6 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     }, 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const getElapsedMinutes = (timeOut: Date) => {
-    const elapsed = getTorontoElapsedTime(timeOut);
-    return Math.floor(elapsed / (1000 * 60));
-  };
 
   const getDurationColor = (minutes: number) => {
     if (minutes < 5) return "text-green-600";
@@ -101,7 +97,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
           </CardHeader>
           <CardContent className="space-y-4">
             {records.map((record) => {
-              const elapsedMs = getTorontoElapsedTime(record.timeOut);
+              const elapsedMs = calculateElapsedTime(record.timeOut);
               const elapsedMinutes = getElapsedMinutes(record.timeOut);
               const studentName = formatStudentName(record.studentName);
               

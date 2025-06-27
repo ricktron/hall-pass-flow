@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCheck, AlertTriangle, Trash2 } from "lucide-react";
-import { HallPassRecord, formatElapsedTime, formatTorontoTime, getTorontoElapsedTime } from "@/lib/supabaseDataManager";
+import { HallPassRecord } from "@/lib/supabaseDataManager";
+import { calculateElapsedTime, formatElapsedTime, formatTorontoTime, getElapsedMinutes } from "@/lib/timeUtils";
 
 interface CurrentlyOutTableProps {
   records: HallPassRecord[];
@@ -21,11 +22,6 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
     }, 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const getElapsedMinutes = (timeOut: Date) => {
-    const elapsed = getTorontoElapsedTime(timeOut);
-    return Math.floor(elapsed / (1000 * 60));
-  };
 
   const getElapsedColor = (minutes: number) => {
     if (minutes < 5) return "text-green-600";
@@ -92,7 +88,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
                 .sort((a, b) => getElapsedMinutes(b.timeOut) - getElapsedMinutes(a.timeOut))
                 .map((record) => {
                   const elapsedMinutes = getElapsedMinutes(record.timeOut);
-                  const elapsedMilliseconds = getTorontoElapsedTime(record.timeOut);
+                  const elapsedMilliseconds = calculateElapsedTime(record.timeOut);
                   const isOverLimit = elapsedMinutes > 10;
                   
                   return (

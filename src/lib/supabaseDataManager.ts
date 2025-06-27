@@ -1,5 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { calculateDurationMinutes } from "@/lib/timeUtils";
 
 export interface HallPassRecord {
   id: string;
@@ -31,8 +31,7 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
     if (existingRecords && existingRecords.length > 0) {
       const openRecord = existingRecords[0];
       const timeIn = new Date();
-      const timeOut = new Date(openRecord.timeOut);
-      const duration = Math.abs(Math.round((timeIn.getTime() - timeOut.getTime()) / (1000 * 60))); // duration in minutes
+      const duration = calculateDurationMinutes(openRecord.timeOut, timeIn);
 
       const { error: updateError } = await supabase
         .from('Hall_Passes')
@@ -126,8 +125,7 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
 
     const record = records[0];
     const timeIn = new Date();
-    const timeOut = new Date(record.timeOut);
-    const duration = Math.abs(Math.round((timeIn.getTime() - timeOut.getTime()) / (1000 * 60))); // duration in minutes
+    const duration = calculateDurationMinutes(record.timeOut, timeIn);
 
     const { error: updateError } = await supabase
       .from('Hall_Passes')
@@ -247,12 +245,10 @@ export const getWeeklyStats = async (studentName: string): Promise<{
     }
 
     const tripCount = (data || []).length;
-    // Recalculate duration for each record to ensure accuracy
+    // Use normalized duration calculation
     const totalMinutes = (data || []).reduce((sum, record) => {
       if (record.timeIn && record.timeOut) {
-        const timeOut = new Date(record.timeOut);
-        const timeIn = new Date(record.timeIn);
-        const calculatedDuration = Math.abs((timeIn.getTime() - timeOut.getTime()) / (1000 * 60));
+        const calculatedDuration = calculateDurationMinutes(record.timeOut, record.timeIn!);
         return sum + calculatedDuration;
       }
       return sum + Math.abs(record.duration || 0);
@@ -335,18 +331,18 @@ export const getAnalytics = async () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Calculate longest trip today - recalculate duration for accuracy
+    // Calculate longest trip today using normalized duration calculation
     const completedTodayRecords = todayRecords.filter(record => record.duration !== null && record.timeIn && record.timeOut);
     let longestTripToday = { duration: 0, student: '' };
     
     if (completedTodayRecords.length > 0) {
       const longest = completedTodayRecords.reduce((prev, current) => {
-        const currentDuration = Math.abs((new Date(current.timeIn!).getTime() - new Date(current.timeOut).getTime()) / (1000 * 60));
-        const prevDuration = Math.abs((new Date(prev.timeIn!).getTime() - new Date(prev.timeOut).getTime()) / (1000 * 60));
+        const currentDuration = calculateDurationMinutes(current.timeOut, current.timeIn!);
+        const prevDuration = calculateDurationMinutes(prev.timeOut, prev.timeIn!);
         return currentDuration > prevDuration ? current : prev;
       });
       longestTripToday = {
-        duration: Math.abs((new Date(longest.timeIn!).getTime() - new Date(longest.timeOut).getTime()) / (1000 * 60)),
+        duration: calculateDurationMinutes(longest.timeOut, longest.timeIn!),
         student: longest.studentName || ''
       };
     }
@@ -359,11 +355,11 @@ export const getAnalytics = async () => {
       }
     });
 
-    // Calculate average duration for completed records - recalculate for accuracy
+    // Calculate average duration for completed records using normalized calculation
     const completedRecords = records.filter(record => record.timeIn && record.timeOut);
     const averageDuration = completedRecords.length > 0 
       ? completedRecords.reduce((sum, record) => {
-          const duration = Math.abs((new Date(record.timeIn!).getTime() - new Date(record.timeOut).getTime()) / (1000 * 60));
+          const duration = calculateDurationMinutes(record.timeOut, record.timeIn!);
           return sum + duration;
         }, 0) / completedRecords.length
       : 0;
@@ -387,52 +383,4 @@ export const getAnalytics = async () => {
       averageDuration: 0
     };
   }
-};
-
-// Utility function to format time in HH:MM:SS
-export const formatElapsedTime = (milliseconds: number): string => {
-  const totalSeconds = Math.floor(Math.abs(milliseconds) / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-};
-
-// Utility function to format duration in minutes to HH:MM:SS
-export const formatDurationMinutes = (minutes: number): string => {
-  const totalMinutes = Math.abs(minutes);
-  const hours = Math.floor(totalMinutes / 60);
-  const mins = Math.floor(totalMinutes % 60);
-  const secs = Math.floor((totalMinutes % 1) * 60);
-  
-  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
-
-// Utility function to convert UTC timestamp to Toronto time
-export const formatTorontoTime = (date: Date): string => {
-  return date.toLocaleString("en-CA", { 
-    timeZone: "America/Toronto",
-    hour12: false,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
-};
-
-// Utility function to get elapsed time using Toronto timezone
-export const getTorontoElapsedTime = (timeOutUTC: Date): number => {
-  const utcNow = new Date();
-  const localNow = new Date(utcNow.toLocaleString("en-CA", { timeZone: "America/Toronto" }));
-  const localTimeOut = new Date(new Date(timeOutUTC).toLocaleString("en-CA", { timeZone: "America/Toronto" }));
-  return Math.abs(localNow.getTime() - localTimeOut.getTime());
-};
-
-// Utility function to get calculated duration in minutes for display
-export const getCalculatedDuration = (timeOut: Date, timeIn: Date | null): number => {
-  if (!timeIn) return 0;
-  return Math.abs((timeIn.getTime() - timeOut.getTime()) / (1000 * 60));
 };

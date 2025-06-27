@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateReturnTime } from "@/lib/supabaseDataManager";
+import { getElapsedMinutes } from "@/lib/timeUtils";
 import OutTimer from "./OutTimer";
 
 interface StudentRecord {
@@ -37,14 +38,6 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
         variant: "destructive",
       });
     }
-  };
-
-  const getElapsedMinutes = (timeOut: Date) => {
-    // timeOut from Supabase is in UTC, calculate elapsed time directly
-    const now = new Date();
-    const timeOutUTC = new Date(timeOut);
-    const elapsed = Math.abs(now.getTime() - timeOutUTC.getTime());
-    return Math.floor(elapsed / (1000 * 60));
   };
 
   const getBackgroundColor = (timeOut: Date) => {

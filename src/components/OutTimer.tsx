@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from "react";
+import { calculateElapsedTime, formatElapsedTime, getElapsedMinutes } from "@/lib/timeUtils";
 
 interface OutTimerProps {
   timeOut: Date;
@@ -16,45 +17,9 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  const getElapsedTime = () => {
-    try {
-      if (!timeOut || isNaN(timeOut.getTime())) {
-        console.warn("Invalid timeOut provided to OutTimer:", timeOut);
-        return 0;
-      }
-      
-      // timeOut from Supabase is in UTC, convert to Central Time for calculation
-      const now = new Date();
-      const timeOutUTC = new Date(timeOut);
-      
-      // Calculate elapsed time in milliseconds
-      return Math.abs(now.getTime() - timeOutUTC.getTime());
-    } catch (error) {
-      console.error("Error calculating elapsed time:", error, { timeOut, currentTime });
-      return 0;
-    }
-  };
-
-  const formatElapsedTime = (milliseconds: number): string => {
-    if (!milliseconds || milliseconds < 0) {
-      return "00:00:00";
-    }
-    
-    try {
-      const totalSeconds = Math.floor(milliseconds / 1000);
-      const hours = Math.floor(totalSeconds / 3600);
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      const seconds = totalSeconds % 60;
-      
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    } catch (error) {
-      console.error("Error formatting elapsed time:", error);
-      return "00:00:00";
-    }
-  };
-
-  const elapsedMs = getElapsedTime();
-  const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
+  // Calculate elapsed time using UTC timestamps
+  const elapsedMs = calculateElapsedTime(timeOut);
+  const elapsedMinutes = getElapsedMinutes(timeOut);
 
   const getColorClass = () => {
     if (elapsedMinutes >= 10) return 'text-red-600';

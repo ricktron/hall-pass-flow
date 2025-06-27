@@ -2,6 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, X } from "lucide-react";
+import { getElapsedMinutes } from "@/lib/timeUtils";
 import OutTimer from "./OutTimer";
 
 interface StudentRecord {
@@ -18,14 +19,6 @@ interface CurrentlyOutDisplayProps {
 }
 
 const CurrentlyOutDisplay = ({ students, onStudentReturn, onClose }: CurrentlyOutDisplayProps) => {
-  const getElapsedMinutes = (timeOut: Date) => {
-    // timeOut from Supabase is in UTC, calculate elapsed time directly
-    const now = new Date();
-    const timeOutUTC = new Date(timeOut);
-    const elapsed = Math.abs(now.getTime() - timeOutUTC.getTime());
-    return Math.floor(elapsed / (1000 * 60));
-  };
-
   const getBackgroundColor = (timeOut: Date) => {
     const elapsedMinutes = getElapsedMinutes(timeOut);
     if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';

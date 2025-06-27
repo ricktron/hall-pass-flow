@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateReturnTime, getWeeklyStats } from "@/lib/supabaseDataManager";
+import { getElapsedMinutes } from "@/lib/timeUtils";
 import OutTimer from "./OutTimer";
 
 interface StudentRecord {
@@ -49,26 +50,7 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
     }
   };
 
-  const getElapsedMinutes = () => {
-    try {
-      if (!student.timeOut || isNaN(student.timeOut.getTime())) {
-        console.warn("Invalid timeOut in SoloStudentView:", student.timeOut);
-        return 0;
-      }
-      
-      // timeOut from Supabase is in UTC, calculate elapsed time directly
-      const now = new Date();
-      const timeOutUTC = new Date(student.timeOut);
-      
-      const elapsed = Math.abs(now.getTime() - timeOutUTC.getTime());
-      return Math.floor(elapsed / (1000 * 60));
-    } catch (error) {
-      console.error("Error calculating elapsed time in SoloStudentView:", error);
-      return 0;
-    }
-  };
-
-  const elapsedMinutes = getElapsedMinutes();
+  const elapsedMinutes = getElapsedMinutes(student.timeOut);
 
   const getBackgroundColor = () => {
     if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';
