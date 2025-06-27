@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCheck, AlertTriangle } from "lucide-react";
-import { HallPassRecord, formatElapsedTime } from "@/lib/supabaseDataManager";
+import { HallPassRecord, formatElapsedTime, formatChicagoTime } from "@/lib/supabaseDataManager";
 
 interface CurrentlyOutTableProps {
   records: HallPassRecord[];
@@ -83,7 +83,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
               <tr className="border-b">
                 <th className="text-left py-2 px-2">Student</th>
                 <th className="text-left py-2 px-2">Period</th>
-                <th className="text-left py-2 px-2">Time Out</th>
+                <th className="text-left py-2 px-2">Time Out (CT)</th>
                 <th className="text-left py-2 px-2">Elapsed (HH:MM:SS)</th>
                 <th className="text-left py-2 px-2">Action</th>
               </tr>
@@ -111,7 +111,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                         <Badge variant="outline">Period {record.period}</Badge>
                       </td>
                       <td className="py-3 px-2 text-sm text-gray-600">
-                        {record.timeOut.toLocaleTimeString()}
+                        {formatChicagoTime(record.timeOut)}
                       </td>
                       <td className="py-3 px-2">
                         <Badge 
