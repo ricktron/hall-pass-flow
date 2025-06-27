@@ -3,15 +3,16 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserCheck, AlertTriangle } from "lucide-react";
-import { HallPassRecord, formatElapsedTime, formatChicagoTime } from "@/lib/supabaseDataManager";
+import { UserCheck, AlertTriangle, Trash2 } from "lucide-react";
+import { HallPassRecord, formatElapsedTime, formatTorontoTime, getTorontoElapsedTime } from "@/lib/supabaseDataManager";
 
 interface CurrentlyOutTableProps {
   records: HallPassRecord[];
   onMarkReturn: (studentName: string, period: string) => void;
+  onDeleteRecord?: (recordId: string, studentName: string) => void;
 }
 
-const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) => {
+const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyOutTableProps) => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -21,12 +22,9 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
     return () => clearInterval(interval);
   }, []);
 
-  const getElapsedMilliseconds = (timeOut: Date) => {
-    return currentTime.getTime() - timeOut.getTime();
-  };
-
   const getElapsedMinutes = (timeOut: Date) => {
-    return Math.floor((currentTime.getTime() - timeOut.getTime()) / (1000 * 60));
+    const elapsed = getTorontoElapsedTime(timeOut);
+    return Math.floor(elapsed / (1000 * 60));
   };
 
   const getElapsedColor = (minutes: number) => {
@@ -83,9 +81,10 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
               <tr className="border-b">
                 <th className="text-left py-2 px-2">Student</th>
                 <th className="text-left py-2 px-2">Period</th>
-                <th className="text-left py-2 px-2">Time Out (CT)</th>
+                <th className="text-left py-2 px-2">Destination</th>
+                <th className="text-left py-2 px-2">Time Out (Toronto)</th>
                 <th className="text-left py-2 px-2">Elapsed (HH:MM:SS)</th>
-                <th className="text-left py-2 px-2">Action</th>
+                <th className="text-left py-2 px-2">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -93,7 +92,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                 .sort((a, b) => getElapsedMinutes(b.timeOut) - getElapsedMinutes(a.timeOut))
                 .map((record) => {
                   const elapsedMinutes = getElapsedMinutes(record.timeOut);
-                  const elapsedMilliseconds = getElapsedMilliseconds(record.timeOut);
+                  const elapsedMilliseconds = getTorontoElapsedTime(record.timeOut);
                   const isOverLimit = elapsedMinutes > 10;
                   
                   return (
@@ -110,8 +109,11 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                       <td className="py-3 px-2">
                         <Badge variant="outline">Period {record.period}</Badge>
                       </td>
+                      <td className="py-3 px-2">
+                        <Badge variant="secondary">{record.destination || 'Unknown'}</Badge>
+                      </td>
                       <td className="py-3 px-2 text-sm text-gray-600">
-                        {formatChicagoTime(record.timeOut)}
+                        {formatTorontoTime(record.timeOut)}
                       </td>
                       <td className="py-3 px-2">
                         <Badge 
@@ -122,14 +124,26 @@ const CurrentlyOutTable = ({ records, onMarkReturn }: CurrentlyOutTableProps) =>
                         </Badge>
                       </td>
                       <td className="py-3 px-2">
-                        <Button
-                          size="sm"
-                          variant={isOverLimit ? "destructive" : "outline"}
-                          onClick={() => onMarkReturn(record.studentName, record.period)}
-                        >
-                          <UserCheck className="w-4 h-4 mr-1" />
-                          Mark Returned
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant={isOverLimit ? "destructive" : "outline"}
+                            onClick={() => onMarkReturn(record.studentName, record.period)}
+                          >
+                            <UserCheck className="w-4 h-4 mr-1" />
+                            Mark Returned
+                          </Button>
+                          {onDeleteRecord && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onDeleteRecord(record.id, record.studentName)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { addHallPassRecord } from "@/lib/supabaseDataManager";
+import { addHallPassRecord, getStudentNames } from "@/lib/supabaseDataManager";
 import PostSignoutConfirmation from "./PostSignoutConfirmation";
 
 interface StudentViewProps {
@@ -40,7 +40,37 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [signoutTime, setSignoutTime] = useState<Date | null>(null);
+  const [studentNames, setStudentNames] = useState<string[]>([]);
+  const [filteredNames, setFilteredNames] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    const loadStudentNames = async () => {
+      const names = await getStudentNames();
+      setStudentNames(names);
+    };
+    loadStudentNames();
+  }, []);
+
+  useEffect(() => {
+    if (firstName.trim().length > 1) {
+      const filtered = studentNames.filter(name => 
+        name.toLowerCase().includes(firstName.toLowerCase())
+      ).slice(0, 5);
+      setFilteredNames(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  }, [firstName, studentNames]);
+
+  const handleNameSelect = (fullName: string) => {
+    const parts = fullName.split(' ');
+    setFirstName(parts[0] || '');
+    setLastName(parts.slice(1).join(' ') || '');
+    setShowSuggestions(false);
+  };
 
   const handleSubmit = async () => {
     if (!firstName.trim() || !lastName.trim() || !selectedPeriod || !selectedDestination) {
@@ -58,6 +88,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
       const now = new Date();
       const studentName = `${firstName.trim()} ${lastName.trim()}`;
       const dayOfWeek = DAYS_OF_WEEK[now.getDay()];
+      const isEarlyDismissal = selectedDestination === "Early Dismissal";
       
       const success = await addHallPassRecord({
         studentName,
@@ -65,12 +96,26 @@ const StudentView = ({ onBack }: StudentViewProps) => {
         timeOut: now,
         timeIn: null,
         duration: null,
-        dayOfWeek
+        dayOfWeek,
+        destination: selectedDestination,
+        earlyDismissal: isEarlyDismissal
       });
 
       if (success) {
-        setSignoutTime(now);
-        setShowConfirmation(true);
+        if (isEarlyDismissal) {
+          toast({
+            title: "Early Dismissal Recorded",
+            description: `${studentName} has been marked for early dismissal.`,
+          });
+          // Reset form for early dismissal
+          setFirstName("");
+          setLastName("");
+          setSelectedPeriod("");
+          setSelectedDestination("");
+        } else {
+          setSignoutTime(now);
+          setShowConfirmation(true);
+        }
       } else {
         toast({
           title: "Error",
@@ -136,7 +181,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="space-y-2 relative">
                 <Label htmlFor="firstName">First Name</Label>
                 <Input
                   id="firstName"
@@ -144,7 +189,22 @@ const StudentView = ({ onBack }: StudentViewProps) => {
                   placeholder="Enter first name"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
+                  onFocus={() => firstName.trim().length > 1 && setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 />
+                {showSuggestions && (
+                  <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto">
+                    {filteredNames.map((name, index) => (
+                      <div
+                        key={index}
+                        className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleNameSelect(name)}
+                      >
+                        {name}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastName">Last Name</Label>

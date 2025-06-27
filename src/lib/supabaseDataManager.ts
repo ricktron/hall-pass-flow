@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface HallPassRecord {
@@ -9,6 +8,8 @@ export interface HallPassRecord {
   timeIn: Date | null;
   duration: number | null;
   dayOfWeek: string;
+  destination?: string;
+  earlyDismissal?: boolean;
 }
 
 export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
@@ -30,7 +31,7 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
       const openRecord = existingRecords[0];
       const timeIn = new Date();
       const timeOut = new Date(openRecord.timeOut);
-      const duration = Math.round((timeIn.getTime() - timeOut.getTime()) / (1000 * 60)); // duration in minutes
+      const duration = Math.abs(Math.round((timeIn.getTime() - timeOut.getTime()) / (1000 * 60))); // duration in minutes
 
       const { error: updateError } = await supabase
         .from('Hall_Passes')
@@ -55,7 +56,9 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
         timeOut: record.timeOut.toISOString(),
         timeIn: record.timeIn ? record.timeIn.toISOString() : null,
         duration: record.duration,
-        dayOfWeek: record.dayOfWeek
+        dayOfWeek: record.dayOfWeek,
+        destination: record.destination,
+        earlyDismissal: record.earlyDismissal || false
       }]);
 
     if (error) {
@@ -88,7 +91,9 @@ export const getAllHallPassRecords = async (): Promise<HallPassRecord[]> => {
       timeOut: new Date(record.timeOut),
       timeIn: record.timeIn ? new Date(record.timeIn) : null,
       duration: record.duration,
-      dayOfWeek: record.dayOfWeek || ''
+      dayOfWeek: record.dayOfWeek || '',
+      destination: record.destination,
+      earlyDismissal: record.earlyDismissal || false
     }));
   } catch (error) {
     console.error("Error fetching hall pass records:", error);
@@ -121,13 +126,13 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
     const record = records[0];
     const timeIn = new Date();
     const timeOut = new Date(record.timeOut);
-    const duration = Math.round((timeIn.getTime() - timeOut.getTime()) / (1000 * 60)); // duration in minutes
+    const duration = Math.abs(Math.round((timeIn.getTime() - timeOut.getTime()) / (1000 * 60))); // duration in minutes
 
     const { error: updateError } = await supabase
       .from('Hall_Passes')
       .update({ 
         timeIn: timeIn.toISOString(), 
-        duration: Math.abs(duration) // Ensure duration is always positive
+        duration: duration
       })
       .eq('id', record.id);
 
@@ -143,12 +148,31 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
   }
 };
 
+export const deleteHallPassRecord = async (recordId: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('Hall_Passes')
+      .delete()
+      .eq('id', recordId);
+
+    if (error) {
+      console.error("Error deleting hall pass record:", error);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Error deleting hall pass record:", error);
+    return false;
+  }
+};
+
 export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
   try {
     const { data, error } = await supabase
       .from('Hall_Passes')
       .select('*')
       .is('timeIn', null)
+      .neq('earlyDismissal', true) // Exclude early dismissal records
       .order('timeOut', { ascending: false });
 
     if (error) {
@@ -163,10 +187,33 @@ export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
       timeOut: new Date(record.timeOut),
       timeIn: null,
       duration: null,
-      dayOfWeek: record.dayOfWeek || ''
+      dayOfWeek: record.dayOfWeek || '',
+      destination: record.destination,
+      earlyDismissal: record.earlyDismissal || false
     }));
   } catch (error) {
     console.error("Error fetching currently out records:", error);
+    return [];
+  }
+};
+
+export const getStudentNames = async (): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('Hall_Passes')
+      .select('studentName')
+      .order('studentName');
+
+    if (error) {
+      console.error("Error fetching student names:", error);
+      return [];
+    }
+
+    // Get unique student names
+    const uniqueNames = [...new Set(data.map(record => record.studentName).filter(Boolean))];
+    return uniqueNames;
+  } catch (error) {
+    console.error("Error fetching student names:", error);
     return [];
   }
 };
@@ -335,7 +382,7 @@ export const getAnalytics = async () => {
 
 // Utility function to format time in HH:MM:SS
 export const formatElapsedTime = (milliseconds: number): string => {
-  const totalSeconds = Math.floor(milliseconds / 1000);
+  const totalSeconds = Math.floor(Math.abs(milliseconds) / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
@@ -345,18 +392,19 @@ export const formatElapsedTime = (milliseconds: number): string => {
 
 // Utility function to format duration in minutes to HH:MM:SS
 export const formatDurationMinutes = (minutes: number): string => {
-  const hours = Math.floor(minutes / 60);
-  const mins = Math.floor(minutes % 60);
-  const secs = Math.floor((minutes % 1) * 60);
+  const totalMinutes = Math.abs(minutes);
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = Math.floor(totalMinutes % 60);
+  const secs = Math.floor((totalMinutes % 1) * 60);
   
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
-// Utility function to convert UTC timestamp to Chicago time
-export const formatChicagoTime = (date: Date): string => {
-  return date.toLocaleString("en-US", { 
-    timeZone: "America/Chicago",
-    hour12: true,
+// Utility function to convert UTC timestamp to Toronto time
+export const formatTorontoTime = (date: Date): string => {
+  return date.toLocaleString("en-CA", { 
+    timeZone: "America/Toronto",
+    hour12: false,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -364,6 +412,14 @@ export const formatChicagoTime = (date: Date): string => {
     minute: '2-digit',
     second: '2-digit'
   });
+};
+
+// Utility function to get elapsed time using Toronto timezone
+export const getTorontoElapsedTime = (timeOutUTC: Date): number => {
+  const utcNow = new Date();
+  const localNow = new Date(utcNow.toLocaleString("en-CA", { timeZone: "America/Toronto" }));
+  const localTimeOut = new Date(new Date(timeOutUTC).toLocaleString("en-CA", { timeZone: "America/Toronto" }));
+  return Math.abs(localNow.getTime() - localTimeOut.getTime());
 };
 
 // Utility function to get calculated duration in minutes for display

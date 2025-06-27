@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Users, Clock, TrendingUp, Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentlyOutRecords, updateReturnTime, getAnalytics, formatDurationMinutes } from "@/lib/supabaseDataManager";
+import { getCurrentlyOutRecords, updateReturnTime, getAnalytics, formatDurationMinutes, deleteHallPassRecord } from "@/lib/supabaseDataManager";
 import { HallPassRecord } from "@/lib/supabaseDataManager";
 import CurrentlyOutTable from "@/components/CurrentlyOutTable";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
@@ -63,6 +63,23 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       toast({
         title: "Error",
         description: "Could not mark student as returned.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteRecord = async (recordId: string, studentName: string) => {
+    const success = await deleteHallPassRecord(recordId);
+    if (success) {
+      toast({
+        title: "Record Deleted",
+        description: `Record for ${studentName} has been deleted.`,
+      });
+      loadData();
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not delete record.",
         variant: "destructive",
       });
     }
@@ -188,6 +205,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
         <CurrentlyOutTable 
           records={filteredOut} 
           onMarkReturn={handleMarkReturn}
+          onDeleteRecord={handleDeleteRecord}
         />
 
         {/* Analytics Panel */}
