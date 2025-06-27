@@ -12,12 +12,24 @@ export const calculateElapsedTime = (timeOut: Date | string, timeIn?: Date | str
     const startTime = new Date(timeOut);
     const endTime = timeIn ? new Date(timeIn) : new Date();
     
+    console.log("calculateElapsedTime debug:", {
+      timeOut,
+      timeIn,
+      startTime,
+      endTime,
+      startTimeValid: !isNaN(startTime.getTime()),
+      endTimeValid: !isNaN(endTime.getTime()),
+      startTimeMs: startTime.getTime(),
+      endTimeMs: endTime.getTime()
+    });
+    
     if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
       console.warn("Invalid date provided to calculateElapsedTime", { timeOut, timeIn });
       return 0;
     }
     
     const elapsed = endTime.getTime() - startTime.getTime();
+    console.log("Calculated elapsed time:", elapsed, "ms");
     
     // Ensure we never return negative time
     return Math.max(0, elapsed);
@@ -43,7 +55,10 @@ export const formatElapsedTime = (milliseconds: number): string => {
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    const formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    console.log("formatElapsedTime:", { milliseconds, totalSeconds, hours, minutes, seconds, formatted });
+    
+    return formatted;
   } catch (error) {
     console.error("Error formatting elapsed time:", error);
     return "00:00:00";

@@ -12,7 +12,21 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
 
   useEffect(() => {
     const updateElapsed = () => {
+      const now = new Date();
+      const timeOutDate = new Date(timeOut);
+      
+      console.log("OutTimer Debug:", {
+        timeOut,
+        timeOutDate,
+        now,
+        timeOutType: typeof timeOut,
+        isValidTimeOut: !isNaN(timeOutDate.getTime()),
+        isValidNow: !isNaN(now.getTime())
+      });
+      
       const elapsed = calculateElapsedTime(timeOut);
+      console.log("Calculated elapsed:", elapsed, "ms");
+      
       setElapsedMs(elapsed);
     };
 
@@ -24,7 +38,7 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
 
     // Cleanup interval on unmount or when timeOut changes
     return () => clearInterval(interval);
-  }, [timeOut]); // Include timeOut in dependency array so timer resets when it changes
+  }, [timeOut]);
 
   const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
 
@@ -33,6 +47,12 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
     if (elapsedMinutes >= 5) return 'text-yellow-600';
     return 'text-green-600';
   };
+
+  console.log("OutTimer render:", {
+    elapsedMs,
+    elapsedMinutes,
+    formattedTime: formatElapsedTime(elapsedMs)
+  });
 
   return (
     <div className={`font-mono text-lg font-bold ${getColorClass()} ${className}`}>
