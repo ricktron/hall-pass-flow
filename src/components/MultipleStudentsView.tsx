@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { HallPassRecord, updateReturnTime } from "@/lib/supabaseDataManager";
 import { calculateElapsedTime, formatElapsedTime, getElapsedMinutes } from "@/lib/timeUtils";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface MultipleStudentsViewProps {
   records: HallPassRecord[];
@@ -26,6 +27,7 @@ const DESTINATION_COLORS = {
 
 const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsViewProps) => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [weeklyAverage, setWeeklyAverage] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -34,6 +36,56 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const loadWeeklyAverage = async () => {
+    try {
+      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      
+      console.log("Loading weekly average for completed trips since:", oneWeekAgo);
+      
+      const { data: pastTrips, error } = await supabase
+        .from('Hall_Passes')
+        .select('timeOut, timeIn')
+        .gte('timeOut', oneWeekAgo)
+        .not('timeIn', 'is', null)
+        .eq('earlyDismissal', false);
+
+      if (error) {
+        console.error("Error fetching past trips:", error);
+        return;
+      }
+
+      console.log("Past trips found:", pastTrips?.length || 0);
+
+      if (!pastTrips || pastTrips.length === 0) {
+        setWeeklyAverage(0);
+        return;
+      }
+
+      const durations = pastTrips.map(trip => {
+        const outTime = new Date(trip.timeOut).getTime();
+        const inTime = new Date(trip.timeIn).getTime();
+        const durationMinutes = Math.round((inTime - outTime) / 60000);
+        return Math.max(0, durationMinutes); // Ensure non-negative
+      });
+
+      console.log("Trip durations (minutes):", durations);
+
+      const average = durations.length > 0 
+        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+        : 0;
+
+      console.log("Calculated weekly average:", average, "minutes");
+      setWeeklyAverage(average);
+    } catch (error) {
+      console.error("Error calculating weekly average:", error);
+      setWeeklyAverage(0);
+    }
+  };
+
+  useEffect(() => {
+    loadWeeklyAverage();
+  }, [records]); // Recalculate when records change
 
   const getDurationColor = (minutes: number) => {
     if (minutes < 5) return "text-green-600";
@@ -57,6 +109,8 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
         description: `${studentName} has been marked as returned.`,
       });
       onRefresh();
+      // Recalculate average after marking return
+      loadWeeklyAverage();
     } else {
       toast({
         title: "Error",
@@ -129,6 +183,17 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
                 </div>
               );
             })}
+            
+            {records.length > 0 && (
+              <div className="text-center p-4 bg-gray-50 rounded-lg mt-6">
+                <div className="text-lg font-semibold text-gray-700">
+                  Average Time Out: {weeklyAverage} minutes
+                  <div className="text-sm text-gray-500 mt-1">
+                    (Based on completed trips from past 7 days)
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
