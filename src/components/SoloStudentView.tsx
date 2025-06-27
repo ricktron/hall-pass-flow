@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { updateReturnTime } from "@/lib/supabaseDataManager";
+import { updateReturnTime, getWeeklyStats } from "@/lib/supabaseDataManager";
 
 interface StudentRecord {
   studentName: string;
@@ -21,6 +21,7 @@ interface SoloStudentViewProps {
 
 const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStudentViewProps) => {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [weeklyAverage, setWeeklyAverage] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -29,6 +30,14 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const loadWeeklyStats = async () => {
+      const stats = await getWeeklyStats(student.studentName);
+      setWeeklyAverage(stats.averageMinutes);
+    };
+    loadWeeklyStats();
+  }, [student.studentName]);
 
   const handleMarkReturn = async () => {
     const success = await updateReturnTime(student.studentName, student.period);
@@ -101,6 +110,10 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
                 <div className="text-lg text-gray-600">{student.destination}</div>
                 <div className={`text-8xl font-mono font-bold ${getColorClass()}`}>
                   {formatElapsedTime(elapsedMs)}
+                </div>
+                <div className="text-lg text-gray-600 mt-4">
+                  {student.studentName} has been out for {elapsedMinutes} minutes. 
+                  The weekly average is {weeklyAverage} minutes.
                 </div>
               </div>
             </div>

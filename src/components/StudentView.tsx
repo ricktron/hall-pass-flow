@@ -54,11 +54,6 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     setShowForm(true);
   };
 
-  const handleComplete = () => {
-    setCurrentStudents([]);
-    setShowForm(true);
-  };
-
   // Show "Have a Great Day" message for early dismissals
   if (showGreatDayMessage) {
     return (
@@ -107,7 +102,6 @@ const StudentView = ({ onBack }: StudentViewProps) => {
               students={currentStudents}
               onStudentReturn={handleStudentReturn}
               onSignOutAnother={handleSignOutAnother}
-              onComplete={handleComplete}
             />
           )}
         </div>

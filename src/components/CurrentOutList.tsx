@@ -17,10 +17,9 @@ interface CurrentOutListProps {
   students: StudentRecord[];
   onStudentReturn: (studentName: string, period: string) => void;
   onSignOutAnother: () => void;
-  onComplete: () => void;
 }
 
-const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother, onComplete }: CurrentOutListProps) => {
+const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: CurrentOutListProps) => {
   const { toast } = useToast();
 
   const handleMarkReturn = async (studentName: string, period: string) => {
@@ -123,13 +122,6 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother, onComplet
           >
             <UserPlus className="w-4 h-4 mr-2" />
             Another Out
-          </Button>
-          <Button
-            size="lg"
-            className="flex-1 py-3 bg-blue-600 hover:bg-blue-700"
-            onClick={onComplete}
-          >
-            Done
           </Button>
         </div>
       </CardContent>
