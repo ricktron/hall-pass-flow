@@ -49,7 +49,7 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother, onComplet
   const getBackgroundColor = (timeOut: Date) => {
     const elapsedMinutes = getElapsedMinutes(timeOut);
     if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';
-    if (elapsedMinutes <= 10) return 'bg-yellow-100 border-yellow-300';
+    if (elapsedMinutes < 10) return 'bg-yellow-100 border-yellow-300';
     return 'bg-red-100 border-red-300';
   };
 

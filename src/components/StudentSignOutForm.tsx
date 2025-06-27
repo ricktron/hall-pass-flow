@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { addHallPassRecord, getStudentNames, getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
@@ -30,6 +29,7 @@ const DESTINATIONS = [
   "Dean of Academics",
   "Nurse",
   "Football Meeting",
+  "Early Dismissal",
   "Other"
 ];
 
@@ -42,7 +42,6 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   const [lastName, setLastName] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [selectedDestination, setSelectedDestination] = useState("");
-  const [isEarlyDismissal, setIsEarlyDismissal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [studentNames, setStudentNames] = useState<string[]>([]);
   const [filteredNames, setFilteredNames] = useState<string[]>([]);
@@ -81,7 +80,6 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
     setLastName("");
     setSelectedPeriod("");
     setSelectedDestination("");
-    setIsEarlyDismissal(false);
   };
 
   const checkForDuplicateEntry = async (studentName: string) => {
@@ -105,17 +103,20 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
       const now = new Date();
       const studentName = `${firstName.trim()} ${lastName.trim()}`;
       const dayOfWeek = DAYS_OF_WEEK[now.getDay()];
+      const isEarlyDismissal = selectedDestination === 'Early Dismissal';
       
-      // Check for duplicate entry
-      const isDuplicate = await checkForDuplicateEntry(studentName);
-      if (isDuplicate) {
-        toast({
-          title: "Student Already Out",
-          description: `${studentName} is already signed out. Please mark them as returned first.`,
-          variant: "destructive",
-        });
-        setIsSubmitting(false);
-        return;
+      // Check for duplicate entry only if not early dismissal
+      if (!isEarlyDismissal) {
+        const isDuplicate = await checkForDuplicateEntry(studentName);
+        if (isDuplicate) {
+          toast({
+            title: "Student Already Out",
+            description: `${studentName} is already signed out. Please mark them as returned first.`,
+            variant: "destructive",
+          });
+          setIsSubmitting(false);
+          return;
+        }
       }
       
       const success = await addHallPassRecord({
@@ -238,17 +239,6 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
               ))}
             </SelectContent>
           </Select>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox 
-            id="earlyDismissal" 
-            checked={isEarlyDismissal}
-            onCheckedChange={(checked) => setIsEarlyDismissal(checked === true)}
-          />
-          <Label htmlFor="earlyDismissal" className="text-sm font-medium">
-            Early Dismissal (no return required)
-          </Label>
         </div>
 
         <Button 

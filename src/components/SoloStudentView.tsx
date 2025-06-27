@@ -17,10 +17,9 @@ interface SoloStudentViewProps {
   student: StudentRecord;
   onStudentReturn: (studentName: string, period: string) => void;
   onSignOutAnother: () => void;
-  onComplete: () => void;
 }
 
-const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother, onComplete }: SoloStudentViewProps) => {
+const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStudentViewProps) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const { toast } = useToast();
 
@@ -73,14 +72,14 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother, onComplet
   const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
 
   const getColorClass = () => {
-    if (elapsedMinutes > 10) return 'text-red-600';
-    if (elapsedMinutes > 5) return 'text-yellow-600';
+    if (elapsedMinutes >= 10) return 'text-red-600';
+    if (elapsedMinutes >= 5) return 'text-yellow-600';
     return 'text-green-600';
   };
 
   const getBackgroundColor = () => {
     if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';
-    if (elapsedMinutes <= 10) return 'bg-yellow-100 border-yellow-300';
+    if (elapsedMinutes < 10) return 'bg-yellow-100 border-yellow-300';
     return 'bg-red-100 border-red-300';
   };
 
@@ -123,13 +122,6 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother, onComplet
               >
                 <UserPlus className="w-6 h-6 mr-2" />
                 Another Out
-              </Button>
-              <Button
-                size="lg"
-                className="flex-1 py-6 text-xl bg-blue-600 hover:bg-blue-700"
-                onClick={onComplete}
-              >
-                Done
               </Button>
             </div>
           </CardContent>

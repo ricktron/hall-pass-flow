@@ -22,9 +22,11 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [currentStudents, setCurrentStudents] = useState<StudentRecord[]>([]);
   const [showGreatDayMessage, setShowGreatDayMessage] = useState(false);
   const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
+  const [showForm, setShowForm] = useState(true);
 
   const handleSignOut = (studentRecord: StudentRecord) => {
     setCurrentStudents(prev => [...prev, studentRecord]);
+    setShowForm(false);
   };
 
   const handleEarlyDismissal = (studentName: string) => {
@@ -35,20 +37,26 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const handleGreatDayComplete = () => {
     setShowGreatDayMessage(false);
     setEarlyDismissalStudent("");
+    setShowForm(true);
   };
 
   const handleStudentReturn = (studentName: string, period: string) => {
     setCurrentStudents(prev => 
       prev.filter(s => !(s.studentName === studentName && s.period === period))
     );
+    // If no students left, show the form
+    if (currentStudents.length === 1) {
+      setShowForm(true);
+    }
   };
 
   const handleSignOutAnother = () => {
-    // Form is already visible, just focus remains on form
+    setShowForm(true);
   };
 
   const handleComplete = () => {
     setCurrentStudents([]);
+    setShowForm(true);
   };
 
   // Show "Have a Great Day" message for early dismissals
@@ -61,14 +69,13 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     );
   }
 
-  // Show solo view for single student
-  if (currentStudents.length === 1) {
+  // Show solo view for single student (when form is not showing)
+  if (currentStudents.length === 1 && !showForm) {
     return (
       <SoloStudentView
         student={currentStudents[0]}
         onStudentReturn={handleStudentReturn}
         onSignOutAnother={handleSignOutAnother}
-        onComplete={handleComplete}
       />
     );
   }
@@ -89,16 +96,20 @@ const StudentView = ({ onBack }: StudentViewProps) => {
         </div>
 
         <div className="space-y-6">
-          <StudentSignOutForm 
-            onSignOut={handleSignOut} 
-            onEarlyDismissal={handleEarlyDismissal}
-          />
-          <CurrentOutList 
-            students={currentStudents}
-            onStudentReturn={handleStudentReturn}
-            onSignOutAnother={handleSignOutAnother}
-            onComplete={handleComplete}
-          />
+          {showForm && (
+            <StudentSignOutForm 
+              onSignOut={handleSignOut} 
+              onEarlyDismissal={handleEarlyDismissal}
+            />
+          )}
+          {currentStudents.length > 1 && (
+            <CurrentOutList 
+              students={currentStudents}
+              onStudentReturn={handleStudentReturn}
+              onSignOutAnother={handleSignOutAnother}
+              onComplete={handleComplete}
+            />
+          )}
         </div>
       </div>
     </div>

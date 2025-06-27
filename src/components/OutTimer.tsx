@@ -41,8 +41,8 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
   const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
 
   const getColorClass = () => {
-    if (elapsedMinutes > 10) return 'text-red-600';
-    if (elapsedMinutes > 5) return 'text-yellow-600';
+    if (elapsedMinutes >= 10) return 'text-red-600';
+    if (elapsedMinutes >= 5) return 'text-yellow-600';
     return 'text-green-600';
   };
 
