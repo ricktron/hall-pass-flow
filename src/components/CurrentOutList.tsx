@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateReturnTime } from "@/lib/supabaseDataManager";
-import { getElapsedMinutes, calculateElapsedTime } from "@/lib/timeUtils";
+import { calculateElapsedTime } from "@/lib/timeUtils";
 import OutTimer from "./OutTimer";
 
 interface StudentRecord {
@@ -58,11 +58,12 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
     return 'bg-red-100 border-red-300';
   };
 
-  const getAverageTime = () => {
+  const getCurrentAverage = () => {
     if (students.length === 0) return 0;
     
+    const now = new Date();
     const totalMinutes = students.reduce((sum, student) => {
-      const elapsedMs = calculateElapsedTime(student.timeOut, currentTime);
+      const elapsedMs = calculateElapsedTime(student.timeOut, now);
       const elapsed = Math.floor(elapsedMs / (1000 * 60));
       return sum + elapsed;
     }, 0);
@@ -78,17 +79,14 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
     
     const trimmedName = fullName.trim();
     
-    if (trimmedName.length <= 15 || !trimmedName.includes(' ')) {
+    // Always return full name unless it's extremely long
+    if (trimmedName.length <= 30) {
       return trimmedName;
     }
     
+    // Only abbreviate if really necessary
     const parts = trimmedName.split(' ');
-    
-    if (parts.length === 2 && trimmedName.length <= 25) {
-      return trimmedName;
-    }
-    
-    if (trimmedName.length > 25) {
+    if (parts.length >= 2) {
       return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
     }
     
@@ -143,7 +141,7 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
         {students.length > 1 && (
           <div className="text-center p-4 bg-gray-50 rounded-lg">
             <div className="text-lg font-semibold text-gray-700">
-              Average Time Out: {getAverageTime()} minutes
+              Current Average Time Out: {getCurrentAverage()} minutes
               <div className="text-sm text-gray-500 mt-1">
                 (Real-time average of students currently out)
               </div>

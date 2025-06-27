@@ -47,14 +47,11 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     // Reload the current students to get the most up-to-date list
     const updatedStudents = await loadCurrentStudents();
     
-    // Don't hide the form immediately - let the user see the updated list
-    // and decide if they want to sign out another student
+    // Always show the appropriate view based on student count
     if (updatedStudents.length === 1) {
-      // If this is the first student, show solo view
-      setShowForm(false);
+      setShowForm(false); // Show solo view
     } else if (updatedStudents.length >= 2) {
-      // If multiple students, show the list view
-      setShowForm(false);
+      setShowForm(false); // Show list view
     }
   };
 
@@ -77,10 +74,9 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     if (updatedStudents.length === 0) {
       setShowForm(true);
     } else if (updatedStudents.length === 1) {
-      // Switch to solo view if only one student remains
-      setShowForm(false);
+      setShowForm(false); // Show solo view
     }
-    // If multiple students remain, stay in list view
+    // If multiple students remain, stay in list view (showForm remains false)
   };
 
   const handleSignOutAnother = () => {
@@ -124,7 +120,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
         </div>
 
         <div className="space-y-6">
-          {(showForm || currentStudents.length === 0) && (
+          {showForm && (
             <StudentSignOutForm 
               onSignOut={handleSignOut} 
               onEarlyDismissal={handleEarlyDismissal}

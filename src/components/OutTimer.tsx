@@ -11,55 +11,43 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
   const [elapsedMs, setElapsedMs] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
+  const timeOutRef = useRef(timeOut);
+
+  // Update timeOut ref when prop changes
+  useEffect(() => {
+    timeOutRef.current = timeOut;
+  }, [timeOut]);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    // Clear any existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    // Ensure we have a valid timeOut value
-    if (!timeOut) {
-      console.warn("OutTimer - No timeOut provided");
-      setElapsedMs(0);
-      return;
-    }
     
-    const calculateAndUpdateElapsed = () => {
+    const updateElapsed = () => {
       if (!mountedRef.current) return;
       
       try {
-        const elapsed = calculateElapsedTime(timeOut);
+        const elapsed = calculateElapsedTime(timeOutRef.current);
         setElapsedMs(elapsed);
       } catch (error) {
         console.error("OutTimer - Error calculating elapsed time:", error);
-        if (mountedRef.current) {
-          setElapsedMs(0);
-        }
       }
     };
 
     // Calculate immediately
-    calculateAndUpdateElapsed();
+    updateElapsed();
 
-    // Then update every second with a unique interval for this instance
-    intervalRef.current = setInterval(calculateAndUpdateElapsed, 1000);
-    
+    // Set up interval - only create if we don't have one
+    if (!intervalRef.current) {
+      intervalRef.current = setInterval(updateElapsed, 1000);
+    }
+
     return () => {
+      mountedRef.current = false;
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
-  }, [timeOut]);
+  }, []); // Empty dependency array - we handle timeOut changes via ref
 
   const elapsedMinutes = Math.floor(elapsedMs / (1000 * 60));
 
