@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { calculateDurationMinutes, getLocalTodayBounds, getLocalWeekStart } from "@/lib/timeUtils";
+import { calculateDurationMinutes, getLocalTodayBounds, getLocalWeekStart, formatDurationHMS } from "@/lib/timeUtils";
 
 export interface HallPassRecord {
   id: string;
@@ -252,7 +252,7 @@ export const getWeeklyStats = async (studentName: string): Promise<{
     // Filter out trips longer than 90 minutes (likely incomplete - student forgot to sign back in)
     const validTrips = (data || []).filter(record => {
       if (record.timeIn && record.timeOut) {
-        const calculatedDuration = calculateDurationMinutes(record.timeOut, record.timeIn!);
+        const calculatedDuration = calculateDurationMinutes(record.timeOut, record.timeIn);
         return calculatedDuration <= 90; // Ignore trips longer than 1.5 hours
       }
       return Math.abs(record.duration || 0) <= 90;
@@ -291,12 +291,13 @@ export const getAnalytics = async () => {
         totalTripsToday: 0,
         mostFrequentToday: [],
         mostFrequentWeek: [],
-        longestTripToday: { duration: 0, student: '' },
+        longestTripToday: { duration: 0, student: '', durationFormatted: '00:00:00' },
         tripsPerPeriod: {},
         averageDuration: 0,
+        averageDurationFormatted: '00:00:00',
         topLongestTripsToday: [],
         mostCommonDestination: '',
-        periodWithLongestAverage: { period: '', averageDuration: 0 }
+        periodWithLongestAverage: { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' }
       };
     }
 
@@ -346,16 +347,20 @@ export const getAnalytics = async () => {
       return duration <= 90; // Ignore trips longer than 1.5 hours - likely incomplete
     });
     
-    // Get top 5 longest trips today
+    // Get top 5 longest trips today with HH:MM:SS formatting
     const topLongestTripsToday = completedTodayRecords
-      .map(record => ({
-        student: record.studentName || '',
-        duration: calculateDurationMinutes(record.timeOut, record.timeIn!)
-      }))
+      .map(record => {
+        const durationMinutes = calculateDurationMinutes(record.timeOut, record.timeIn!);
+        return {
+          student: record.studentName || '',
+          duration: durationMinutes,
+          durationFormatted: formatDurationHMS(durationMinutes)
+        };
+      })
       .sort((a, b) => b.duration - a.duration)
       .slice(0, 5);
     
-    let longestTripToday = { duration: 0, student: '' };
+    let longestTripToday = { duration: 0, student: '', durationFormatted: '00:00:00' };
     if (topLongestTripsToday.length > 0) {
       longestTripToday = topLongestTripsToday[0];
     }
@@ -381,6 +386,8 @@ export const getAnalytics = async () => {
           return sum + duration;
         }, 0) / completedRecords.length
       : 0;
+
+    const averageDurationFormatted = formatDurationHMS(Math.round(averageDuration));
 
     // Most common destination
     const destinationCount: { [key: string]: number } = {};
@@ -410,11 +417,15 @@ export const getAnalytics = async () => {
       }
     });
 
-    let periodWithLongestAverage = { period: '', averageDuration: 0 };
+    let periodWithLongestAverage = { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' };
     Object.entries(periodDurations).forEach(([period, durations]) => {
       const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
       if (avg > periodWithLongestAverage.averageDuration) {
-        periodWithLongestAverage = { period, averageDuration: Math.round(avg) };
+        periodWithLongestAverage = { 
+          period, 
+          averageDuration: Math.round(avg),
+          averageDurationFormatted: formatDurationHMS(Math.round(avg))
+        };
       }
     });
 
@@ -425,6 +436,7 @@ export const getAnalytics = async () => {
       longestTripToday,
       tripsPerPeriod,
       averageDuration: Math.round(averageDuration * 10) / 10, // Round to 1 decimal place
+      averageDurationFormatted,
       topLongestTripsToday,
       mostCommonDestination,
       periodWithLongestAverage
@@ -435,12 +447,13 @@ export const getAnalytics = async () => {
       totalTripsToday: 0,
       mostFrequentToday: [],
       mostFrequentWeek: [],
-      longestTripToday: { duration: 0, student: '' },
+      longestTripToday: { duration: 0, student: '', durationFormatted: '00:00:00' },
       tripsPerPeriod: {},
       averageDuration: 0,
+      averageDurationFormatted: '00:00:00',
       topLongestTripsToday: [],
       mostCommonDestination: '',
-      periodWithLongestAverage: { period: '', averageDuration: 0 }
+      periodWithLongestAverage: { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' }
     };
   }
 };

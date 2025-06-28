@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getCurrentlyOutRecords, getAnalytics, HallPassRecord, markStudentReturn } from "@/lib/supabaseDataManager";
+import { formatLocalTime } from "@/lib/timeUtils";
 import CurrentlyOutTable from "./CurrentlyOutTable";
 import SecurityWarnings from "./SecurityWarnings";
 
@@ -17,6 +18,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [currentlyOut, setCurrentlyOut] = useState<HallPassRecord[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -28,6 +30,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
         ]);
         setCurrentlyOut(outRecords);
         setAnalytics(analyticsData);
+        setLastUpdated(new Date());
       } catch (error) {
         console.error("Error fetching teacher view data:", error);
       } finally {
@@ -48,6 +51,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       // Refresh the data after marking return
       const outRecords = await getCurrentlyOutRecords();
       setCurrentlyOut(outRecords);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error("Error marking student return:", error);
     }
@@ -95,7 +99,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 <CardTitle className="flex items-center justify-between">
                   Currently Out ({currentlyOut.length})
                   <span className="text-sm font-normal text-gray-500">
-                    Updates every 30 seconds
+                    Last Updated: {formatLocalTime(lastUpdated)}
                   </span>
                 </CardTitle>
               </CardHeader>
@@ -123,7 +127,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
-                    {analytics?.averageDuration || 0}m
+                    {analytics?.averageDurationFormatted || '00:00:00'}
                   </div>
                   <div className="text-sm text-gray-600">Avg Duration</div>
                 </div>
@@ -135,7 +139,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                     {analytics.longestTripToday.student}
                   </div>
                   <div className="text-sm text-gray-600">
-                    Longest trip: {analytics.longestTripToday.duration}m
+                    Longest trip: {analytics.longestTripToday.durationFormatted}
                   </div>
                 </div>
               )}
@@ -207,7 +211,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                   {analytics.topLongestTripsToday.map((trip: any, index: number) => (
                     <div key={index} className="text-center p-4 bg-red-50 rounded-lg">
                       <div className="text-lg font-bold text-red-600">
-                        {trip.duration}m
+                        {trip.durationFormatted}
                       </div>
                       <div className="text-sm text-gray-600">{trip.student}</div>
                     </div>
@@ -230,7 +234,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Period with Longest Avg:</span>
                   <span className="font-medium">
-                    {analytics.periodWithLongestAverage.period} ({analytics.periodWithLongestAverage.averageDuration}m)
+                    {analytics.periodWithLongestAverage.period} ({analytics.periodWithLongestAverage.averageDurationFormatted})
                   </span>
                 </div>
               )}
