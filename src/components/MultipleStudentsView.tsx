@@ -2,11 +2,11 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users, RefreshCw, UserPlus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { HallPassRecord, updateReturnTime } from "@/lib/supabaseDataManager";
-import { calculateElapsedTime, formatElapsedTime, getElapsedMinutes, formatLocalTime } from "@/lib/timeUtils";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { getElapsedMinutes, formatDuration } from "@/lib/timeUtils";
 
 interface MultipleStudentsViewProps {
   records: HallPassRecord[];
@@ -14,113 +14,28 @@ interface MultipleStudentsViewProps {
   onRefresh: () => void;
 }
 
-const DESTINATION_COLORS = {
-  "Bathroom": "bg-orange-100 border-orange-300",
-  "Nurse": "bg-red-100 border-red-300",
-  "Counselor": "bg-blue-100 border-blue-300",
-  "Dean of Students": "bg-purple-100 border-purple-300",
-  "Dean of Academics": "bg-green-100 border-green-300",
-  "Locker": "bg-gray-100 border-gray-300",
-  "Football Meeting": "bg-yellow-100 border-yellow-300",
-  "Other": "bg-pink-100 border-pink-300"
-};
-
 const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsViewProps) => {
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [weeklyAverage, setWeeklyAverage] = useState(0);
-  const [currentAverage, setCurrentAverage] = useState(0);
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Update current time every second for real-time calculations
   useEffect(() => {
-    const interval = setInterval(() => {
+    const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
-    return () => clearInterval(interval);
+
+    return () => clearInterval(timer);
   }, []);
 
-  // Calculate real-time average of students currently out
-  useEffect(() => {
-    if (records.length > 0) {
-      const now = new Date();
-      const totalMinutes = records.reduce((sum, record) => {
-        const elapsedSeconds = calculateElapsedTime(record.timeOut);
-        const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-        return sum + elapsedMinutes;
-      }, 0);
-      const average = Math.round(totalMinutes / records.length);
-      setCurrentAverage(average);
-    } else {
-      setCurrentAverage(0);
-    }
-  }, [records, currentTime]);
-
-  // Load historical weekly average from completed trips
-  const loadWeeklyAverage = async () => {
-    try {
-      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      
-      console.log("Loading weekly average for completed trips since:", oneWeekAgo);
-      
-      const { data: pastTrips, error } = await supabase
-        .from('Hall_Passes')
-        .select('timeOut, timeIn, duration')
-        .gte('timeOut', oneWeekAgo)
-        .not('timeIn', 'is', null)
-        .not('duration', 'is', null)
-        .gt('duration', 0)
-        .eq('earlyDismissal', false);
-
-      if (error) {
-        console.error("Error fetching past trips:", error);
-        return;
-      }
-
-      console.log("Past trips found:", pastTrips?.length || 0);
-
-      if (!pastTrips || pastTrips.length === 0) {
-        setWeeklyAverage(0);
-        return;
-      }
-
-      const durations = pastTrips.map(trip => {
-        const durationMinutes = Math.abs(Number(trip.duration) || 0);
-        return Math.max(0, Math.round(durationMinutes));
-      });
-
-      console.log("Trip durations (minutes):", durations);
-
-      const average = durations.length > 0 
-        ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
-        : 0;
-
-      console.log("Calculated weekly average:", average, "minutes");
-      setWeeklyAverage(average);
-    } catch (error) {
-      console.error("Error calculating weekly average:", error);
-      setWeeklyAverage(0);
-    }
+  const handleBackClick = () => {
+    navigate("/");
   };
 
-  useEffect(() => {
-    loadWeeklyAverage();
-  }, [records]);
-
-  const getDurationColor = (minutes: number) => {
-    if (minutes < 5) return "text-green-600";
-    if (minutes <= 10) return "text-yellow-600";
-    return "text-red-600";
+  const handleSignOutAnother = () => {
+    navigate("/");
   };
 
-  const getRowColor = (minutes: number, destination: string) => {
-    const destinationColor = DESTINATION_COLORS[destination as keyof typeof DESTINATION_COLORS] || "bg-gray-100 border-gray-300";
-    
-    if (minutes > 10) return `${destinationColor} border-l-4 border-l-red-500`;
-    if (minutes > 5) return `${destinationColor} border-l-4 border-l-yellow-500`;
-    return `${destinationColor} border-l-4 border-l-green-500`;
-  };
-
-  const handleMarkReturn = async (studentName: string, period: string) => {
+  const handleStudentReturn = async (studentName: string, period: string) => {
     const success = await updateReturnTime(studentName, period);
     if (success) {
       toast({
@@ -128,7 +43,6 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
         description: `${studentName} has been marked as returned.`,
       });
       onRefresh();
-      loadWeeklyAverage();
     } else {
       toast({
         title: "Error",
@@ -138,102 +52,94 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     }
   };
 
-  const formatStudentName = (fullName: string) => {
-    if (!fullName || fullName.trim() === '') {
-      return 'Unknown Student';
-    }
-    
-    const trimmedName = fullName.trim();
-    
-    if (trimmedName.length <= 15 || !trimmedName.includes(' ')) {
-      return trimmedName;
-    }
-    
-    const parts = trimmedName.split(' ');
-    
-    if (parts.length === 2 && trimmedName.length <= 25) {
-      return trimmedName;
-    }
-    
-    if (trimmedName.length > 25) {
-      return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
-    }
-    
-    return trimmedName;
+  const getRowColor = (timeOut: Date) => {
+    const elapsed = getElapsedMinutes(timeOut);
+    if (elapsed < 5) return 'bg-green-50 border-green-200';
+    if (elapsed < 10) return 'bg-yellow-50 border-yellow-200';
+    return 'bg-red-50 border-red-200';
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex items-center mb-6">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="mr-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <h1 className="text-3xl font-bold text-gray-800">Students Currently Out</h1>
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Button 
+              variant="outline" 
+              onClick={handleBackClick}
+              className="mr-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-3xl font-bold text-gray-800">Students Currently Out</h1>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={onRefresh}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </Button>
+            <Button 
+              onClick={handleSignOutAnother}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+            >
+              <UserPlus className="w-4 h-4" />
+              Sign Out Another
+            </Button>
+          </div>
         </div>
 
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl">
+            <CardTitle className="flex items-center">
+              <Users className="w-5 h-5 mr-2 text-blue-600" />
               {records.length} Student{records.length !== 1 ? 's' : ''} Currently Out
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {records.map((record) => {
-              const elapsedSeconds = calculateElapsedTime(record.timeOut);
-              const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-              const studentName = formatStudentName(record.studentName);
-              
-              return (
-                <div 
-                  key={record.id}
-                  className={`p-4 rounded-lg border-2 ${getRowColor(elapsedMinutes, record.destination || 'Other')}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-4">
-                        <div className="font-bold text-lg">{studentName}</div>
-                        <div className="text-sm text-gray-600">
-                          Period {record.period}
+          <CardContent>
+            {records.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No students are currently out.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {records.map((record) => (
+                  <div 
+                    key={`${record.studentName}-${record.period}`}
+                    className={`p-4 rounded-lg border-2 ${getRowColor(record.timeOut)}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-4">
+                          <div className="text-xl font-bold text-gray-800">
+                            {record.studentName}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Period {record.period}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {record.destination || 'Unknown'}
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-600">
-                          {record.destination || 'Unknown'}
-                        </div>
-                        <div className={`font-mono text-lg font-bold ${getDurationColor(elapsedMinutes)}`}>
-                          {formatElapsedTime(elapsedSeconds)}
+                        <div className="text-sm text-gray-500 mt-1">
+                          Out for: {formatDuration(getElapsedMinutes(record.timeOut))}
                         </div>
                       </div>
+                      <Button
+                        size="sm"
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => handleStudentReturn(record.studentName, record.period)}
+                      >
+                        Mark Returned
+                      </Button>
                     </div>
-                    <Button
-                      size="lg"
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-3"
-                      onClick={() => handleMarkReturn(record.studentName, record.period)}
-                    >
-                      Returned
-                    </Button>
                   </div>
-                </div>
-              );
-            })}
-            
-            {records.length > 0 && (
-              <div className="text-center p-4 bg-gray-50 rounded-lg mt-6">
-                <div className="text-lg font-semibold text-gray-700">
-                  Current Average Time Out: {currentAverage} minutes
-                  <div className="text-sm text-gray-500 mt-1">
-                    (Real-time average of students currently out)
-                  </div>
-                  {weeklyAverage > 0 && (
-                    <div className="text-sm text-gray-500 mt-2">
-                      Weekly average from completed trips: {weeklyAverage} minutes
-                    </div>
-                  )}
-                </div>
+                ))}
               </div>
             )}
           </CardContent>
