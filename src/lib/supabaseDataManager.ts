@@ -147,6 +147,11 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
   }
 };
 
+// Add markStudentReturn as an alias to updateReturnTime for teacher view
+export const markStudentReturn = async (studentName: string, period: string): Promise<boolean> => {
+  return updateReturnTime(studentName, period);
+};
+
 export const deleteHallPassRecord = async (recordId: string): Promise<boolean> => {
   try {
     const { error } = await supabase
