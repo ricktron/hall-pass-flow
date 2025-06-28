@@ -1,6 +1,16 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom font loading */
+@font-face {
+  font-family: 'Brittany Signature';
+  src: url('https://jgicbewohdubulzdcuat.supabase.co/storage/v1/object/public/fonts/BrittanySignature.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
 
