@@ -300,7 +300,14 @@ export const getAnalytics = async () => {
         periodWithLongestAverage: { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' },
         averageTripsPerDay: 0,
         weeklyAverageDuration: 0,
-        weeklyAverageDurationFormatted: '00:00:00'
+        weeklyAverageDurationFormatted: '00:00:00',
+        topStudentsThisWeek: [],
+        longestTripThisWeek: { student: '', duration: 0, durationFormatted: '00:00:00', dayOfWeek: '' },
+        quietestPeriods: [],
+        weeklyStats: { totalTrips: 0, averageTripsPerStudent: 0, studentsWhoNeverLeft: 0 },
+        unreturnedPasses: [],
+        destinationDistribution: [],
+        weeklyTrendData: []
       };
     }
 
@@ -461,20 +468,147 @@ export const getAnalytics = async () => {
       }
     });
 
+    // NEW ANALYTICS
+
+    // 1. Top Students This Week (Frequent Flyers)
+    const weekFrequency: { [key: string]: { count: number, totalDuration: number, completedTrips: number } } = {};
+    
+    weekRecords.forEach(record => {
+      if (record.studentName) {
+        if (!weekFrequency[record.studentName]) {
+          weekFrequency[record.studentName] = { count: 0, totalDuration: 0, completedTrips: 0 };
+        }
+        weekFrequency[record.studentName].count++;
+        
+        if (record.timeIn && record.timeOut) {
+          const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
+          if (duration <= 90) {
+            weekFrequency[record.studentName].totalDuration += duration;
+            weekFrequency[record.studentName].completedTrips++;
+          }
+        }
+      }
+    });
+
+    const topStudentsThisWeek = Object.entries(weekFrequency)
+      .map(([name, data]) => ({
+        name,
+        count: data.count,
+        averageDuration: data.completedTrips > 0 ? Math.round(data.totalDuration / data.completedTrips) : 0,
+        averageDurationFormatted: data.completedTrips > 0 ? formatDurationHMS(Math.round(data.totalDuration / data.completedTrips)) : '00:00:00'
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // 2. Longest Trip This Week
+    const completedWeekRecords = weekRecords.filter(record => {
+      if (!record.timeIn || !record.timeOut) return false;
+      const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
+      return duration <= 90;
+    });
+
+    let longestTripThisWeek = { student: '', duration: 0, durationFormatted: '00:00:00', dayOfWeek: '' };
+    if (completedWeekRecords.length > 0) {
+      const longest = completedWeekRecords
+        .map(record => {
+          const duration = calculateDurationMinutes(record.timeOut, record.timeIn!);
+          return {
+            student: record.studentName || '',
+            duration,
+            durationFormatted: formatDurationHMS(duration),
+            dayOfWeek: record.dayOfWeek || new Date(record.timeOut).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Toronto' })
+          };
+        })
+        .sort((a, b) => b.duration - a.duration)[0];
+      
+      longestTripThisWeek = longest;
+    }
+
+    // 3. Quietest Periods
+    const periodTripsThisWeek: { [key: string]: number } = {};
+    weekRecords.forEach(record => {
+      if (record.period) {
+        periodTripsThisWeek[record.period] = (periodTripsThisWeek[record.period] || 0) + 1;
+      }
+    });
+
+    const quietestPeriods = Object.entries(periodTripsThisWeek)
+      .map(([period, count]) => ({ period, count }))
+      .sort((a, b) => a.count - b.count)
+      .slice(0, 2);
+
+    // 4. Weekly Stats
+    const uniqueStudentsThisWeek = new Set(weekRecords.map(r => r.studentName).filter(Boolean));
+    const allUniqueStudents = new Set(records.map(r => r.studentName).filter(Boolean));
+    const studentsWhoNeverLeft = allUniqueStudents.size - uniqueStudentsThisWeek.size;
+
+    const weeklyStats = {
+      totalTrips: weekRecords.length,
+      averageTripsPerStudent: uniqueStudentsThisWeek.size > 0 ? Math.round((weekRecords.length / uniqueStudentsThisWeek.size) * 10) / 10 : 0,
+      studentsWhoNeverLeft
+    };
+
+    // 5. Unreturned Passes
+    const unreturnedPasses = records
+      .filter(record => !record.timeIn && !record.earlyDismissal)
+      .map(record => ({
+        studentName: record.studentName || '',
+        period: record.period || '',
+        timeOut: new Date(record.timeOut),
+        destination: record.destination || ''
+      }))
+      .sort((a, b) => b.timeOut.getTime() - a.timeOut.getTime());
+
+    // 6. Destination Distribution
+    const destinationCounts: { [key: string]: number } = {};
+    weekRecords.forEach(record => {
+      if (record.destination) {
+        destinationCounts[record.destination] = (destinationCounts[record.destination] || 0) + 1;
+      }
+    });
+
+    const totalDestinationTrips = Object.values(destinationCounts).reduce((sum, count) => sum + count, 0);
+    const destinationDistribution = Object.entries(destinationCounts)
+      .map(([destination, count]) => ({
+        destination,
+        count,
+        percentage: totalDestinationTrips > 0 ? Math.round((count / totalDestinationTrips) * 100) : 0
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // 7. Weekly Trend Data (simple version - just this week by day)
+    const weeklyTrendData: { day: string, trips: number }[] = [];
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    
+    daysOfWeek.forEach(day => {
+      const dayRecords = weekRecords.filter(record => {
+        const recordDay = new Date(record.timeOut).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Toronto' });
+        return recordDay === day;
+      });
+      weeklyTrendData.push({ day, trips: dayRecords.length });
+    });
+
     return {
       totalTripsToday: todayRecords.length,
       mostFrequentToday,
       mostFrequentWeek,
       longestTripToday,
       tripsPerPeriod,
-      averageDuration: Math.round(averageDuration * 10) / 10, // Round to 1 decimal place
+      averageDuration: Math.round(averageDuration * 10) / 10,
       averageDurationFormatted,
       topLongestTripsToday,
       mostCommonDestination,
       periodWithLongestAverage,
       averageTripsPerDay,
       weeklyAverageDuration: Math.round(weeklyAverageDuration * 10) / 10,
-      weeklyAverageDurationFormatted
+      weeklyAverageDurationFormatted,
+      topStudentsThisWeek,
+      longestTripThisWeek,
+      quietestPeriods,
+      weeklyStats,
+      unreturnedPasses,
+      destinationDistribution,
+      weeklyTrendData
     };
   } catch (error) {
     console.error("Error calculating analytics:", error);
@@ -491,7 +625,14 @@ export const getAnalytics = async () => {
       periodWithLongestAverage: { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' },
       averageTripsPerDay: 0,
       weeklyAverageDuration: 0,
-      weeklyAverageDurationFormatted: '00:00:00'
+      weeklyAverageDurationFormatted: '00:00:00',
+      topStudentsThisWeek: [],
+      longestTripThisWeek: { student: '', duration: 0, durationFormatted: '00:00:00', dayOfWeek: '' },
+      quietestPeriods: [],
+      weeklyStats: { totalTrips: 0, averageTripsPerStudent: 0, studentsWhoNeverLeft: 0 },
+      unreturnedPasses: [],
+      destinationDistribution: [],
+      weeklyTrendData: []
     };
   }
 };
