@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Users, Clock, BarChart3 } from "lucide-react";
+import { ArrowLeft, Users, BarChart3, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import AnalyticsPanel from "./AnalyticsPanel";
@@ -127,52 +127,27 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
         {activeView === 'overview' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Currently Out</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{currentlyOutCount}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Students away from class
-                  </p>
+            {currentlyOutCount === 0 ? (
+              <Card className="shadow-lg">
+                <CardContent className="py-16">
+                  <div className="text-center">
+                    <UserCheck className="w-16 h-16 mx-auto mb-4 text-green-600 opacity-70" />
+                    <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                      All students are currently in class.
+                    </h2>
+                    <p className="text-lg text-gray-600">
+                      No hall passes are currently active.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Classroom</CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{CLASSROOM_ID}</div>
-                  <p className="text-xs text-muted-foreground">
-                    Active room ID
-                  </p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Status</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">Active</div>
-                  <p className="text-xs text-muted-foreground">
-                    System operational
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <CurrentlyOutDisplay 
-              students={currentlyOutStudents}
-              onStudentReturn={handleStudentReturn}
-              onClose={handleCloseCurrentlyOut}
-            />
+            ) : (
+              <CurrentlyOutDisplay 
+                students={currentlyOutStudents}
+                onStudentReturn={handleStudentReturn}
+                onClose={handleCloseCurrentlyOut}
+              />
+            )}
           </div>
         )}
 
