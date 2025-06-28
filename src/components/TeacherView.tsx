@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +7,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { getCurrentlyOutRecords, getAnalytics, HallPassRecord, markStudentReturn } from "@/lib/supabaseDataManager";
 import { formatLocalTime } from "@/lib/timeUtils";
 import CurrentlyOutTable from "./CurrentlyOutTable";
-import SecurityWarnings from "./SecurityWarnings";
 
 interface TeacherViewProps {
   onBack: () => void;
@@ -88,8 +86,6 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
           </Button>
           <h1 className="text-3xl font-bold text-gray-900">Teacher Dashboard</h1>
         </div>
-        
-        <SecurityWarnings />
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Currently Out Section */}
