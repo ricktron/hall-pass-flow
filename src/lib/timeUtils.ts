@@ -87,8 +87,8 @@ export const calculateDurationMinutes = (timeOut: Date | string, timeIn: Date | 
  * @returns Elapsed time in minutes
  */
 export const getElapsedMinutes = (timeOut: Date | string): number => {
-  const elapsedMs = calculateElapsedTime(timeOut);
-  const minutes = Math.floor(elapsedMs / (1000 * 60));
+  const elapsedSeconds = calculateElapsedTime(timeOut);
+  const minutes = Math.floor(elapsedSeconds / 60);
   return minutes;
 };
 
@@ -105,6 +105,7 @@ export const formatLocalTime = (date: Date | string): string => {
     }
     
     return dateObj.toLocaleString("en-US", { 
+      timeZone: "America/Toronto",
       hour12: false,
       year: 'numeric',
       month: '2-digit',
@@ -117,4 +118,65 @@ export const formatLocalTime = (date: Date | string): string => {
     console.error("Error formatting local time:", error);
     return "Invalid Date";
   }
+};
+
+/**
+ * Get local timezone boundaries for "today"
+ * @returns Start and end of day in America/Toronto timezone
+ */
+export const getLocalTodayBounds = () => {
+  const now = new Date();
+  const timeZone = "America/Toronto";
+  
+  // Get current date in Toronto timezone
+  const torontoDate = new Date(now.toLocaleString("en-CA", { timeZone }));
+  
+  const startOfDay = new Date(torontoDate.getFullYear(), torontoDate.getMonth(), torontoDate.getDate(), 0, 0, 0, 0);
+  const endOfDay = new Date(torontoDate.getFullYear(), torontoDate.getMonth(), torontoDate.getDate(), 23, 59, 59, 999);
+  
+  return { startOfDay, endOfDay };
+};
+
+/**
+ * Get start of local week (Monday) in America/Toronto timezone
+ * @returns Start of week in local timezone
+ */
+export const getLocalWeekStart = () => {
+  const now = new Date();
+  const timeZone = "America/Toronto";
+  
+  // Get current date in Toronto timezone
+  const torontoDate = new Date(now.toLocaleString("en-CA", { timeZone }));
+  
+  const startOfWeek = new Date(torontoDate);
+  const dayOfWeek = torontoDate.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  startOfWeek.setDate(torontoDate.getDate() - daysToMonday);
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  return startOfWeek;
+};
+
+/**
+ * Format duration in a readable format (minutes or HH:MM:SS)
+ * @param minutes Duration in minutes
+ * @returns Formatted duration string
+ */
+export const formatDurationReadable = (minutes: number): string => {
+  if (minutes >= 90) {
+    return "1.5+ hrs";
+  }
+  
+  if (minutes < 60) {
+    return `${minutes} min${minutes !== 1 ? 's' : ''}`;
+  }
+  
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  
+  if (remainingMinutes === 0) {
+    return `${hours} hr${hours !== 1 ? 's' : ''}`;
+  }
+  
+  return `${hours}h ${remainingMinutes}m`;
 };

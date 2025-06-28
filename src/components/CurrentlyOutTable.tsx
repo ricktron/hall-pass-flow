@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserCheck, AlertTriangle, Trash2 } from "lucide-react";
 import { HallPassRecord } from "@/lib/supabaseDataManager";
-import { calculateElapsedTime, formatElapsedTime, formatLocalTime, getElapsedMinutes } from "@/lib/timeUtils";
+import { calculateElapsedTime, formatElapsedTime, formatLocalTime, getElapsedMinutes, formatDurationReadable } from "@/lib/timeUtils";
 
 interface CurrentlyOutTableProps {
   records: HallPassRecord[];
@@ -46,7 +46,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
 
   const formatElapsedDisplay = (elapsedMinutes: number, elapsedSeconds: number) => {
     if (elapsedMinutes >= 90) {
-      // Show as "90+ minutes" or "1.5+ hrs" for trips longer than 1.5 hours
+      // Show as "1.5+ hrs" for trips longer than 1.5 hours
       return "1.5+ hrs";
     }
     return formatElapsedTime(elapsedSeconds);
@@ -66,7 +66,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
         </CardContent>
       </Card>
     );
-  };
+  }
 
   return (
     <Card className="mb-6">

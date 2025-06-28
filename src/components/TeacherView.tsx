@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Users, Clock, TrendingUp, Filter } from "lucide-react";
+import { ArrowLeft, Users, Clock, TrendingUp, Filter, MapPin, Award } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentlyOutRecords, updateReturnTime, getAnalytics, deleteHallPassRecord } from "@/lib/supabaseDataManager";
-import { formatElapsedTime } from "@/lib/timeUtils";
+import { formatDurationReadable } from "@/lib/timeUtils";
 import { HallPassRecord } from "@/lib/supabaseDataManager";
 import CurrentlyOutTable from "@/components/CurrentlyOutTable";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
@@ -26,6 +26,9 @@ interface Analytics {
   };
   tripsPerPeriod: { [period: string]: number };
   averageDuration: number;
+  topLongestTripsToday: { student: string; duration: number }[];
+  mostCommonDestination: string;
+  periodWithLongestAverage: { period: string; averageDuration: number };
 }
 
 const TeacherView = ({ onBack }: TeacherViewProps) => {
@@ -94,12 +97,6 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     return periodMatch && studentMatch;
   });
 
-  // Format average duration to one decimal place in minutes
-  const formatAverageDuration = (avgMinutes: number): string => {
-    if (!avgMinutes || avgMinutes === 0) return "0.0 minutes";
-    return `${avgMinutes.toFixed(1)} minutes`;
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
       <div className="max-w-7xl mx-auto">
@@ -166,7 +163,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Avg Duration</p>
                   <p className="text-2xl font-bold">
-                    {analytics?.averageDuration ? formatAverageDuration(analytics.averageDuration) : '0.0 minutes'}
+                    {analytics?.averageDuration ? `${analytics.averageDuration.toFixed(1)} min` : '0.0 min'}
                   </p>
                 </div>
               </div>
@@ -214,6 +211,72 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
           onMarkReturn={handleMarkReturn}
           onDeleteRecord={handleDeleteRecord}
         />
+
+        {/* Enhanced Analytics */}
+        {analytics && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Top Longest Trips Today */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Award className="w-5 h-5 mr-2" />
+                  Top 5 Longest Trips Today
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {analytics.topLongestTripsToday.length > 0 ? (
+                  <div className="space-y-2">
+                    {analytics.topLongestTripsToday.map((trip, index) => (
+                      <div key={index} className="flex justify-between items-center">
+                        <span className="text-sm">
+                          {index + 1}. {trip.student}
+                        </span>
+                        <span className="font-medium">
+                          {formatDurationReadable(trip.duration)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">No completed trips today</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Enhanced Statistics */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <MapPin className="w-5 h-5 mr-2" />
+                  Additional Insights
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Most common destination:</span>
+                  <span className="font-medium">{analytics.mostCommonDestination}</span>
+                </div>
+                
+                {analytics.periodWithLongestAverage.period && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Period with longest avg:</span>
+                    <span className="font-medium">
+                      Period {analytics.periodWithLongestAverage.period} 
+                      ({formatDurationReadable(analytics.periodWithLongestAverage.averageDuration)})
+                    </span>
+                  </div>
+                )}
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Average trip today:</span>
+                  <span className="font-medium">
+                    {formatDurationReadable(Math.round(analytics.averageDuration))}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Analytics Panel */}
         {analytics && <AnalyticsPanel analytics={analytics} />}

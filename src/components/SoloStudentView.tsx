@@ -99,40 +99,40 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2">
       <div className="max-w-6xl mx-auto">
         <Card className="shadow-lg">
-          <CardHeader>
+          <CardHeader className="pb-4">
             <CardTitle className="flex items-center text-xl">
               <Clock className="w-5 h-5 mr-2 text-blue-600" />
               Student Currently Out
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-8">
-            <div className={`p-12 rounded-lg border-2 ${getBackgroundColor()}`}>
-              <div className="text-center space-y-8">
+          <CardContent className="space-y-6">
+            <div className={`p-8 rounded-lg border-2 ${getBackgroundColor()}`}>
+              <div className="text-center space-y-6">
                 {/* Large student name */}
-                <div className="text-6xl font-bold text-gray-800">{student.studentName}</div>
+                <div className="text-7xl font-bold text-gray-800">{student.studentName}</div>
                 
                 {/* Period and destination */}
-                <div className="space-y-2">
-                  <div className="text-2xl text-gray-600">Period {student.period}</div>
-                  <div className="text-xl text-gray-600">{student.destination}</div>
+                <div className="space-y-1">
+                  <div className="text-3xl text-gray-600">Period {student.period}</div>
+                  <div className="text-2xl text-gray-600">{student.destination}</div>
                 </div>
                 
                 {/* Large timer */}
                 <div className="text-center">
-                  <OutTimer timeOut={student.timeOut} className="text-9xl font-mono" />
+                  <OutTimer timeOut={student.timeOut} className="text-8xl font-mono font-bold" />
                 </div>
                 
                 {/* Split average lines */}
-                <div className="space-y-2 text-lg text-gray-600">
+                <div className="space-y-1 text-xl text-gray-600">
                   <div>{student.studentName} average time out this week: {weeklyAverage} minutes</div>
                   <div>Average trip this week: {overallWeeklyAverage} minutes</div>
                 </div>
                 
                 {/* Random quote */}
-                <div className="mt-8 pt-6 border-t border-gray-300">
+                <div className="mt-6 pt-4 border-t border-gray-300">
                   <div className="text-gray-500 text-sm text-center italic">
                     {quote}
                   </div>
@@ -140,7 +140,7 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
               </div>
             </div>
 
-            <div className="flex gap-4 pt-4">
+            <div className="flex gap-4">
               <Button
                 size="lg"
                 className="flex-1 py-6 text-xl bg-green-600 hover:bg-green-700 text-white"
