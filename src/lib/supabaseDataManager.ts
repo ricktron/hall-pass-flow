@@ -11,6 +11,7 @@ export interface HallPassRecord {
   dayOfWeek: string;
   destination?: string;
   earlyDismissal?: boolean;
+  classroom?: string;
 }
 
 export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
@@ -58,7 +59,8 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
         duration: record.duration,
         dayOfWeek: record.dayOfWeek,
         destination: record.destination,
-        earlyDismissal: record.earlyDismissal || false
+        earlyDismissal: record.earlyDismissal || false,
+        classroom: record.classroom
       }]);
 
     if (error) {
@@ -93,7 +95,8 @@ export const getAllHallPassRecords = async (): Promise<HallPassRecord[]> => {
       duration: record.duration,
       dayOfWeek: record.dayOfWeek || '',
       destination: record.destination,
-      earlyDismissal: record.earlyDismissal || false
+      earlyDismissal: record.earlyDismissal || false,
+      classroom: record.classroom
     }));
   } catch (error) {
     console.error("Error fetching hall pass records:", error);
@@ -193,7 +196,8 @@ export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
       duration: null,
       dayOfWeek: record.dayOfWeek || '',
       destination: record.destination,
-      earlyDismissal: record.earlyDismissal || false
+      earlyDismissal: record.earlyDismissal || false,
+      classroom: record.classroom
     }));
   } catch (error) {
     console.error("Error fetching currently out records:", error);
@@ -408,13 +412,13 @@ export const getAnalytics = async () => {
 
     // Calculate number of school days this week (Monday to Friday, up to today)
     const now = new Date();
-    const torontoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
-    const startOfWeekLocal = new Date(startOfWeek.getTime() - (5 * 60 * 60 * 1000)); // Convert back to local
+    const chicagoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
+    const startOfWeekLocal = new Date(startOfWeek.getTime() - (6 * 60 * 60 * 1000)); // Convert back to local
     
     let schoolDays = 0;
     const currentDate = new Date(startOfWeekLocal);
     
-    while (currentDate <= torontoNow) {
+    while (currentDate <= chicagoNow) {
       const dayOfWeek = currentDate.getDay();
       if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday to Friday
         schoolDays++;
@@ -510,7 +514,7 @@ export const getAnalytics = async () => {
             student: record.studentName || '',
             duration,
             durationFormatted: formatDurationHMS(duration),
-            dayOfWeek: record.dayOfWeek || new Date(record.timeOut).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Toronto' })
+            dayOfWeek: record.dayOfWeek || new Date(record.timeOut).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Chicago' })
           };
         })
         .sort((a, b) => b.duration - a.duration)[0];
@@ -576,7 +580,7 @@ export const getAnalytics = async () => {
     
     daysOfWeek.forEach(day => {
       const dayRecords = weekRecords.filter(record => {
-        const recordDay = new Date(record.timeOut).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Toronto' });
+        const recordDay = new Date(record.timeOut).toLocaleDateString('en-US', { weekday: 'long', timeZone: 'America/Chicago' });
         return recordDay === day;
       });
       weeklyTrendData.push({ day, trips: dayRecords.length });

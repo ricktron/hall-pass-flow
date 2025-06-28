@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       Hall_Passes: {
         Row: {
+          classroom: string | null
           dayOfWeek: string | null
           destination: string | null
           duration: number | null
@@ -22,6 +23,7 @@ export type Database = {
           timeOut: string | null
         }
         Insert: {
+          classroom?: string | null
           dayOfWeek?: string | null
           destination?: string | null
           duration?: number | null
@@ -33,6 +35,7 @@ export type Database = {
           timeOut?: string | null
         }
         Update: {
+          classroom?: string | null
           dayOfWeek?: string | null
           destination?: string | null
           duration?: number | null

@@ -78,7 +78,8 @@ export const useStudentSignOut = ({ onSignOut, onEarlyDismissal }: UseStudentSig
         duration: null,
         dayOfWeek,
         destination: selectedDestination,
-        earlyDismissal: isEarlyDismissal
+        earlyDismissal: isEarlyDismissal,
+        classroom: "B12" // Automatically include classroom B12
       });
 
       if (success) {
