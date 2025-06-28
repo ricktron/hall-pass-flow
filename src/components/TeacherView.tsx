@@ -60,7 +60,34 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   }, []);
 
   const handleBackClick = () => {
-    navigate("/");
+    console.log("Back button clicked - attempting navigation");
+    
+    // Try multiple approaches to ensure navigation works
+    try {
+      // First try using the onBack prop if provided
+      if (onBack) {
+        console.log("Using onBack prop");
+        onBack();
+        return;
+      }
+      
+      // Then try React Router navigation
+      console.log("Using navigate('/')");
+      navigate("/", { replace: true });
+      
+      // If navigation doesn't work after a short delay, force reload
+      setTimeout(() => {
+        if (window.location.pathname !== "/") {
+          console.log("Navigate failed, using window.location");
+          window.location.href = "/";
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error("Navigation error:", error);
+      // Fallback to direct window navigation
+      window.location.href = "/";
+    }
   };
 
   const handleStudentReturn = async (studentName: string, period: string) => {

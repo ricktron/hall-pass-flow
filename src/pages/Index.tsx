@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,7 @@ import { getCurrentlyOutRecords, HallPassRecord } from "@/lib/supabaseDataManage
 import { CLASSROOM_ID } from "@/config/classroom";
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'select' | 'student' | 'teacher' | 'multiple'>('select'); // Fixed: Default to 'select'
+  const [currentView, setCurrentView] = useState<'select' | 'student' | 'teacher' | 'multiple'>('select');
   const [currentlyOutRecords, setCurrentlyOutRecords] = useState<HallPassRecord[]>([]);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState(false);
@@ -28,8 +27,9 @@ const Index = () => {
   }, []);
 
   const handleBackToSelection = () => {
-    setCurrentView('select'); // Fixed: Always return to role selector
-    setIsTeacherAuthenticated(false); // Reset teacher auth when going back
+    console.log("handleBackToSelection called - returning to role selector");
+    setCurrentView('select');
+    setIsTeacherAuthenticated(false);
   };
 
   const handleStudentModeClick = () => {
