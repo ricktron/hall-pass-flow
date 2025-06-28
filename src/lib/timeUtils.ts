@@ -1,3 +1,4 @@
+
 // Utility functions for consistent time handling throughout the app
 
 /**
@@ -7,27 +8,29 @@
  */
 export const calculateElapsedTime = (timeOut: Date | string): number => {
   try {
-    const startTime = new Date(timeOut).getTime(); // UTC milliseconds
-    const now = Date.now(); // Current UTC milliseconds
-    
-    console.log("calculateElapsedTime:", {
-      timeOut,
-      startTime,
-      now,
-      startUTC: new Date(startTime).toISOString(),
-      nowUTC: new Date(now).toISOString()
-    });
-    
+    const parsed = typeof timeOut === "string" && !timeOut.endsWith("Z")
+      ? new Date(timeOut + "Z") // force proper UTC interpretation
+      : new Date(timeOut);
+
+    const startTime = parsed.getTime();
+    const now = Date.now();
+
     if (isNaN(startTime)) {
       console.warn("Invalid start time:", timeOut);
       return 0;
     }
-    
+
     const diffMs = now - startTime;
     const elapsedSeconds = Math.max(0, Math.floor(diffMs / 1000));
-    
-    console.log("Elapsed calculation:", { diffMs, elapsedSeconds });
-    
+
+    console.log("Elapsed debug:", {
+      timeOut,
+      parsed,
+      now: new Date(now).toISOString(),
+      diffMs,
+      elapsedSeconds
+    });
+
     return elapsedSeconds;
   } catch (error) {
     console.error("Error calculating elapsed time:", error);
