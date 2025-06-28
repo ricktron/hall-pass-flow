@@ -324,9 +324,9 @@ export const getAnalytics = async () => {
       return recordDate >= startOfWeek;
     });
 
-    // Calculate most frequent leavers
+    // Calculate most frequent leavers for today and week
     const todayFrequency: { [key: string]: number } = {};
-    const weekFrequency: { [key: string]: number } = {};
+    const basicWeekFrequency: { [key: string]: number } = {};
 
     todayRecords.forEach(record => {
       if (record.studentName) {
@@ -336,7 +336,7 @@ export const getAnalytics = async () => {
 
     weekRecords.forEach(record => {
       if (record.studentName) {
-        weekFrequency[record.studentName] = (weekFrequency[record.studentName] || 0) + 1;
+        basicWeekFrequency[record.studentName] = (basicWeekFrequency[record.studentName] || 0) + 1;
       }
     });
 
@@ -345,7 +345,7 @@ export const getAnalytics = async () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    const mostFrequentWeek = Object.entries(weekFrequency)
+    const mostFrequentWeek = Object.entries(basicWeekFrequency)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
@@ -400,7 +400,7 @@ export const getAnalytics = async () => {
     const averageDurationFormatted = formatDurationHMS(Math.round(averageDuration));
 
     // Calculate weekly metrics
-    const completedWeekRecords = weekRecords.filter(record => {
+    const validWeekRecords = weekRecords.filter(record => {
       if (!record.timeIn || !record.timeOut) return false;
       const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
       return duration <= 90; // Cap at 90 minutes
@@ -424,11 +424,11 @@ export const getAnalytics = async () => {
 
     const averageTripsPerDay = schoolDays > 0 ? Math.round((weekRecords.length / schoolDays) * 10) / 10 : 0;
     
-    const weeklyAverageDuration = completedWeekRecords.length > 0 
-      ? completedWeekRecords.reduce((sum, record) => {
+    const weeklyAverageDuration = validWeekRecords.length > 0 
+      ? validWeekRecords.reduce((sum, record) => {
           const duration = calculateDurationMinutes(record.timeOut, record.timeIn!);
           return sum + duration;
-        }, 0) / completedWeekRecords.length
+        }, 0) / validWeekRecords.length
       : 0;
 
     const weeklyAverageDurationFormatted = formatDurationHMS(Math.round(weeklyAverageDuration));
@@ -447,7 +447,7 @@ export const getAnalytics = async () => {
     // Period with longest average duration this week
     const periodDurations: { [key: string]: number[] } = {};
 
-    completedWeekRecords.forEach(record => {
+    validWeekRecords.forEach(record => {
       if (record.period) {
         if (!periodDurations[record.period]) {
           periodDurations[record.period] = [];
@@ -471,26 +471,26 @@ export const getAnalytics = async () => {
     // NEW ANALYTICS
 
     // 1. Top Students This Week (Frequent Flyers)
-    const weekFrequency: { [key: string]: { count: number, totalDuration: number, completedTrips: number } } = {};
+    const detailedWeekFrequency: { [key: string]: { count: number, totalDuration: number, completedTrips: number } } = {};
     
     weekRecords.forEach(record => {
       if (record.studentName) {
-        if (!weekFrequency[record.studentName]) {
-          weekFrequency[record.studentName] = { count: 0, totalDuration: 0, completedTrips: 0 };
+        if (!detailedWeekFrequency[record.studentName]) {
+          detailedWeekFrequency[record.studentName] = { count: 0, totalDuration: 0, completedTrips: 0 };
         }
-        weekFrequency[record.studentName].count++;
+        detailedWeekFrequency[record.studentName].count++;
         
         if (record.timeIn && record.timeOut) {
           const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
           if (duration <= 90) {
-            weekFrequency[record.studentName].totalDuration += duration;
-            weekFrequency[record.studentName].completedTrips++;
+            detailedWeekFrequency[record.studentName].totalDuration += duration;
+            detailedWeekFrequency[record.studentName].completedTrips++;
           }
         }
       }
     });
 
-    const topStudentsThisWeek = Object.entries(weekFrequency)
+    const topStudentsThisWeek = Object.entries(detailedWeekFrequency)
       .map(([name, data]) => ({
         name,
         count: data.count,
@@ -501,15 +501,9 @@ export const getAnalytics = async () => {
       .slice(0, 5);
 
     // 2. Longest Trip This Week
-    const completedWeekRecords = weekRecords.filter(record => {
-      if (!record.timeIn || !record.timeOut) return false;
-      const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
-      return duration <= 90;
-    });
-
     let longestTripThisWeek = { student: '', duration: 0, durationFormatted: '00:00:00', dayOfWeek: '' };
-    if (completedWeekRecords.length > 0) {
-      const longest = completedWeekRecords
+    if (validWeekRecords.length > 0) {
+      const longest = validWeekRecords
         .map(record => {
           const duration = calculateDurationMinutes(record.timeOut, record.timeIn!);
           return {
