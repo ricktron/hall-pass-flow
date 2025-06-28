@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { HallPassRecord, updateReturnTime } from "@/lib/supabaseDataManager";
-import { calculateElapsedTime, formatElapsedTime, getElapsedMinutes } from "@/lib/timeUtils";
+import { calculateElapsedTime, formatElapsedTime, getElapsedMinutes, formatLocalTime } from "@/lib/timeUtils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 

@@ -85,9 +85,9 @@ export const getElapsedMinutes = (timeOut: Date | string): number => {
 };
 
 /**
- * Format a UTC timestamp for display in local timezone
+ * Format a UTC timestamp for display in local timezone (America/Chicago)
  * @param date UTC date to format
- * @returns Formatted date string in local timezone
+ * @returns Formatted date string in America/Chicago timezone
  */
 export const formatLocalTime = (date: Date | string): string => {
   try {
@@ -97,7 +97,7 @@ export const formatLocalTime = (date: Date | string): string => {
     }
     
     return dateObj.toLocaleString("en-US", { 
-      timeZone: "America/Toronto",
+      timeZone: "America/Chicago",
       hour12: false,
       year: 'numeric',
       month: '2-digit',
@@ -113,20 +113,21 @@ export const formatLocalTime = (date: Date | string): string => {
 };
 
 /**
- * Get local timezone boundaries for "today"
- * @returns Start and end of day in America/Toronto timezone
+ * Get local timezone boundaries for "today" in America/Chicago
+ * @returns Start and end of day in America/Chicago timezone
  */
 export const getLocalTodayBounds = () => {
   const now = new Date();
   
-  // Create date in Toronto timezone
-  const torontoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
+  // Create date in Chicago timezone
+  const chicagoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
   
-  const startOfDay = new Date(torontoNow.getFullYear(), torontoNow.getMonth(), torontoNow.getDate(), 0, 0, 0, 0);
-  const endOfDay = new Date(torontoNow.getFullYear(), torontoNow.getMonth(), torontoNow.getDate(), 23, 59, 59, 999);
+  const startOfDay = new Date(chicagoNow.getFullYear(), chicagoNow.getMonth(), chicagoNow.getDate(), 0, 0, 0, 0);
+  const endOfDay = new Date(chicagoNow.getFullYear(), chicagoNow.getMonth(), chicagoNow.getDate(), 23, 59, 59, 999);
   
   // Convert back to UTC for database queries
-  const timezoneOffset = 5 * 60 * 60 * 1000; // EST is UTC-5 (adjust for DST as needed)
+  // Chicago is UTC-6 (CST) or UTC-5 (CDT), let the system handle DST automatically
+  const timezoneOffset = chicagoNow.getTimezoneOffset() * 60 * 1000;
   
   return { 
     startOfDay: new Date(startOfDay.getTime() + timezoneOffset), 
@@ -135,23 +136,24 @@ export const getLocalTodayBounds = () => {
 };
 
 /**
- * Get start of local week (Monday) in America/Toronto timezone
- * @returns Start of week in local timezone
+ * Get start of local week (Monday) in America/Chicago timezone
+ * @returns Start of week in America/Chicago timezone
  */
 export const getLocalWeekStart = () => {
   const now = new Date();
   
-  // Create date in Toronto timezone
-  const torontoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
+  // Create date in Chicago timezone
+  const chicagoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Chicago" }));
   
-  const startOfWeek = new Date(torontoNow);
-  const dayOfWeek = torontoNow.getDay();
+  const startOfWeek = new Date(chicagoNow);
+  const dayOfWeek = chicagoNow.getDay();
   const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  startOfWeek.setDate(torontoNow.getDate() - daysToMonday);
+  startOfWeek.setDate(chicagoNow.getDate() - daysToMonday);
   startOfWeek.setHours(0, 0, 0, 0);
   
   // Convert back to UTC for database queries
-  const timezoneOffset = 5 * 60 * 60 * 1000; // EST is UTC-5
+  // Let the system handle DST automatically
+  const timezoneOffset = chicagoNow.getTimezoneOffset() * 60 * 1000;
   
   return new Date(startOfWeek.getTime() + timezoneOffset);
 };
