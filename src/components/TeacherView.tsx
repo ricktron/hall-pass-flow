@@ -1,12 +1,19 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { getCurrentlyOutRecords, getAnalytics, HallPassRecord } from "@/lib/supabaseDataManager";
+import { getCurrentlyOutRecords, getAnalytics, HallPassRecord, markStudentReturn } from "@/lib/supabaseDataManager";
 import CurrentlyOutTable from "./CurrentlyOutTable";
 import SecurityWarnings from "./SecurityWarnings";
 
-const TeacherView = () => {
+interface TeacherViewProps {
+  onBack: () => void;
+}
+
+const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [currentlyOut, setCurrentlyOut] = useState<HallPassRecord[]>([]);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -35,6 +42,17 @@ const TeacherView = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const handleMarkReturn = async (studentName: string, period: string) => {
+    try {
+      await markStudentReturn(studentName, period);
+      // Refresh the data after marking return
+      const outRecords = await getCurrentlyOutRecords();
+      setCurrentlyOut(outRecords);
+    } catch (error) {
+      console.error("Error marking student return:", error);
+    }
+  };
+
   const formatChartData = () => {
     if (!analytics?.tripsPerPeriod) return [];
     
@@ -55,7 +73,17 @@ const TeacherView = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Teacher Dashboard</h1>
+        <div className="flex items-center mb-8">
+          <Button 
+            variant="outline" 
+            onClick={onBack}
+            className="mr-4"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          <h1 className="text-3xl font-bold text-gray-900">Teacher Dashboard</h1>
+        </div>
         
         <SecurityWarnings />
         
@@ -72,7 +100,10 @@ const TeacherView = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <CurrentlyOutTable records={currentlyOut} />
+                <CurrentlyOutTable 
+                  records={currentlyOut} 
+                  onMarkReturn={handleMarkReturn}
+                />
               </CardContent>
             </Card>
           </div>
