@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { calculateDurationMinutes } from "@/lib/timeUtils";
 
@@ -12,6 +13,25 @@ export interface HallPassRecord {
   destination?: string;
   earlyDismissal?: boolean;
 }
+
+// Helper function to get local timezone boundaries for "today"
+const getLocalTodayBounds = () => {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+  return { startOfDay, endOfDay };
+};
+
+// Helper function to get start of local week (Monday)
+const getLocalWeekStart = () => {
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  const dayOfWeek = now.getDay();
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  startOfWeek.setDate(now.getDate() - daysToMonday);
+  startOfWeek.setHours(0, 0, 0, 0);
+  return startOfWeek;
+};
 
 export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
   try {
@@ -223,30 +243,38 @@ export const getWeeklyStats = async (studentName: string): Promise<{
   averageMinutes: number;
 }> => {
   try {
-    // Get start of current week (Monday)
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    const dayOfWeek = now.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    startOfWeek.setDate(now.getDate() - daysToMonday);
-    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfWeek = getLocalWeekStart();
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('Hall_Passes')
       .select('*')
-      .eq('studentName', studentName)
       .gte('timeOut', startOfWeek.toISOString())
       .not('timeIn', 'is', null)
       .not('duration', 'is', null);
+
+    // If studentName is provided, filter by it; otherwise get all students for overall average
+    if (studentName) {
+      query = query.eq('studentName', studentName);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching weekly stats:", error);
       return { tripCount: 0, totalMinutes: 0, averageMinutes: 0 };
     }
 
-    const tripCount = (data || []).length;
-    // Use normalized duration calculation
-    const totalMinutes = (data || []).reduce((sum, record) => {
+    // Filter out trips longer than 90 minutes (likely incomplete - student forgot to sign back in)
+    const validTrips = (data || []).filter(record => {
+      if (record.timeIn && record.timeOut) {
+        const calculatedDuration = calculateDurationMinutes(record.timeOut, record.timeIn!);
+        return calculatedDuration <= 90; // Ignore trips longer than 1.5 hours
+      }
+      return Math.abs(record.duration || 0) <= 90;
+    });
+
+    const tripCount = validTrips.length;
+    const totalMinutes = validTrips.reduce((sum, record) => {
       if (record.timeIn && record.timeOut) {
         const calculatedDuration = calculateDurationMinutes(record.timeOut, record.timeIn!);
         return sum + calculatedDuration;
@@ -264,16 +292,8 @@ export const getWeeklyStats = async (studentName: string): Promise<{
 
 export const getAnalytics = async () => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(today);
-    todayEnd.setHours(23, 59, 59, 999);
-
-    // Get start of current week
-    const startOfWeek = new Date(today);
-    const dayOfWeek = today.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    startOfWeek.setDate(today.getDate() - daysToMonday);
+    const { startOfDay, endOfDay } = getLocalTodayBounds();
+    const startOfWeek = getLocalWeekStart();
 
     const { data: allRecords, error } = await supabase
       .from('Hall_Passes')
@@ -294,10 +314,10 @@ export const getAnalytics = async () => {
 
     const records = allRecords || [];
 
-    // Filter records for today and this week
+    // Filter records using local time boundaries
     const todayRecords = records.filter(record => {
       const recordDate = new Date(record.timeOut);
-      return recordDate >= today && recordDate <= todayEnd;
+      return recordDate >= startOfDay && recordDate <= endOfDay;
     });
 
     const weekRecords = records.filter(record => {
@@ -331,8 +351,13 @@ export const getAnalytics = async () => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
-    // Calculate longest trip today using normalized duration calculation
-    const completedTodayRecords = todayRecords.filter(record => record.duration !== null && record.timeIn && record.timeOut);
+    // Calculate longest trip today, ignoring trips over 90 minutes (likely incomplete)
+    const completedTodayRecords = todayRecords.filter(record => {
+      if (!record.duration || !record.timeIn || !record.timeOut) return false;
+      const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
+      return duration <= 90; // Ignore trips longer than 1.5 hours - likely incomplete
+    });
+    
     let longestTripToday = { duration: 0, student: '' };
     
     if (completedTodayRecords.length > 0) {
@@ -355,8 +380,13 @@ export const getAnalytics = async () => {
       }
     });
 
-    // Calculate average duration for completed records using normalized calculation
-    const completedRecords = records.filter(record => record.timeIn && record.timeOut);
+    // Calculate average duration for completed records, ignoring trips over 90 minutes
+    const completedRecords = records.filter(record => {
+      if (!record.timeIn || !record.timeOut) return false;
+      const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
+      return duration <= 90; // Ignore trips longer than 1.5 hours - likely incomplete
+    });
+    
     const averageDuration = completedRecords.length > 0 
       ? completedRecords.reduce((sum, record) => {
           const duration = calculateDurationMinutes(record.timeOut, record.timeIn!);

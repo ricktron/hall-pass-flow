@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,21 +24,32 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
   }, []);
 
   const getElapsedColor = (minutes: number) => {
+    if (minutes >= 90) return "text-red-600 font-bold"; // Trips longer than 1.5 hours - likely incomplete
     if (minutes < 5) return "text-green-600";
     if (minutes <= 10) return "text-yellow-600";
     return "text-red-600";
   };
 
   const getElapsedBadge = (minutes: number) => {
+    if (minutes >= 90) return "destructive"; // Trips longer than 1.5 hours
     if (minutes < 5) return "default";
     if (minutes <= 10) return "secondary";
     return "destructive";
   };
 
   const getRowColor = (minutes: number) => {
+    if (minutes >= 90) return "bg-red-100"; // Trips longer than 1.5 hours
     if (minutes < 5) return "";
     if (minutes <= 10) return "bg-yellow-50";
     return "bg-red-50";
+  };
+
+  const formatElapsedDisplay = (elapsedMinutes: number, elapsedSeconds: number) => {
+    if (elapsedMinutes >= 90) {
+      // Show as "90+ minutes" or "1.5+ hrs" for trips longer than 1.5 hours
+      return "1.5+ hrs";
+    }
+    return formatElapsedTime(elapsedSeconds);
   };
 
   if (records.length === 0) {
@@ -78,7 +90,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
                 <th className="text-left py-2 px-2">Period</th>
                 <th className="text-left py-2 px-2">Destination</th>
                 <th className="text-left py-2 px-2">Time Out (Local)</th>
-                <th className="text-left py-2 px-2">Elapsed (HH:MM:SS)</th>
+                <th className="text-left py-2 px-2">Elapsed</th>
                 <th className="text-left py-2 px-2">Actions</th>
               </tr>
             </thead>
@@ -87,8 +99,9 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
                 .sort((a, b) => getElapsedMinutes(b.timeOut) - getElapsedMinutes(a.timeOut))
                 .map((record) => {
                   const elapsedMinutes = getElapsedMinutes(record.timeOut);
-                  const elapsedMilliseconds = calculateElapsedTime(record.timeOut);
+                  const elapsedSeconds = calculateElapsedTime(record.timeOut);
                   const isOverLimit = elapsedMinutes > 10;
+                  const isLikelyIncomplete = elapsedMinutes >= 90; // Likely incomplete - student forgot to sign back in
                   
                   return (
                     <tr 
@@ -97,7 +110,7 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
                     >
                       <td className="py-3 px-2 font-medium">
                         {record.studentName}
-                        {isOverLimit && (
+                        {(isOverLimit || isLikelyIncomplete) && (
                           <AlertTriangle className="w-4 h-4 text-red-500 inline ml-2" />
                         )}
                       </td>
@@ -115,8 +128,13 @@ const CurrentlyOutTable = ({ records, onMarkReturn, onDeleteRecord }: CurrentlyO
                           variant={getElapsedBadge(elapsedMinutes)}
                           className={getElapsedColor(elapsedMinutes)}
                         >
-                          {formatElapsedTime(elapsedMilliseconds)}
+                          {formatElapsedDisplay(elapsedMinutes, elapsedSeconds)}
                         </Badge>
+                        {isLikelyIncomplete && (
+                          <div className="text-xs text-red-600 mt-1">
+                            Likely incomplete
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-2">
                         <div className="flex gap-2">

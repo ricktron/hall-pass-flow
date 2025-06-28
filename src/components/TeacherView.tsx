@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,6 +94,12 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     return periodMatch && studentMatch;
   });
 
+  // Format average duration to one decimal place in minutes
+  const formatAverageDuration = (avgMinutes: number): string => {
+    if (!avgMinutes || avgMinutes === 0) return "0.0 minutes";
+    return `${avgMinutes.toFixed(1)} minutes`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
       <div className="max-w-7xl mx-auto">
@@ -159,7 +166,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Avg Duration</p>
                   <p className="text-2xl font-bold">
-                    {analytics?.averageDuration ? formatElapsedTime(analytics.averageDuration * 60 * 1000) : '00:00:00'}
+                    {analytics?.averageDuration ? formatAverageDuration(analytics.averageDuration) : '0.0 minutes'}
                   </p>
                 </div>
               </div>

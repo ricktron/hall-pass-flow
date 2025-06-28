@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, UserPlus } from "lucide-react";
@@ -21,16 +21,56 @@ interface SoloStudentViewProps {
   onSignOutAnother: () => void;
 }
 
+const quotes = [
+  ""Everyone poops." – Taro Gomi",
+  ""A throne is only a bench covered in velvet." – Napoleon Bonaparte",
+  ""Even the rich must sit on the same porcelain." – Anonymous",
+  ""Better to be silent and be thought a fool than to speak and to remove all doubt." – Abraham Lincoln",
+  ""Time spent in thought is never wasted." – Marcus Aurelius",
+  ""When nature calls, don't put it on hold." – Unknown",
+  ""Cleanliness is next to godliness." – John Wesley",
+  ""You can't rush genius—or a good bathroom break." – Anonymous",
+  ""We all face the same seat in the end." – Socrates, probably",
+  ""The smallest room in the house has the biggest role in your day." – Oprah Winfrey",
+  ""Restrooms are the great equalizer." – Trevor Noah",
+  ""I do some of my best thinking on the toilet." – Steve Jobs",
+  ""Prayer and plumbing: both essential for peace." – Rev. James Forbes",
+  ""I don't care if you're the Pope—you flush." – George Carlin",
+  ""Even in a palace, life is lived one flush at a time." – Dalai Lama (inspired)",
+  ""The bathroom is the sanctuary where no one judges." – Ellen DeGeneres",
+  ""Blessed are those who wash their hands." – Hygiene 24:7",
+  ""Silence is golden. Duct tape is silver. Restrooms are priceless." – Anonymous",
+  ""There is nothing noble in being superior... unless you refill the toilet paper roll." – Ernest Hemingway (rephrased)",
+  ""To go boldly where all have gone before." – Star Trek (adapted)",
+  ""In the restroom, all masks come off." – Oscar Wilde (satirical)",
+  ""The bathroom mirror never lies." – RuPaul",
+  ""We enter alone. We leave relieved." – Ancient Latrine Proverb",
+  ""Relief is a universal language." – Morgan Freeman (imagined)",
+  ""When one door closes, another one opens—hopefully not the stall." – Michael Scott"
+];
+
 const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStudentViewProps) => {
   const [weeklyAverage, setWeeklyAverage] = useState(0);
+  const [overallWeeklyAverage, setOverallWeeklyAverage] = useState(0);
   const { toast } = useToast();
+  
+  // Random quote selected once per session
+  const quote = useMemo(() => quotes[Math.floor(Math.random() * quotes.length)], []);
 
   useEffect(() => {
     const loadWeeklyStats = async () => {
       const stats = await getWeeklyStats(student.studentName);
       setWeeklyAverage(stats.averageMinutes);
     };
+    
+    const loadOverallWeeklyAverage = async () => {
+      // Get overall weekly average for all students
+      const stats = await getWeeklyStats(""); // Empty string to get overall stats
+      setOverallWeeklyAverage(stats.averageMinutes);
+    };
+    
     loadWeeklyStats();
+    loadOverallWeeklyAverage();
   }, [student.studentName]);
 
   const handleMarkReturn = async () => {
@@ -60,7 +100,7 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center text-xl">
@@ -68,18 +108,34 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
               Student Currently Out
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className={`p-8 rounded-lg border-2 ${getBackgroundColor()}`}>
-              <div className="text-center space-y-4">
-                <div className="text-4xl font-bold text-gray-800">{student.studentName}</div>
-                <div className="text-xl text-gray-600">Period {student.period}</div>
-                <div className="text-lg text-gray-600">{student.destination}</div>
-                <div className="text-center">
-                  <OutTimer timeOut={student.timeOut} className="text-8xl" />
+          <CardContent className="space-y-8">
+            <div className={`p-12 rounded-lg border-2 ${getBackgroundColor()}`}>
+              <div className="text-center space-y-8">
+                {/* Large student name */}
+                <div className="text-6xl font-bold text-gray-800">{student.studentName}</div>
+                
+                {/* Period and destination */}
+                <div className="space-y-2">
+                  <div className="text-2xl text-gray-600">Period {student.period}</div>
+                  <div className="text-xl text-gray-600">{student.destination}</div>
                 </div>
-                <div className="text-lg text-gray-600 mt-4">
-                  {student.studentName} has been out for {elapsedMinutes} minutes. 
-                  The weekly average is {weeklyAverage} minutes.
+                
+                {/* Large timer */}
+                <div className="text-center">
+                  <OutTimer timeOut={student.timeOut} className="text-9xl font-mono" />
+                </div>
+                
+                {/* Split average lines */}
+                <div className="space-y-2 text-lg text-gray-600">
+                  <div>{student.studentName} average time out this week: {weeklyAverage} minutes</div>
+                  <div>Average trip this week: {overallWeeklyAverage} minutes</div>
+                </div>
+                
+                {/* Random quote */}
+                <div className="mt-8 pt-6 border-t border-gray-300">
+                  <div className="text-gray-500 text-sm text-center italic">
+                    {quote}
+                  </div>
                 </div>
               </div>
             </div>
