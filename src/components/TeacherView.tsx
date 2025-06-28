@@ -111,21 +111,21 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
           {/* Analytics Cards */}
           <Card>
             <CardHeader>
-              <CardTitle>Today's Overview</CardTitle>
+              <CardTitle>Weekly Overview</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
-                    {analytics?.totalTripsToday || 0}
+                    {analytics?.averageTripsPerDay || 0}
                   </div>
-                  <div className="text-sm text-gray-600">Total Trips</div>
+                  <div className="text-sm text-gray-600">Average Trips per Day (This Week)</div>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
-                    {analytics?.averageDurationFormatted || '00:00:00'}
+                    {analytics?.weeklyAverageDurationFormatted || '00:00:00'}
                   </div>
-                  <div className="text-sm text-gray-600">Avg Duration</div>
+                  <div className="text-sm text-gray-600">Average Trip Duration (This Week)</div>
                 </div>
               </div>
               
@@ -135,7 +135,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                     {analytics.longestTripToday.student}
                   </div>
                   <div className="text-sm text-gray-600">
-                    Longest trip: {analytics.longestTripToday.durationFormatted}
+                    Longest trip today: {analytics.longestTripToday.durationFormatted}
                   </div>
                 </div>
               )}

@@ -297,7 +297,10 @@ export const getAnalytics = async () => {
         averageDurationFormatted: '00:00:00',
         topLongestTripsToday: [],
         mostCommonDestination: '',
-        periodWithLongestAverage: { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' }
+        periodWithLongestAverage: { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' },
+        averageTripsPerDay: 0,
+        weeklyAverageDuration: 0,
+        weeklyAverageDurationFormatted: '00:00:00'
       };
     }
 
@@ -389,6 +392,40 @@ export const getAnalytics = async () => {
 
     const averageDurationFormatted = formatDurationHMS(Math.round(averageDuration));
 
+    // Calculate weekly metrics
+    const completedWeekRecords = weekRecords.filter(record => {
+      if (!record.timeIn || !record.timeOut) return false;
+      const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
+      return duration <= 90; // Cap at 90 minutes
+    });
+
+    // Calculate number of school days this week (Monday to Friday, up to today)
+    const now = new Date();
+    const torontoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
+    const startOfWeekLocal = new Date(startOfWeek.getTime() - (5 * 60 * 60 * 1000)); // Convert back to local
+    
+    let schoolDays = 0;
+    const currentDate = new Date(startOfWeekLocal);
+    
+    while (currentDate <= torontoNow) {
+      const dayOfWeek = currentDate.getDay();
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) { // Monday to Friday
+        schoolDays++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    const averageTripsPerDay = schoolDays > 0 ? Math.round((weekRecords.length / schoolDays) * 10) / 10 : 0;
+    
+    const weeklyAverageDuration = completedWeekRecords.length > 0 
+      ? completedWeekRecords.reduce((sum, record) => {
+          const duration = calculateDurationMinutes(record.timeOut, record.timeIn!);
+          return sum + duration;
+        }, 0) / completedWeekRecords.length
+      : 0;
+
+    const weeklyAverageDurationFormatted = formatDurationHMS(Math.round(weeklyAverageDuration));
+
     // Most common destination
     const destinationCount: { [key: string]: number } = {};
     todayRecords.forEach(record => {
@@ -402,11 +439,6 @@ export const getAnalytics = async () => {
 
     // Period with longest average duration this week
     const periodDurations: { [key: string]: number[] } = {};
-    const completedWeekRecords = weekRecords.filter(record => {
-      if (!record.timeIn || !record.timeOut) return false;
-      const duration = calculateDurationMinutes(record.timeOut, record.timeIn);
-      return duration <= 90; // Cap at 90 minutes
-    });
 
     completedWeekRecords.forEach(record => {
       if (record.period) {
@@ -439,7 +471,10 @@ export const getAnalytics = async () => {
       averageDurationFormatted,
       topLongestTripsToday,
       mostCommonDestination,
-      periodWithLongestAverage
+      periodWithLongestAverage,
+      averageTripsPerDay,
+      weeklyAverageDuration: Math.round(weeklyAverageDuration * 10) / 10,
+      weeklyAverageDurationFormatted
     };
   } catch (error) {
     console.error("Error calculating analytics:", error);
@@ -453,7 +488,10 @@ export const getAnalytics = async () => {
       averageDurationFormatted: '00:00:00',
       topLongestTripsToday: [],
       mostCommonDestination: '',
-      periodWithLongestAverage: { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' }
+      periodWithLongestAverage: { period: '', averageDuration: 0, averageDurationFormatted: '00:00:00' },
+      averageTripsPerDay: 0,
+      weeklyAverageDuration: 0,
+      weeklyAverageDurationFormatted: '00:00:00'
     };
   }
 };
