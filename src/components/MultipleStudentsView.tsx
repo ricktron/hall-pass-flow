@@ -6,7 +6,7 @@ import { ArrowLeft, Users, RefreshCw, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HallPassRecord, updateReturnTime } from "@/lib/supabaseDataManager";
 import { useToast } from "@/hooks/use-toast";
-import { getElapsedMinutes, formatDuration } from "@/lib/timeUtils";
+import { getElapsedMinutes, formatDurationReadable } from "@/lib/timeUtils";
 
 interface MultipleStudentsViewProps {
   records: HallPassRecord[];
@@ -127,7 +127,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
                           </div>
                         </div>
                         <div className="text-sm text-gray-500 mt-1">
-                          Out for: {formatDuration(getElapsedMinutes(record.timeOut))}
+                          Out for: {formatDurationReadable(getElapsedMinutes(record.timeOut))}
                         </div>
                       </div>
                       <Button

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,8 +5,9 @@ import { ArrowLeft, Users, Clock, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import AnalyticsPanel from "./AnalyticsPanel";
-import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
+import { getCurrentlyOutRecords, getAnalytics, updateReturnTime } from "@/lib/supabaseDataManager";
 import { CLASSROOM_ID } from "@/config/classroom";
+import { useToast } from "@/hooks/use-toast";
 
 interface TeacherViewProps {
   onBack: () => void;
@@ -15,22 +15,75 @@ interface TeacherViewProps {
 
 const TeacherView = ({ onBack }: TeacherViewProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentlyOutCount, setCurrentlyOutCount] = useState(0);
+  const [currentlyOutStudents, setCurrentlyOutStudents] = useState([]);
+  const [analytics, setAnalytics] = useState({
+    totalTripsToday: 0,
+    mostFrequentToday: [],
+    mostFrequentWeek: [],
+    longestTripToday: {
+      duration: 0,
+      student: '',
+      durationFormatted: '00:00:00'
+    },
+    tripsPerPeriod: {},
+    averageDuration: 0,
+    averageDurationFormatted: '00:00:00'
+  });
   const [activeView, setActiveView] = useState<'overview' | 'analytics'>('overview');
 
   const loadCurrentlyOutCount = async () => {
     const records = await getCurrentlyOutRecords();
     setCurrentlyOutCount(records.length);
+    setCurrentlyOutStudents(records.map(record => ({
+      studentName: record.studentName,
+      period: record.period,
+      timeOut: record.timeOut,
+      destination: record.destination || 'Unknown'
+    })));
+  };
+
+  const loadAnalytics = async () => {
+    const analyticsData = await getAnalytics();
+    setAnalytics(analyticsData);
   };
 
   useEffect(() => {
     loadCurrentlyOutCount();
-    const interval = setInterval(loadCurrentlyOutCount, 10000);
+    loadAnalytics();
+    const interval = setInterval(() => {
+      loadCurrentlyOutCount();
+      loadAnalytics();
+    }, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const handleBackClick = () => {
     navigate("/");
+  };
+
+  const handleStudentReturn = async (studentName: string, period: string) => {
+    const success = await updateReturnTime(studentName, period);
+    if (success) {
+      toast({
+        title: "Student Returned",
+        description: `${studentName} has been marked as returned.`,
+      });
+      loadCurrentlyOutCount();
+      loadAnalytics();
+    } else {
+      toast({
+        title: "Error",
+        description: "Could not mark student as returned.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCloseCurrentlyOut = () => {
+    // This could be used to hide the currently out display if needed
+    // For now, we'll keep it always visible in the teacher view
   };
 
   return (
@@ -115,12 +168,16 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
               </Card>
             </div>
 
-            <CurrentlyOutDisplay />
+            <CurrentlyOutDisplay 
+              students={currentlyOutStudents}
+              onStudentReturn={handleStudentReturn}
+              onClose={handleCloseCurrentlyOut}
+            />
           </div>
         )}
 
         {activeView === 'analytics' && (
-          <AnalyticsPanel />
+          <AnalyticsPanel analytics={analytics} />
         )}
       </div>
     </div>
