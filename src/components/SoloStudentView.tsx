@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, CheckCircle, UserPlus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { updateReturnTime, getWeeklyStats } from "@/lib/supabaseDataManager";
-import { getElapsedMinutes } from "@/lib/timeUtils";
+import { getElapsedMinutes, formatDurationReadable } from "@/lib/timeUtils";
 import OutTimer from "./OutTimer";
 
 interface StudentRecord {
@@ -102,37 +102,37 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-2">
       <div className="max-w-6xl mx-auto">
         <Card className="shadow-lg">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center text-xl">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center text-lg">
               <Clock className="w-5 h-5 mr-2 text-blue-600" />
               Student Currently Out
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className={`p-8 rounded-lg border-2 ${getBackgroundColor()}`}>
-              <div className="text-center space-y-6">
+          <CardContent className="space-y-4">
+            <div className={`p-6 rounded-lg border-2 ${getBackgroundColor()}`}>
+              <div className="text-center space-y-4">
                 {/* Large student name */}
-                <div className="text-7xl font-bold text-gray-800">{student.studentName}</div>
+                <div className="text-6xl font-bold text-gray-800">{student.studentName}</div>
                 
                 {/* Period and destination */}
                 <div className="space-y-1">
-                  <div className="text-3xl text-gray-600">Period {student.period}</div>
-                  <div className="text-2xl text-gray-600">{student.destination}</div>
+                  <div className="text-2xl text-gray-600">Period {student.period}</div>
+                  <div className="text-xl text-gray-600">{student.destination}</div>
                 </div>
                 
                 {/* Large timer */}
                 <div className="text-center">
-                  <OutTimer timeOut={student.timeOut} className="text-8xl font-mono font-bold" />
+                  <OutTimer timeOut={student.timeOut} className="text-7xl" />
                 </div>
                 
                 {/* Split average lines */}
-                <div className="space-y-1 text-xl text-gray-600">
-                  <div>{student.studentName} average time out this week: {weeklyAverage} minutes</div>
-                  <div>Average trip this week: {overallWeeklyAverage} minutes</div>
+                <div className="space-y-1 text-lg text-gray-600">
+                  <div>{student.studentName} average time out this week: {formatDurationReadable(weeklyAverage)}</div>
+                  <div>Average trip this week: {formatDurationReadable(overallWeeklyAverage)}</div>
                 </div>
                 
                 {/* Random quote */}
-                <div className="mt-6 pt-4 border-t border-gray-300">
+                <div className="mt-4 pt-3 border-t border-gray-300">
                   <div className="text-gray-500 text-sm text-center italic">
                     {quote}
                   </div>
@@ -143,19 +143,19 @@ const SoloStudentView = ({ student, onStudentReturn, onSignOutAnother }: SoloStu
             <div className="flex gap-4">
               <Button
                 size="lg"
-                className="flex-1 py-6 text-xl bg-green-600 hover:bg-green-700 text-white"
+                className="flex-1 py-4 text-lg bg-green-600 hover:bg-green-700 text-white"
                 onClick={handleMarkReturn}
               >
-                <CheckCircle className="w-6 h-6 mr-2" />
+                <CheckCircle className="w-5 h-5 mr-2" />
                 Returned
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                className="flex-1 py-6 text-xl"
+                className="flex-1 py-4 text-lg"
                 onClick={onSignOutAnother}
               >
-                <UserPlus className="w-6 h-6 mr-2" />
+                <UserPlus className="w-5 h-5 mr-2" />
                 Another Out
               </Button>
             </div>

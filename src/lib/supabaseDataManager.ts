@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { calculateDurationMinutes, getLocalTodayBounds, getLocalWeekStart } from "@/lib/timeUtils";
 

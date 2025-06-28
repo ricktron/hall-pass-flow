@@ -4,10 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Users, Clock, TrendingUp, Filter, MapPin, Award } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ArrowLeft, Users, Clock, TrendingUp, Filter, MapPin, Award, BarChart3 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentlyOutRecords, updateReturnTime, getAnalytics, deleteHallPassRecord } from "@/lib/supabaseDataManager";
-import { formatDurationReadable } from "@/lib/timeUtils";
+import { formatDurationReadable, formatDurationHMS } from "@/lib/timeUtils";
 import { HallPassRecord } from "@/lib/supabaseDataManager";
 import CurrentlyOutTable from "@/components/CurrentlyOutTable";
 import AnalyticsPanel from "@/components/AnalyticsPanel";
@@ -36,6 +37,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [filterPeriod, setFilterPeriod] = useState("all");
   const [filterStudent, setFilterStudent] = useState("");
+  const [chartTimeframe, setChartTimeframe] = useState("today");
   const { toast } = useToast();
 
   const loadData = async () => {
@@ -89,7 +91,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     }
   };
 
-  // Filter currently out students
+  // Filter currently out students using local time
   const filteredOut = records.filter(record => {
     const periodMatch = filterPeriod === "all" || record.period === filterPeriod;
     const studentMatch = filterStudent === "" || 
@@ -109,7 +111,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
             <h1 className="text-3xl font-bold text-gray-800">Teacher Dashboard</h1>
           </div>
           <div className="text-sm text-gray-600">
-            Last updated: {new Date().toLocaleTimeString()}
+            Last updated: {new Date().toLocaleTimeString("en-US", { timeZone: "America/Toronto" })}
           </div>
         </div>
 
@@ -163,7 +165,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Avg Duration</p>
                   <p className="text-2xl font-bold">
-                    {analytics?.averageDuration ? `${analytics.averageDuration.toFixed(1)} min` : '0.0 min'}
+                    {analytics?.averageDuration ? formatDurationReadable(Math.round(analytics.averageDuration)) : '0m'}
                   </p>
                 </div>
               </div>
@@ -212,10 +214,53 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
           onDeleteRecord={handleDeleteRecord}
         />
 
+        {/* Trips by Period Chart with Tabs */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BarChart3 className="w-5 h-5 mr-2" />
+              Trips by Period
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={chartTimeframe} onValueChange={setChartTimeframe}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="today">Today</TabsTrigger>
+                <TabsTrigger value="week">This Week</TabsTrigger>
+                <TabsTrigger value="month">This Month</TabsTrigger>
+              </TabsList>
+              <TabsContent value="today" className="mt-4">
+                <div className="grid grid-cols-8 gap-2">
+                  {["A", "B", "C", "D", "E", "F", "G", "H"].map(period => (
+                    <div key={period} className="text-center">
+                      <div className="bg-blue-100 rounded p-2 mb-1">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {analytics?.tripsPerPeriod[period] || 0}
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-600">Period {period}</div>
+                    </div>
+                  ))}
+                </div>
+              </TabsContent>
+              <TabsContent value="week" className="mt-4">
+                <div className="text-center text-gray-500 py-8">
+                  Weekly data visualization coming soon...
+                </div>
+              </TabsContent>
+              <TabsContent value="month" className="mt-4">
+                <div className="text-center text-gray-500 py-8">
+                  Monthly data visualization coming soon...
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
         {/* Enhanced Analytics */}
         {analytics && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Top Longest Trips Today */}
+            {/* Top 5 Longest Trips Today */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -231,8 +276,8 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                         <span className="text-sm">
                           {index + 1}. {trip.student}
                         </span>
-                        <span className="font-medium">
-                          {formatDurationReadable(trip.duration)}
+                        <span className="font-mono font-medium">
+                          {formatDurationHMS(trip.duration)}
                         </span>
                       </div>
                     ))}
@@ -243,7 +288,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
               </CardContent>
             </Card>
 
-            {/* Enhanced Statistics */}
+            {/* Additional Insights */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">

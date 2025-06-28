@@ -11,11 +11,8 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
-    console.log("OutTimer mounted with timeOut:", timeOut);
-    
     const updateTimer = () => {
       const seconds = calculateElapsedTime(timeOut);
-      console.log("OutTimer update - elapsed seconds:", seconds);
       setElapsedSeconds(seconds);
     };
 
@@ -24,10 +21,8 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
 
     // Set up interval to update every second
     const interval = setInterval(updateTimer, 1000);
-    console.log("OutTimer interval started:", interval);
 
     return () => {
-      console.log("OutTimer cleanup, clearing interval:", interval);
       clearInterval(interval);
     };
   }, [timeOut]);
@@ -40,15 +35,8 @@ const OutTimer = ({ timeOut, className = "" }: OutTimerProps) => {
     return 'text-green-600';
   };
 
-  console.log("OutTimer render:", {
-    timeOut,
-    elapsedSeconds,
-    elapsedMinutes,
-    formattedTime: formatElapsedTime(elapsedSeconds)
-  });
-
   return (
-    <div className={`font-mono text-lg font-bold ${getColorClass()} ${className}`}>
+    <div className={`font-mono font-bold ${getColorClass()} ${className}`}>
       {formatElapsedTime(elapsedSeconds)}
     </div>
   );

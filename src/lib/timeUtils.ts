@@ -8,9 +8,9 @@
  */
 export const calculateElapsedTime = (timeOut: Date | string): number => {
   try {
-    const parsed = typeof timeOut === "string" && !timeOut.endsWith("Z")
-      ? new Date(timeOut + "Z") // force proper UTC interpretation
-      : new Date(timeOut);
+    const parsed = typeof timeOut === "string" 
+      ? new Date(timeOut) 
+      : timeOut;
 
     const startTime = parsed.getTime();
     const now = Date.now();
@@ -22,14 +22,6 @@ export const calculateElapsedTime = (timeOut: Date | string): number => {
 
     const diffMs = now - startTime;
     const elapsedSeconds = Math.max(0, Math.floor(diffMs / 1000));
-
-    console.log("Elapsed debug:", {
-      timeOut,
-      parsed,
-      now: new Date(now).toISOString(),
-      diffMs,
-      elapsedSeconds
-    });
 
     return elapsedSeconds;
   } catch (error) {
@@ -72,9 +64,9 @@ export const calculateDurationMinutes = (timeOut: Date | string, timeIn: Date | 
     }
     
     const durationMs = endTime.getTime() - startTime.getTime();
-    const durationMinutes = durationMs / (1000 * 60);
+    const durationMinutes = Math.round(durationMs / (1000 * 60));
     
-    return Math.max(0, Math.round(durationMinutes)); // Ensure never negative and rounded
+    return Math.max(0, durationMinutes);
   } catch (error) {
     console.error("Error calculating duration:", error);
     return 0;
@@ -126,15 +118,20 @@ export const formatLocalTime = (date: Date | string): string => {
  */
 export const getLocalTodayBounds = () => {
   const now = new Date();
-  const timeZone = "America/Toronto";
   
-  // Get current date in Toronto timezone
-  const torontoDate = new Date(now.toLocaleString("en-CA", { timeZone }));
+  // Create date in Toronto timezone
+  const torontoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
   
-  const startOfDay = new Date(torontoDate.getFullYear(), torontoDate.getMonth(), torontoDate.getDate(), 0, 0, 0, 0);
-  const endOfDay = new Date(torontoDate.getFullYear(), torontoDate.getMonth(), torontoDate.getDate(), 23, 59, 59, 999);
+  const startOfDay = new Date(torontoNow.getFullYear(), torontoNow.getMonth(), torontoNow.getDate(), 0, 0, 0, 0);
+  const endOfDay = new Date(torontoNow.getFullYear(), torontoNow.getMonth(), torontoNow.getDate(), 23, 59, 59, 999);
   
-  return { startOfDay, endOfDay };
+  // Convert back to UTC for database queries
+  const timezoneOffset = 5 * 60 * 60 * 1000; // EST is UTC-5 (adjust for DST as needed)
+  
+  return { 
+    startOfDay: new Date(startOfDay.getTime() + timezoneOffset), 
+    endOfDay: new Date(endOfDay.getTime() + timezoneOffset) 
+  };
 };
 
 /**
@@ -143,18 +140,20 @@ export const getLocalTodayBounds = () => {
  */
 export const getLocalWeekStart = () => {
   const now = new Date();
-  const timeZone = "America/Toronto";
   
-  // Get current date in Toronto timezone
-  const torontoDate = new Date(now.toLocaleString("en-CA", { timeZone }));
+  // Create date in Toronto timezone
+  const torontoNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Toronto" }));
   
-  const startOfWeek = new Date(torontoDate);
-  const dayOfWeek = torontoDate.getDay();
+  const startOfWeek = new Date(torontoNow);
+  const dayOfWeek = torontoNow.getDay();
   const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-  startOfWeek.setDate(torontoDate.getDate() - daysToMonday);
+  startOfWeek.setDate(torontoNow.getDate() - daysToMonday);
   startOfWeek.setHours(0, 0, 0, 0);
   
-  return startOfWeek;
+  // Convert back to UTC for database queries
+  const timezoneOffset = 5 * 60 * 60 * 1000; // EST is UTC-5
+  
+  return new Date(startOfWeek.getTime() + timezoneOffset);
 };
 
 /**
@@ -168,15 +167,32 @@ export const formatDurationReadable = (minutes: number): string => {
   }
   
   if (minutes < 60) {
-    return `${minutes} min${minutes !== 1 ? 's' : ''}`;
+    return `${minutes}m`;
   }
   
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
   
   if (remainingMinutes === 0) {
-    return `${hours} hr${hours !== 1 ? 's' : ''}`;
+    return `${hours}h`;
   }
   
   return `${hours}h ${remainingMinutes}m`;
+};
+
+/**
+ * Format duration in HH:MM:SS format from minutes
+ * @param minutes Duration in minutes
+ * @returns Formatted HH:MM:SS string
+ */
+export const formatDurationHMS = (minutes: number): string => {
+  if (minutes >= 90) {
+    return "1:30:00+";
+  }
+  
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  const seconds = 0; // We don't track seconds for completed trips
+  
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
