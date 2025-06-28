@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import StudentSignOutForm from "./StudentSignOutForm";
 import CurrentOutList from "./CurrentOutList";
 import SoloStudentView from "./SoloStudentView";
@@ -20,6 +21,7 @@ interface StudentRecord {
 }
 
 const StudentView = ({ onBack }: StudentViewProps) => {
+  const navigate = useNavigate();
   const [currentStudents, setCurrentStudents] = useState<StudentRecord[]>([]);
   const [showGreatDayMessage, setShowGreatDayMessage] = useState(false);
   const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
@@ -83,6 +85,10 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     setShowForm(true);
   };
 
+  const handleBackClick = () => {
+    navigate("/");
+  };
+
   // Show "Have a Great Day" message for early dismissals
   if (showGreatDayMessage) {
     return (
@@ -110,7 +116,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
         <div className="flex items-center mb-6">
           <Button 
             variant="outline" 
-            onClick={onBack}
+            onClick={handleBackClick}
             className="mr-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
