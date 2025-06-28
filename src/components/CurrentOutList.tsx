@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -161,27 +162,6 @@ const CurrentOutList = ({ students, onStudentReturn, onSignOutAnother }: Current
       </CardContent>
     </Card>
   );
-};
-
-const formatStudentName = (fullName: string) => {
-  if (!fullName || fullName.trim() === '') {
-    return 'Unknown Student';
-  }
-  
-  const trimmedName = fullName.trim();
-  
-  // Always return full name unless it's extremely long
-  if (trimmedName.length <= 30) {
-    return trimmedName;
-  }
-  
-  // Only abbreviate if really necessary
-  const parts = trimmedName.split(' ');
-  if (parts.length >= 2) {
-    return `${parts[0]} ${parts[parts.length - 1].charAt(0)}.`;
-  }
-  
-  return trimmedName;
 };
 
 export default CurrentOutList;

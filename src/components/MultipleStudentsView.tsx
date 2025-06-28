@@ -6,7 +6,8 @@ import { ArrowLeft, Users, RefreshCw, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { HallPassRecord, updateReturnTime } from "@/lib/supabaseDataManager";
 import { useToast } from "@/hooks/use-toast";
-import { getElapsedMinutes, formatDurationReadable } from "@/lib/timeUtils";
+import { getElapsedMinutes, formatElapsedTime, calculateElapsedTime } from "@/lib/timeUtils";
+import OutTimer from "./OutTimer";
 
 interface MultipleStudentsViewProps {
   records: HallPassRecord[];
@@ -59,6 +60,73 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
     return 'bg-red-50 border-red-200';
   };
 
+  // If exactly one student, show large card layout
+  if (records.length === 1) {
+    const student = records[0];
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <Button 
+                variant="outline" 
+                onClick={handleBackClick}
+                className="mr-4"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+              <h1 className="text-3xl font-bold text-gray-800">Student Currently Out</h1>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={onRefresh}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </Button>
+              <Button 
+                onClick={handleSignOutAnother}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+              >
+                <UserPlus className="w-4 h-4" />
+                Sign Out Another
+              </Button>
+            </div>
+          </div>
+
+          <Card className="shadow-lg">
+            <CardContent className="p-8">
+              <div className={`p-8 rounded-lg border-2 ${getRowColor(student.timeOut)}`}>
+                <div className="text-center space-y-6">
+                  <div className="text-6xl font-bold text-gray-800">{student.studentName}</div>
+                  <div className="space-y-2">
+                    <div className="text-2xl text-gray-600">Period {student.period}</div>
+                    <div className="text-xl text-gray-600">{student.destination || 'Unknown'}</div>
+                  </div>
+                  <div className="text-center">
+                    <OutTimer timeOut={student.timeOut} className="text-7xl" />
+                  </div>
+                  <Button
+                    size="lg"
+                    className="px-8 py-4 text-lg bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handleStudentReturn(student.studentName, student.period)}
+                  >
+                    Mark Returned
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Multiple students - show compact list layout
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-6xl mx-auto">
@@ -125,9 +193,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
                           <div className="text-sm text-gray-600">
                             {record.destination || 'Unknown'}
                           </div>
-                        </div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          Out for: {formatDurationReadable(getElapsedMinutes(record.timeOut))}
+                          <OutTimer timeOut={record.timeOut} />
                         </div>
                       </div>
                       <Button
