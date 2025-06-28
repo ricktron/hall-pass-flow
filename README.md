@@ -1,73 +1,73 @@
-# Welcome to your Lovable project
 
-## Project info
+# Mr. Garnett's Bathroom Pass System
 
-**URL**: https://lovable.dev/projects/0352e31a-9cb6-4a3e-8c71-0b6b0193e1a6
+A digital hall pass tracking system for classroom use, designed for public kiosk deployment (e.g., on classroom Chromebooks).
 
-## How can I edit this code?
+## What It Does
 
-There are several ways of editing your application.
+This app tracks student bathroom trips by logging:
+- Student name and class period
+- Time out and time returned
+- Destination (Bathroom, Nurse, Office, etc.)
+- Duration of each trip
+- Analytics for teachers to monitor patterns
 
-**Use Lovable**
+## Features
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0352e31a-9cb6-4a3e-8c71-0b6b0193e1a6) and start prompting.
+- **Student Mode**: Simple sign-out interface for students
+- **Teacher Dashboard**: PIN-protected analytics and management
+- **Real-time Tracking**: Shows currently out students with live timers
+- **Data Analytics**: Trip frequency, duration averages, and pattern analysis
+- **Kiosk-Friendly**: Always returns to role selector after use
 
-Changes made via Lovable will be committed automatically to this repo.
+## Technology Stack
 
-**Use your preferred IDE**
+- **Frontend**: React + TypeScript + Vite
+- **UI**: Tailwind CSS + shadcn/ui components  
+- **Backend**: Supabase (PostgreSQL database)
+- **Routing**: React Router
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Database
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+The app connects to Supabase and stores data in the `Hall_Passes` table with columns:
+- `studentName`, `period`, `timeOut`, `timeIn`, `duration`
+- `dayOfWeek`, `destination`, `earlyDismissal`, `classroom`
 
-Follow these steps:
+## Configuration
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+### Classroom ID
+Update the classroom identifier in `src/config/classroom.ts`:
+```typescript
+export const CLASSROOM_ID = "B12"; // Change this for your classroom
 ```
 
-**Edit a file directly in GitHub**
+### Teacher PIN
+The teacher dashboard is protected by a hardcoded PIN. Check `src/components/PinEntryDialog.tsx` to modify the PIN if needed.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Supabase Connection
+Set up your Supabase project and update the connection details in `src/integrations/supabase/client.ts`.
 
-**Use GitHub Codespaces**
+## Development
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```sh
+# Install dependencies
+npm install
 
-## What technologies are used for this project?
+# Start development server
+npm run dev
 
-This project is built with:
+# Build for production
+npm run build
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Deployment
 
-## How can I deploy this project?
+Deploy using the Lovable platform or any static hosting service that supports React applications.
 
-Simply open [Lovable](https://lovable.dev/projects/0352e31a-9cb6-4a3e-8c71-0b6b0193e1a6) and click on Share -> Publish.
+## Usage
 
-## Can I connect a custom domain to my Lovable project?
+1. **Students**: Walk up to the kiosk, select "Student", enter name/period/destination, and sign out
+2. **Teachers**: Select "Teacher", enter PIN, access dashboard with analytics and student management
+3. **Return Process**: Students can mark themselves returned, or teachers can do it from the dashboard
 
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+The app automatically returns to the role selector after each interaction, making it perfect for shared classroom use.

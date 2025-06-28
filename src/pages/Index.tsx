@@ -11,7 +11,7 @@ import { getCurrentlyOutRecords, HallPassRecord } from "@/lib/supabaseDataManage
 import { CLASSROOM_ID } from "@/config/classroom";
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'select' | 'student' | 'teacher' | 'multiple'>('student'); // Default to student view
+  const [currentView, setCurrentView] = useState<'select' | 'student' | 'teacher' | 'multiple'>('select'); // Fixed: Default to 'select'
   const [currentlyOutRecords, setCurrentlyOutRecords] = useState<HallPassRecord[]>([]);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState(false);
@@ -19,23 +19,16 @@ const Index = () => {
   const loadCurrentlyOut = async () => {
     const records = await getCurrentlyOutRecords();
     setCurrentlyOutRecords(records);
-    
-    // Auto-switch to multiple students view if there are students out and we're in student mode
-    if (records.length > 0 && currentView === 'student') {
-      setCurrentView('multiple');
-    } else if (records.length === 0 && currentView === 'multiple') {
-      setCurrentView('student');
-    }
   };
 
   useEffect(() => {
     loadCurrentlyOut();
     const interval = setInterval(loadCurrentlyOut, 10000); // Check every 10 seconds
     return () => clearInterval(interval);
-  }, [currentView]);
+  }, []);
 
   const handleBackToSelection = () => {
-    setCurrentView('student'); // Always return to student view instead of selection
+    setCurrentView('select'); // Fixed: Always return to role selector
     setIsTeacherAuthenticated(false); // Reset teacher auth when going back
   };
 
@@ -93,6 +86,7 @@ const Index = () => {
     );
   }
 
+  // Role Selector View (default)
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">

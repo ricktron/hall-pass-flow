@@ -29,11 +29,11 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
   }, []);
 
   const handleBackClick = () => {
-    navigate("/");
+    onBack(); // Use the provided onBack function
   };
 
   const handleSignOutAnother = () => {
-    navigate("/");
+    onBack(); // This will return to role selector, where they can choose student mode
   };
 
   const handleStudentReturn = async (studentName: string, period: string) => {
