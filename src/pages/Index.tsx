@@ -6,21 +6,25 @@ import { Users, GraduationCap } from "lucide-react";
 import StudentView from "@/components/StudentView";
 import TeacherView from "@/components/TeacherView";
 import MultipleStudentsView from "@/components/MultipleStudentsView";
+import PinEntryDialog from "@/components/PinEntryDialog";
 import { getCurrentlyOutRecords, HallPassRecord } from "@/lib/supabaseDataManager";
+import { CLASSROOM_ID } from "@/config/classroom";
 
 const Index = () => {
-  const [currentView, setCurrentView] = useState<'select' | 'student' | 'teacher' | 'multiple'>('select');
+  const [currentView, setCurrentView] = useState<'select' | 'student' | 'teacher' | 'multiple'>('student'); // Default to student view
   const [currentlyOutRecords, setCurrentlyOutRecords] = useState<HallPassRecord[]>([]);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState(false);
 
   const loadCurrentlyOut = async () => {
     const records = await getCurrentlyOutRecords();
     setCurrentlyOutRecords(records);
     
-    // Auto-switch to multiple students view if there are students out
-    if (records.length > 0 && currentView === 'select') {
+    // Auto-switch to multiple students view if there are students out and we're in student mode
+    if (records.length > 0 && currentView === 'student') {
       setCurrentView('multiple');
     } else if (records.length === 0 && currentView === 'multiple') {
-      setCurrentView('select');
+      setCurrentView('student');
     }
   };
 
@@ -31,7 +35,8 @@ const Index = () => {
   }, [currentView]);
 
   const handleBackToSelection = () => {
-    setCurrentView('select');
+    setCurrentView('student'); // Always return to student view instead of selection
+    setIsTeacherAuthenticated(false); // Reset teacher auth when going back
   };
 
   const handleStudentModeClick = () => {
@@ -41,6 +46,34 @@ const Index = () => {
       setCurrentView('student');
     }
   };
+
+  const handleTeacherModeClick = () => {
+    if (isTeacherAuthenticated) {
+      setCurrentView('teacher');
+    } else {
+      setShowPinDialog(true);
+    }
+  };
+
+  const handlePinSuccess = () => {
+    setIsTeacherAuthenticated(true);
+    setShowPinDialog(false);
+    setCurrentView('teacher');
+  };
+
+  const handlePinCancel = () => {
+    setShowPinDialog(false);
+  };
+
+  // Clear teacher authentication on page reload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      setIsTeacherAuthenticated(false);
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   if (currentView === 'student') {
     return <StudentView onBack={handleBackToSelection} />;
@@ -61,57 +94,65 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl">
-        <div className="text-center mb-8">
-          <h1 className="font-brittany text-6xl text-gray-800 mb-1 tracking-wide">Mr. Garnett's</h1>
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">Bathroom Pass System</h1>
-          <p className="text-lg text-gray-600">Select your role to continue</p>
-          {currentlyOutRecords.length > 0 && (
-            <p className="text-lg text-orange-600 font-semibold mt-2">
-              {currentlyOutRecords.length} student{currentlyOutRecords.length !== 1 ? 's' : ''} currently out
-            </p>
-          )}
-        </div>
-        
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleStudentModeClick}>
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                <Users className="w-8 h-8 text-blue-600" />
-              </div>
-              <CardTitle className="text-2xl text-gray-800">Student</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-gray-600 mb-6">
-                {currentlyOutRecords.length > 0 
-                  ? "View currently out students or sign out" 
-                  : "Sign out for hall pass"
-                }
+    <>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-4xl">
+          <div className="text-center mb-8">
+            <h1 className="font-brittany text-6xl text-gray-800 mb-1 tracking-wide">Mr. Garnett's</h1>
+            <h1 className="text-4xl font-bold text-gray-800 mb-2">Bathroom Pass System</h1>
+            <p className="text-lg text-gray-600">Select your role to continue</p>
+            {currentlyOutRecords.length > 0 && (
+              <p className="text-lg text-orange-600 font-semibold mt-2">
+                {currentlyOutRecords.length} student{currentlyOutRecords.length !== 1 ? 's' : ''} currently out
               </p>
-              <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                {currentlyOutRecords.length > 0 ? "View Current Students" : "Continue as Student"}
-              </Button>
-            </CardContent>
-          </Card>
+            )}
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleStudentModeClick}>
+              <CardHeader className="text-center pb-4">
+                <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <Users className="w-8 h-8 text-blue-600" />
+                </div>
+                <CardTitle className="text-2xl text-gray-800">Student</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 mb-6">
+                  {currentlyOutRecords.length > 0 
+                    ? "View currently out students or sign out" 
+                    : "Sign out for hall pass"
+                  }
+                </p>
+                <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                  {currentlyOutRecords.length > 0 ? "View Current Students" : "Continue as Student"}
+                </Button>
+              </CardContent>
+            </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setCurrentView('teacher')}>
-            <CardHeader className="text-center pb-4">
-              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                <GraduationCap className="w-8 h-8 text-green-600" />
-              </div>
-              <CardTitle className="text-2xl text-gray-800">Teacher</CardTitle>
-            </CardHeader>
-            <CardContent className="text-center">
-              <p className="text-gray-600 mb-6">View dashboard and manage students</p>
-              <Button className="w-full bg-green-600 hover:bg-green-700">
-                Continue as Teacher
-              </Button>
-            </CardContent>
-          </Card>
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleTeacherModeClick}>
+              <CardHeader className="text-center pb-4">
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                  <GraduationCap className="w-8 h-8 text-green-600" />
+                </div>
+                <CardTitle className="text-2xl text-gray-800">Teacher</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 mb-6">View dashboard and manage students</p>
+                <Button className="w-full bg-green-600 hover:bg-green-700">
+                  Continue as Teacher
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
+
+      <PinEntryDialog
+        isOpen={showPinDialog}
+        onSuccess={handlePinSuccess}
+        onCancel={handlePinCancel}
+      />
+    </>
   );
 };
 

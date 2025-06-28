@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { addHallPassRecord, getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 import { DAYS_OF_WEEK } from "@/constants/formOptions";
+import { CLASSROOM_ID } from "@/config/classroom";
 
 interface StudentRecord {
   studentName: string;
@@ -79,7 +79,7 @@ export const useStudentSignOut = ({ onSignOut, onEarlyDismissal }: UseStudentSig
         dayOfWeek,
         destination: selectedDestination,
         earlyDismissal: isEarlyDismissal,
-        classroom: "B12" // Automatically include classroom B12
+        classroom: CLASSROOM_ID // Use the configured classroom ID
       });
 
       if (success) {

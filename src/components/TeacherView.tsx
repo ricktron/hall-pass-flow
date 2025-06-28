@@ -77,16 +77,22 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center mb-8">
-          <Button 
-            variant="outline" 
-            onClick={onBack}
-            className="mr-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Teacher Dashboard</h1>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center">
+            <Button 
+              variant="outline" 
+              onClick={onBack}
+              className="mr-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <h1 className="text-3xl font-bold text-gray-900">Teacher Dashboard</h1>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-gray-500">Classroom</div>
+            <div className="text-xl font-bold text-gray-800">Mr. Garnett — B12</div>
+          </div>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
