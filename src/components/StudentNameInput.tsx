@@ -9,6 +9,7 @@ interface StudentNameInputProps {
   onFirstNameChange: (value: string) => void;
   onLastNameChange: (value: string) => void;
   studentNames: string[];
+  onKeyDown?: (e: React.KeyboardEvent, nextFieldId?: string) => void;
 }
 
 const StudentNameInput = ({
@@ -16,7 +17,8 @@ const StudentNameInput = ({
   lastName,
   onFirstNameChange,
   onLastNameChange,
-  studentNames
+  studentNames,
+  onKeyDown
 }: StudentNameInputProps) => {
   const [filteredNames, setFilteredNames] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -52,6 +54,7 @@ const StudentNameInput = ({
           onChange={(e) => onFirstNameChange(e.target.value)}
           onFocus={() => firstName.trim().length > 1 && setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          onKeyDown={(e) => onKeyDown?.(e, 'lastName')}
         />
         {showSuggestions && (
           <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-40 overflow-y-auto">
@@ -75,6 +78,7 @@ const StudentNameInput = ({
           placeholder="Enter last name"
           value={lastName}
           onChange={(e) => onLastNameChange(e.target.value)}
+          onKeyDown={(e) => onKeyDown?.(e, 'period-select')}
         />
       </div>
     </div>

@@ -8,20 +8,22 @@ interface PeriodDestinationSelectsProps {
   selectedDestination: string;
   onPeriodChange: (value: string) => void;
   onDestinationChange: (value: string) => void;
+  onKeyDown?: (e: React.KeyboardEvent, nextFieldId?: string) => void;
 }
 
 const PeriodDestinationSelects = ({
   selectedPeriod,
   selectedDestination,
   onPeriodChange,
-  onDestinationChange
+  onDestinationChange,
+  onKeyDown
 }: PeriodDestinationSelectsProps) => {
   return (
     <>
       <div className="space-y-2">
         <Label htmlFor="period">Class Period</Label>
         <Select value={selectedPeriod} onValueChange={onPeriodChange}>
-          <SelectTrigger>
+          <SelectTrigger id="period-select" onKeyDown={(e) => onKeyDown?.(e, 'destination-select')}>
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent>
@@ -37,7 +39,7 @@ const PeriodDestinationSelects = ({
       <div className="space-y-2">
         <Label htmlFor="destination">Destination</Label>
         <Select value={selectedDestination} onValueChange={onDestinationChange}>
-          <SelectTrigger>
+          <SelectTrigger id="destination-select" onKeyDown={(e) => onKeyDown?.(e, 'signOutButton')}>
             <SelectValue placeholder="Select destination" />
           </SelectTrigger>
           <SelectContent>

@@ -102,6 +102,27 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
 
   const isFormValid = firstName.trim() && lastName.trim() && selectedPeriod && selectedDestination;
 
+  const handleKeyDown = (e: React.KeyboardEvent, nextFieldId?: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (nextFieldId) {
+        const nextField = document.getElementById(nextFieldId);
+        if (nextField) {
+          nextField.focus();
+          // For select elements, trigger them to open
+          if (nextField.tagName === 'BUTTON' && nextField.getAttribute('role') === 'combobox') {
+            nextField.click();
+          }
+        }
+      } else {
+        // This is the submit button
+        if (isFormValid) {
+          handleFormSubmit();
+        }
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card className="shadow-lg">
@@ -118,6 +139,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
             onFirstNameChange={setFirstName}
             onLastNameChange={setLastName}
             studentNames={studentNames}
+            onKeyDown={handleKeyDown}
           />
 
           <PeriodDestinationSelects
@@ -125,11 +147,14 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
             selectedDestination={selectedDestination}
             onPeriodChange={setSelectedPeriod}
             onDestinationChange={setSelectedDestination}
+            onKeyDown={handleKeyDown}
           />
 
           <Button 
+            id="signOutButton"
             className="w-full py-3 text-lg" 
             onClick={handleFormSubmit}
+            onKeyDown={(e) => handleKeyDown(e)}
             disabled={isSubmitting || !isFormValid}
           >
             {isSubmitting ? "Processing..." : "Sign Out"}
