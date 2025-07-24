@@ -60,7 +60,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   }, []);
 
   const handleBackClick = () => {
-    navigate("/");
+    onBack();
   };
 
   const handleStudentReturn = async (studentName: string, period: string) => {
@@ -92,6 +92,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
             <Button 
+              type="button"
               variant="outline" 
               onClick={handleBackClick}
               className="mr-4"

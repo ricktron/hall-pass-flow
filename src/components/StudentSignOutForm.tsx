@@ -151,6 +151,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
           />
 
           <Button 
+            type="button"
             id="signOutButton"
             className="w-full py-3 text-lg" 
             onClick={handleFormSubmit}

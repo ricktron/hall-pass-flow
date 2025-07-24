@@ -86,7 +86,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   };
 
   const handleBackClick = () => {
-    navigate("/");
+    onBack();
   };
 
   // Show "Have a Great Day" message for early dismissals
@@ -115,6 +115,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center mb-6">
           <Button 
+            type="button"
             variant="outline" 
             onClick={handleBackClick}
             className="mr-4"
