@@ -127,19 +127,14 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
     }
 
     const record = records[0];
-    const timeIn = new Date();
-    const duration = calculateDurationMinutes(record.timeOut, timeIn);
 
-    const { error: updateError } = await supabase
+    const { error } = await supabase
       .from('Hall_Passes')
-      .update({ 
-        timeIn: timeIn.toISOString(), 
-        duration: duration
-      })
+      .update({ timeIn: new Date().toISOString() })
       .eq('id', record.id);
 
-    if (updateError) {
-      console.error("Error updating hall pass record:", updateError);
+    if (error) {
+      console.error("Error updating hall pass record:", error);
       return false;
     }
 

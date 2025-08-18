@@ -8,6 +8,7 @@ import AnalyticsPanel from "./AnalyticsPanel";
 import { getCurrentlyOutRecords, getAnalytics, updateReturnTime } from "@/lib/supabaseDataManager";
 import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TeacherViewProps {
   onBack: () => void;
@@ -64,19 +65,60 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   };
 
   const handleStudentReturn = async (studentName: string, period: string) => {
-    const success = await updateReturnTime(studentName, period);
-    if (success) {
+    try {
+      // Find the most recent record for this student where timeIn is null
+      const { data: records, error: fetchError } = await supabase
+        .from('Hall_Passes')
+        .select('*')
+        .eq('studentName', studentName)
+        .eq('period', period)
+        .is('timeIn', null)
+        .order('timeOut', { ascending: false })
+        .limit(1);
+
+      if (fetchError) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'Return failed', 
+          description: `${fetchError.code ?? ''} ${fetchError.message}`.trim() 
+        });
+        return;
+      }
+
+      if (!records || records.length === 0) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'Return failed', 
+          description: 'No active hall pass record found' 
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('Hall_Passes')
+        .update({ timeIn: new Date().toISOString() })
+        .eq('id', records[0].id);
+
+      if (error) {
+        toast({ 
+          variant: 'destructive', 
+          title: 'Return failed', 
+          description: `${error.code ?? ''} ${error.message}`.trim() 
+        });
+        return;
+      }
+
       toast({
         title: "Student Returned",
         description: `${studentName} has been marked as returned.`,
       });
       loadCurrentlyOutCount();
       loadAnalytics();
-    } else {
-      toast({
-        title: "Error",
-        description: "Could not mark student as returned.",
-        variant: "destructive",
+    } catch (error) {
+      toast({ 
+        variant: 'destructive', 
+        title: 'Return failed', 
+        description: 'An unexpected error occurred' 
       });
     }
   };
