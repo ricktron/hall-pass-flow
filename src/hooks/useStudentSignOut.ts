@@ -70,35 +70,37 @@ export const useStudentSignOut = ({ onSignOut, onEarlyDismissal }: UseStudentSig
         }
       }
       
-      const success = await addHallPassRecord({
-        studentName,
-        period: selectedPeriod,
-        timeOut: centralTime,
-        timeIn: null,
-        duration: null,
-        dayOfWeek,
-        destination: selectedDestination,
-        earlyDismissal: isEarlyDismissal,
-        classroom: CLASSROOM_ID // Use the configured classroom ID
-      });
+      try {
+        const success = await addHallPassRecord({
+          studentName,
+          period: selectedPeriod,
+          timeOut: centralTime,
+          timeIn: null,
+          duration: null,
+          dayOfWeek,
+          destination: selectedDestination,
+          earlyDismissal: isEarlyDismissal,
+          classroom: CLASSROOM_ID // Use the configured classroom ID
+        });
 
-      if (success) {
-        if (isEarlyDismissal) {
-          onEarlyDismissal(studentName);
-        } else {
-          onSignOut({
-            studentName,
-            period: selectedPeriod,
-            timeOut: centralTime,
-            destination: selectedDestination
-          });
+        if (success) {
+          if (isEarlyDismissal) {
+            onEarlyDismissal(studentName);
+          } else {
+            onSignOut({
+              studentName,
+              period: selectedPeriod,
+              timeOut: centralTime,
+              destination: selectedDestination
+            });
+          }
+          return { success: true };
         }
-        return { success: true };
-      } else {
+      } catch (error: any) {
         toast({
-          title: "Error",
-          description: "Failed to sign out. Please try again.",
           variant: "destructive",
+          title: "Sign-out failed",
+          description: `${error.code ?? ''} ${error.message}`.trim()
         });
         return { success: false };
       }

@@ -49,23 +49,21 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
     }
 
     // Now create the new record
+    const payload = {
+      studentName: record.studentName,
+      period: record.period,
+      destination: record.destination,
+      timeOut: record.timeOut.toISOString()
+    };
+
     const { error } = await supabase
       .from('Hall_Passes')
-      .insert([{
-        studentName: record.studentName,
-        period: record.period,
-        timeOut: record.timeOut.toISOString(),
-        timeIn: record.timeIn ? record.timeIn.toISOString() : null,
-        duration: record.duration,
-        dayOfWeek: record.dayOfWeek,
-        destination: record.destination,
-        earlyDismissal: record.earlyDismissal || false,
-        classroom: record.classroom
-      }]);
+      .insert(payload)
+      .select();
 
     if (error) {
       console.error("Error adding hall pass record:", error);
-      return false;
+      throw error;
     }
     return true;
   } catch (error) {
