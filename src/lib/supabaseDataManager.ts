@@ -163,11 +163,7 @@ export const deleteHallPassRecord = async (recordId: string): Promise<boolean> =
 
 export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
   try {
-    const { data, error } = await (supabase as any)
-      .from('Hall_Passes')
-      .select('pass_id, student_name, period, destination, timeout, timein')
-      .filter('timein', 'is', null)
-      .order('timeout', { ascending: false });
+    const { data, error } = await (supabase as any).rpc('open_passes');
 
     if (error) {
       console.error("Error fetching currently out records:", error);
