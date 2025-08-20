@@ -17,11 +17,11 @@ export interface HallPassRecord {
 export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
   try {
     // First, check if the student already has an open trip
-    const { data: existingRecords, error: checkError } = await supabase
+    const { data: existingRecords, error: checkError } = await (supabase as any)
       .from('Hall_Passes')
       .select('*')
       .eq('student_name', record.studentName)
-      .filter('timein', 'is', null) as any;
+      .filter('timein', 'is', null);
 
     if (checkError) {
       console.error("Error checking existing records:", checkError);
@@ -33,10 +33,10 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
       const openRecord = existingRecords[0];
       const timeIn = new Date();
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('Hall_Passes')
         .update({ timein: timeIn.toISOString() })
-        .eq('pass_id', openRecord.pass_id) as any;
+        .eq('pass_id', openRecord.pass_id);
 
       if (updateError) {
         console.error("Error closing existing record:", updateError);
@@ -52,9 +52,9 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
       timeout: record.timeOut.toISOString()
     };
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('Hall_Passes')
-      .insert(payload) as any;
+      .insert(payload);
 
     if (error) {
       console.error("Error adding hall pass record:", error);
@@ -69,7 +69,7 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
 
 export const getAllHallPassRecords = async (): Promise<HallPassRecord[]> => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('Hall_Passes')
       .select('*')
       .order('timeout', { ascending: false });
@@ -100,14 +100,14 @@ export const getAllHallPassRecords = async (): Promise<HallPassRecord[]> => {
 export const updateReturnTime = async (studentName: string, period: string): Promise<boolean> => {
   try {
     // Find the most recent record for this student where timeIn is null
-    const { data: records, error: fetchError } = await supabase
+    const { data: records, error: fetchError } = await (supabase as any)
       .from('Hall_Passes')
       .select('*')
       .eq('student_name', studentName)
       .eq('period', period)
       .filter('timein', 'is', null)
       .order('timeout', { ascending: false })
-      .limit(1) as any;
+      .limit(1);
 
     if (fetchError) {
       console.error("Error finding hall pass record:", fetchError);
@@ -121,10 +121,10 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
 
     const record = records[0];
 
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('Hall_Passes')
       .update({ timein: new Date().toISOString() })
-      .eq('pass_id', record.pass_id) as any;
+      .eq('pass_id', record.pass_id);
 
     if (error) {
       console.error("Error updating hall pass record:", error);
@@ -145,7 +145,7 @@ export const markStudentReturn = async (studentName: string, period: string): Pr
 
 export const deleteHallPassRecord = async (recordId: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('Hall_Passes')
       .delete()
       .eq('pass_id', recordId);
@@ -163,7 +163,7 @@ export const deleteHallPassRecord = async (recordId: string): Promise<boolean> =
 
 export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('Hall_Passes')
       .select('pass_id, student_name, period, destination, timeout, timein')
       .filter('timein', 'is', null)
@@ -194,7 +194,7 @@ export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
 
 export const getStudentNames = async (): Promise<string[]> => {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('Hall_Passes')
       .select('student_name')
       .order('student_name');
@@ -205,7 +205,7 @@ export const getStudentNames = async (): Promise<string[]> => {
     }
 
     // Get unique student names
-    const uniqueNames = [...new Set((data || []).map((record: any) => record.student_name).filter(Boolean))];
+    const uniqueNames = [...new Set((data || []).map((record: any) => record.student_name).filter(Boolean))] as string[];
     return uniqueNames;
   } catch (error) {
     console.error("Error fetching student names:", error);
@@ -221,7 +221,7 @@ export const getWeeklyStats = async (studentName: string): Promise<{
   try {
     const startOfWeek = getLocalWeekStart();
 
-    let query = supabase
+    let query = (supabase as any)
       .from('Hall_Passes')
       .select('*')
       .gte('timeout', startOfWeek.toISOString())
@@ -270,7 +270,7 @@ export const getAnalytics = async () => {
     const { startOfDay, endOfDay } = getLocalTodayBounds();
     const startOfWeek = getLocalWeekStart();
 
-    const { data: allRecords, error } = await supabase
+    const { data: allRecords, error } = await (supabase as any)
       .from('Hall_Passes')
       .select('*')
       .order('timeout', { ascending: false });
