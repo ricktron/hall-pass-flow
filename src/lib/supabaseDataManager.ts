@@ -25,7 +25,7 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
 
     if (checkError) {
       console.error("Error checking existing records:", checkError);
-      return false;
+      throw checkError;
     }
 
     // If there's an existing open trip, close it first
@@ -33,19 +33,19 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
       const openRecord = existingRecords[0];
 
       const { error: updateError } = await (supabase as any)
-        .from('Hall_Passes')
+        .from('bathroom_passes')
         .update({ timein: new Date().toISOString() })
-        .eq('pass_id', openRecord.id);
+        .eq('id', openRecord.id);
 
       if (updateError) {
         console.error("Error closing existing record:", updateError);
-        return false;
+        throw updateError;
       }
     }
 
     // Now create the new record
-    const { error } = await supabase
-      .from('Hall_Passes')
+    const { error } = await (supabase as any)
+      .from('bathroom_passes')
       .insert({
         student_name: record.studentName,
         period: record.period,
@@ -60,7 +60,7 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
     return true;
   } catch (error) {
     console.error("Error adding hall pass record:", error);
-    return false;
+    throw error;
   }
 };
 
@@ -108,7 +108,7 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
 
     if (fetchError) {
       console.error("Error finding hall pass record:", fetchError);
-      return false;
+      throw fetchError;
     }
 
     if (!records || records.length === 0) {
@@ -119,19 +119,19 @@ export const updateReturnTime = async (studentName: string, period: string): Pro
     const record = records[0];
 
     const { error } = await (supabase as any)
-      .from('Hall_Passes')
+      .from('bathroom_passes')
       .update({ timein: new Date().toISOString() })
-      .eq('pass_id', record.id);
+      .eq('id', record.id);
 
     if (error) {
       console.error("Error updating hall pass record:", error);
-      return false;
+      throw error;
     }
 
     return true;
   } catch (error) {
     console.error("Error updating return time:", error);
-    return false;
+    throw error;
   }
 };
 
@@ -162,13 +162,13 @@ export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
   try {
     const { data, error } = await (supabase as any)
       .from('Hall_Passes_api')
-      .select('id, studentName, period, destination, timeOut, timeIn')
+      .select('id, studentName, period, destination, timeOut, timeIn, duration, needsReview')
       .filter('timeIn', 'is', null)
       .order('timeOut', { ascending: false });
 
     if (error) {
       console.error("Error fetching currently out records:", error);
-      return [];
+      throw error;
     }
 
     return (data || []).map((record: any) => ({
@@ -185,7 +185,7 @@ export const getCurrentlyOutRecords = async (): Promise<HallPassRecord[]> => {
     }));
   } catch (error) {
     console.error("Error fetching currently out records:", error);
-    return [];
+    throw error;
   }
 };
 
