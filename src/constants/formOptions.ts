@@ -1,5 +1,5 @@
 
-export const PERIODS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+export const PERIODS = ["A", "B", "C", "D", "E", "F", "G", "H", "House Small Group"];
 
 export const PERIOD_OPTIONS = [
   { label: 'A Period', value: 'A' },
@@ -10,6 +10,7 @@ export const PERIOD_OPTIONS = [
   { label: 'F Period', value: 'F' },
   { label: 'G Period', value: 'G' },
   { label: 'H Period', value: 'H' },
+  { label: 'House Small Group', value: 'House Small Group' },
 ];
 
 export const DESTINATIONS = [

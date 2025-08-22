@@ -22,7 +22,7 @@ interface AnalyticsPanelProps {
 }
 
 const AnalyticsPanel = ({ analytics }: AnalyticsPanelProps) => {
-  const periods = ["A", "B", "C", "D", "E", "F", "G", "H"];
+  const periods = ["A", "B", "C", "D", "E", "F", "G", "H", "House Small Group"];
   const maxTrips = Math.max(...periods.map(p => analytics.tripsPerPeriod[p] || 0));
 
   return (
@@ -92,7 +92,7 @@ const AnalyticsPanel = ({ analytics }: AnalyticsPanelProps) => {
               
               return (
                 <div key={period} className="flex items-center space-x-3">
-                  <div className="w-12 text-sm font-medium">Period {period}</div>
+                  <div className="w-12 text-sm font-medium">{period === 'House Small Group' ? period : `Period ${period}`}</div>
                   <div className="flex-1">
                     <div className="bg-gray-200 rounded-full h-2">
                       <div 
