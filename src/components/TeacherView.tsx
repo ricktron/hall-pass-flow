@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Users, BarChart3, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
+import AnalyticsView from "./AnalyticsView";
 import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
@@ -249,85 +250,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
         )}
 
         {activeView === 'analytics' && (
-          <div className="space-y-6">
-            <div className="mb-4">
-              <h2 className="text-2xl font-semibold text-gray-800">Today's Analytics (Chicago Time)</h2>
-              {err && <div className="mt-2 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{err}</div>}
-              {loading && <div className="mt-2 text-sm opacity-60">Loading…</div>}
-            </div>
-
-            {/* Stats cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <StatCard label="Total trips" value={String(totalTrips)} />
-              <StatCard label="Longest" value={fmtHMS(longestMs)} />
-              <StatCard label="Average" value={fmtHMS(avgMs)} />
-            </div>
-
-            {/* Trips by Period (bar row) */}
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <BarChart3 className="w-5 h-5 mr-2" />
-                  Trips by Period (Today)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {PERIODS.map(p => (
-                    <BarRow key={p} label={p} value={byPeriod[p] ?? 0} max={Math.max(1, ...Object.values(byPeriod))} />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Most Frequent Leavers */}
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Users className="w-5 h-5 mr-2" />
-                  Most Frequent Leavers (Today)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y">
-                  {topLeavers.length === 0 && <div className="p-3 text-sm opacity-60">No trips yet.</div>}
-                  {topLeavers.map(([name, count]) => (
-                    <div key={name} className="flex items-center justify-between py-3">
-                      <span className="text-sm font-medium">{name}</span>
-                      <span className="text-sm font-semibold bg-muted px-2 py-1 rounded">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Still Out 30+ Minutes */}
-            <Card className="shadow-lg">
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <UserCheck className="w-5 h-5 mr-2" />
-                  Still Out 30+ Minutes
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="divide-y">
-                  {openRows.length === 0 && <div className="p-3 text-sm opacity-60">All clear.</div>}
-                  {openRows.map(r => {
-                    const elapsedMs = Date.now() - new Date(r.timeOut).getTime();
-                    return (
-                      <div key={r.id} className="flex items-center justify-between py-3">
-                        <div className="text-sm">
-                          <div className="font-medium">{r.studentName}</div>
-                          <div className="opacity-70">Period {r.period} • Out at {new Date(r.timeOut).toLocaleTimeString()}</div>
-                        </div>
-                        <div className="text-sm font-semibold bg-orange-100 text-orange-800 px-2 py-1 rounded">{fmtHMS(elapsedMs)}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <AnalyticsView />
         )}
       </div>
     </div>
