@@ -14,51 +14,306 @@ export type Database = {
   }
   public: {
     Tables: {
+      bathroom_passes: {
+        Row: {
+          classroom: string | null
+          created_at: string
+          date_local: string | null
+          destination: string | null
+          duration_min: number | null
+          id: string
+          manual_adjust_min: number | null
+          manual_adjust_reason: string | null
+          notes: string | null
+          override_reason: string | null
+          overrode_period: boolean
+          pass_status: string | null
+          period: string | null
+          period_norm: string | null
+          raw_student_name: string | null
+          student_id: string | null
+          student_name: string | null
+          timein: string | null
+          timeout: string | null
+          updated_at: string
+          was_auto_closed: boolean
+        }
+        Insert: {
+          classroom?: string | null
+          created_at?: string
+          date_local?: string | null
+          destination?: string | null
+          duration_min?: number | null
+          id?: string
+          manual_adjust_min?: number | null
+          manual_adjust_reason?: string | null
+          notes?: string | null
+          override_reason?: string | null
+          overrode_period?: boolean
+          pass_status?: string | null
+          period?: string | null
+          period_norm?: string | null
+          raw_student_name?: string | null
+          student_id?: string | null
+          student_name?: string | null
+          timein?: string | null
+          timeout?: string | null
+          updated_at?: string
+          was_auto_closed?: boolean
+        }
+        Update: {
+          classroom?: string | null
+          created_at?: string
+          date_local?: string | null
+          destination?: string | null
+          duration_min?: number | null
+          id?: string
+          manual_adjust_min?: number | null
+          manual_adjust_reason?: string | null
+          notes?: string | null
+          override_reason?: string | null
+          overrode_period?: boolean
+          pass_status?: string | null
+          period?: string | null
+          period_norm?: string | null
+          raw_student_name?: string | null
+          student_id?: string | null
+          student_name?: string | null
+          timein?: string | null
+          timeout?: string | null
+          updated_at?: string
+          was_auto_closed?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bathroom_passes_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bathroom_passes_classroom"
+            columns: ["classroom"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      classrooms: {
+        Row: {
+          id: string
+          teacher_email: string | null
+        }
+        Insert: {
+          id: string
+          teacher_email?: string | null
+        }
+        Update: {
+          id?: string
+          teacher_email?: string | null
+        }
+        Relationships: []
+      }
+      hall_pass_corrections: {
+        Row: {
+          corrected_at: string | null
+          corrected_by: string | null
+          corrected_duration: number
+          corrected_reason: string | null
+          pass_id: string
+        }
+        Insert: {
+          corrected_at?: string | null
+          corrected_by?: string | null
+          corrected_duration: number
+          corrected_reason?: string | null
+          pass_id: string
+        }
+        Update: {
+          corrected_at?: string | null
+          corrected_by?: string | null
+          corrected_duration?: number
+          corrected_reason?: string | null
+          pass_id?: string
+        }
+        Relationships: []
+      }
+      student_name_synonyms: {
+        Row: {
+          created_at: string
+          id: string
+          raw_input: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          raw_input: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          raw_input?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_name_synonyms_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      students: {
+        Row: {
+          active: boolean
+          created_at: string
+          email: string | null
+          external_ref: string | null
+          first_name: string | null
+          first_norm: string | null
+          full_name: string | null
+          full_name_norm: string | null
+          id: string
+          last_name: string | null
+          last_norm: string | null
+          period_code: string | null
+          preferred_name: string | null
+          roster_block: string
+          sis_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          email?: string | null
+          external_ref?: string | null
+          first_name?: string | null
+          first_norm?: string | null
+          full_name?: string | null
+          full_name_norm?: string | null
+          id?: string
+          last_name?: string | null
+          last_norm?: string | null
+          period_code?: string | null
+          preferred_name?: string | null
+          roster_block?: string
+          sis_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          email?: string | null
+          external_ref?: string | null
+          first_name?: string | null
+          first_norm?: string | null
+          full_name?: string | null
+          full_name_norm?: string | null
+          id?: string
+          last_name?: string | null
+          last_norm?: string | null
+          period_code?: string | null
+          preferred_name?: string | null
+          roster_block?: string
+          sis_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
       Hall_Passes: {
         Row: {
           classroom: string | null
-          dayOfWeek: string | null
           destination: string | null
-          duration: number | null
-          earlyDismissal: boolean | null
-          id: string
+          id: string | null
+          notes: string | null
           period: string | null
+          studentId: string | null
           studentName: string | null
           timeIn: string | null
           timeOut: string | null
         }
         Insert: {
           classroom?: string | null
-          dayOfWeek?: string | null
           destination?: string | null
-          duration?: number | null
-          earlyDismissal?: boolean | null
-          id?: string
+          id?: string | null
+          notes?: string | null
           period?: string | null
+          studentId?: string | null
           studentName?: string | null
           timeIn?: string | null
           timeOut?: string | null
         }
         Update: {
           classroom?: string | null
-          dayOfWeek?: string | null
           destination?: string | null
-          duration?: number | null
-          earlyDismissal?: boolean | null
-          id?: string
+          id?: string | null
+          notes?: string | null
           period?: string | null
+          studentId?: string | null
           studentName?: string | null
           timeIn?: string | null
           timeOut?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bathroom_passes_student_id_fkey"
+            columns: ["studentId"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bathroom_passes_classroom"
+            columns: ["classroom"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      Hall_Passes_api: {
+        Row: {
+          destination: string | null
+          duration: number | null
+          firstName: string | null
+          id: string | null
+          lastName: string | null
+          needsReview: boolean | null
+          period: string | null
+          studentId: string | null
+          studentName: string | null
+          timeIn: string | null
+          timeOut: string | null
+          typedName: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bathroom_passes_student_id_fkey"
+            columns: ["studentId"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
-    Views: {
-      [_ in never]: never
-    }
     Functions: {
-      [_ in never]: never
+      normalize_name: {
+        Args: { txt: string }
+        Returns: string
+      }
+      to_local_date_toronto: {
+        Args: { ts: string }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
