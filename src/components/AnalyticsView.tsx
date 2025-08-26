@@ -85,13 +85,16 @@ const AnalyticsView = () => {
   const loadData = async () => {
     setLoading(true);
     setError(null);
+    
+    // Ensure timeFrame defaults to "Week" if empty/null
+    const effectiveTimeFrame = timeFrame || "Week";
 
     try {
       // Load summary data
       const { data: summary, error: summaryError } = await supabase
         .from("hp_summary_windows" as any)
         .select("passes, minutes_out AS total_minutes")
-        .eq("window", timeFrame)
+        .eq("window", effectiveTimeFrame)
         .maybeSingle();
 
       if (summaryError) throw summaryError;
@@ -99,29 +102,21 @@ const AnalyticsView = () => {
 
       // Load return rate data with computed percentage
       const { data: returnRate, error: returnRateError } = await supabase
-        .rpc("get_return_rate_computed" as any, { time_frame: timeFrame });
+        .from("hp_return_rate_windows" as any)
+        .select("pct_returned, still_out, total")
+        .eq("window", effectiveTimeFrame)
+        .maybeSingle();
 
-      if (returnRateError) {
-        // Fallback to direct query if RPC doesn't exist
-        const { data: returnRateFallback, error: returnRateError2 } = await supabase
-          .from("hp_return_rate_windows" as any)
-          .select("pct_returned, still_out, total")
-          .eq("window", timeFrame)
-          .maybeSingle();
-        
-        if (returnRateError2) throw returnRateError2;
-        
-        // Compute percentage client-side
-        const computed = returnRateFallback ? {
-          return_rate_pct: Math.round((returnRateFallback as any).pct_returned * 100 * 10) / 10,
-          still_out: (returnRateFallback as any).still_out,
-          total: (returnRateFallback as any).total
-        } : null;
-        
-        setReturnRateData(computed as unknown as ReturnRateData | null);
-      } else {
-        setReturnRateData(returnRate as unknown as ReturnRateData | null);
-      }
+      if (returnRateError) throw returnRateError;
+      
+      // Compute percentage client-side (pct_returned is 0-1 range)
+      const computed = returnRate ? {
+        return_rate_pct: Math.round((returnRate as any).pct_returned * 100.0 * 10) / 10,
+        still_out: (returnRate as any).still_out,
+        total: (returnRate as any).total
+      } : null;
+      
+      setReturnRateData(computed as unknown as ReturnRateData | null);
 
       // Load average data
       const { data: avg, error: avgError } = await supabase
@@ -130,7 +125,7 @@ const AnalyticsView = () => {
           CASE WHEN passes = 0 THEN NULL
                ELSE ROUND(minutes_out::numeric / passes, 1) END AS avg_minutes
         `)
-        .eq("window", timeFrame)
+        .eq("window", effectiveTimeFrame)
         .maybeSingle();
 
       if (avgError) {
@@ -146,7 +141,7 @@ const AnalyticsView = () => {
       const { data: periods, error: periodError } = await supabase
         .from("hp_by_period_windows" as any)
         .select("period, passes, minutes_out")
-        .eq("window", timeFrame)
+        .eq("window", effectiveTimeFrame)
         .order("passes", { ascending: false })
         .order("period");
 
@@ -166,7 +161,7 @@ const AnalyticsView = () => {
       const { data: destinations, error: destinationError } = await supabase
         .from("hp_by_destination_windows" as any)
         .select("destination, passes, minutes_out, median_min, p90_min")
-        .eq("window", timeFrame)
+        .eq("window", effectiveTimeFrame)
         .order("passes", { ascending: false });
 
       if (destinationError) throw destinationError;
@@ -185,7 +180,7 @@ const AnalyticsView = () => {
       const { data: frequentFlyers, error: frequentFlyerError } = await supabase
         .from("hp_frequent_flyers_windows" as any)
         .select("student_name, passes, minutes_out")
-        .eq("window", timeFrame)
+        .eq("window", effectiveTimeFrame)
         .limit(10);
 
       if (frequentFlyerError) throw frequentFlyerError;
@@ -202,7 +197,7 @@ const AnalyticsView = () => {
       const { data: longestPasses, error: longestError } = await supabase
         .from("hp_longest_windows" as any)
         .select("student_name, period, destination, duration, timeout, timein")
-        .eq("window", timeFrame)
+        .eq("window", effectiveTimeFrame)
         .order("duration", { ascending: false })
         .order("timeout", { ascending: false })
         .limit(10);
