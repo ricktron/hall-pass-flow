@@ -140,7 +140,7 @@ const AnalyticsView = () => {
       // Load period data with labels and calculations
       const { data: periods, error: periodError } = await supabase
         .from("hp_by_period_windows" as any)
-        .select("period, passes, minutes_out")
+        .select("period, passes, minutes_out AS total_minutes")
         .eq("window", effectiveTimeFrame)
         .order("passes", { ascending: false })
         .order("period");
@@ -149,10 +149,11 @@ const AnalyticsView = () => {
       
       // Transform periods with labels and calculations on client side
       const transformedPeriods = (periods as unknown as any[] || []).map((row: any) => ({
+        period: row.period, // Keep raw period
         period_label: row.period?.toLowerCase().includes('house') ? 'House Small Group' : `Period ${row.period}`,
         passes: row.passes,
-        total_minutes: row.minutes_out,
-        avg_minutes: row.passes > 0 ? Math.round((row.minutes_out / row.passes) * 10) / 10 : null
+        total_minutes: row.total_minutes,
+        avg_minutes: row.passes > 0 ? Math.round((row.total_minutes / row.passes) * 10) / 10 : null
       }));
       
       setPeriodData(transformedPeriods);
@@ -273,6 +274,36 @@ const AnalyticsView = () => {
           <div className="text-muted-foreground">Loading analytics...</div>
         </div>
       )}
+
+      {/* Debug Cards - Temporary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <Card className="border-amber-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-amber-700">Debug: TimeFrame Value</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-mono">
+              "{timeFrame || "Week"}"
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-amber-200">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-amber-700">Debug: Row Counts</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xs space-y-1">
+              <div>Summary: {summaryData ? '1' : '0'}</div>
+              <div>Return: {returnRateData ? '1' : '0'}</div>
+              <div>Periods: {periodData.length}</div>
+              <div>Destinations: {destinationData.length}</div>
+              <div>Flyers: {frequentFlyerData.length}</div>
+              <div>Longest: {longestPassData.length}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
