@@ -33,7 +33,7 @@ interface ReturnRateData {
 }
 
 interface PeriodData {
-  period: string;
+  period_label: string;
   passes: number;
   minutes_out: number;
 }
@@ -101,7 +101,7 @@ const AnalyticsView = () => {
       if (returnRateError) throw returnRateError;
       setReturnRateData(returnRate as unknown as ReturnRateData | null);
 
-      // Load period data
+      // Load period data with custom labels
       const { data: periods, error: periodError } = await supabase
         .from("hp_by_period_windows" as any)
         .select("period, passes, minutes_out")
@@ -110,7 +110,15 @@ const AnalyticsView = () => {
         .order("period");
 
       if (periodError) throw periodError;
-      setPeriodData((periods as unknown as PeriodData[]) || []);
+      
+      // Transform periods with labels on client side
+      const transformedPeriods = (periods as unknown as any[] || []).map((row: any) => ({
+        period_label: row.period?.toLowerCase().includes('house') ? 'House Small Group' : `Period ${row.period}`,
+        passes: row.passes,
+        minutes_out: row.minutes_out
+      }));
+      
+      setPeriodData(transformedPeriods);
 
       // Load destination data
       const { data: destinations, error: destinationError } = await supabase
@@ -161,7 +169,7 @@ const AnalyticsView = () => {
   };
 
   const formatReturnRate = (rate: number) => {
-    return `${rate.toFixed(1)}%`;
+    return `${Math.round(rate * 100 * 10) / 10}%`;
   };
 
   return (
@@ -280,7 +288,7 @@ const AnalyticsView = () => {
             >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={periodData}>
-                  <XAxis dataKey="period" />
+                  <XAxis dataKey="period_label" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Bar dataKey="passes" fill="var(--color-passes)" />
@@ -297,8 +305,8 @@ const AnalyticsView = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              By Destination
+            <TrendingUp className="h-5 w-5" />
+              Destinations
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -321,7 +329,7 @@ const AnalyticsView = () => {
                   {destinationData.map((row, index) => (
                     <TableRow 
                       key={index}
-                      className={row.p90_min > 12 ? "bg-orange-50" : ""}
+                      className={row.p90_min > 12 ? "bg-orange-50 dark:bg-orange-950/20" : ""}
                     >
                       <TableCell className="font-medium">{row.destination}</TableCell>
                       <TableCell>{row.passes}</TableCell>
@@ -378,7 +386,7 @@ const AnalyticsView = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Longest Single Passes
+            Longest
           </CardTitle>
         </CardHeader>
         <CardContent>
