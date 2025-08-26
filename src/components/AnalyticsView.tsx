@@ -23,40 +23,45 @@ type TimeFrame = "Day" | "Week" | "Month" | "Quarter" | "All";
 
 interface SummaryData {
   passes: number;
-  minutes_out: number;
+  total_minutes: number;
 }
 
 interface ReturnRateData {
-  pct_returned: number;
+  return_rate_pct: number;
   still_out: number;
   total: number;
+}
+
+interface AvgData {
+  avg_minutes: number | null;
 }
 
 interface PeriodData {
   period_label: string;
   passes: number;
-  minutes_out: number;
+  total_minutes: number;
+  avg_minutes: number | null;
 }
 
 interface DestinationData {
   destination: string;
   passes: number;
-  minutes_out: number;
-  median_min: number;
-  p90_min: number;
+  total_minutes: number;
+  median_minutes: number;
+  p90_minutes: number;
 }
 
 interface FrequentFlyerData {
   student_name: string;
   passes: number;
-  minutes_out: number;
+  total_minutes: number;
 }
 
 interface LongestPassData {
   student_name: string;
   period: string;
   destination: string;
-  duration: number;
+  duration_minutes: number;
   timeout: string;
   timein: string;
 }
@@ -69,6 +74,7 @@ const AnalyticsView = () => {
   // Data states
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [returnRateData, setReturnRateData] = useState<ReturnRateData | null>(null);
+  const [avgData, setAvgData] = useState<AvgData | null>(null);
   const [periodData, setPeriodData] = useState<PeriodData[]>([]);
   const [destinationData, setDestinationData] = useState<DestinationData[]>([]);
   const [frequentFlyerData, setFrequentFlyerData] = useState<FrequentFlyerData[]>([]);
@@ -84,24 +90,59 @@ const AnalyticsView = () => {
       // Load summary data
       const { data: summary, error: summaryError } = await supabase
         .from("hp_summary_windows" as any)
-        .select("passes, minutes_out")
+        .select("passes, minutes_out AS total_minutes")
         .eq("window", timeFrame)
         .maybeSingle();
 
       if (summaryError) throw summaryError;
       setSummaryData(summary as unknown as SummaryData | null);
 
-      // Load return rate data
+      // Load return rate data with computed percentage
       const { data: returnRate, error: returnRateError } = await supabase
-        .from("hp_return_rate_windows" as any)
-        .select("pct_returned, still_out, total")
+        .rpc("get_return_rate_computed" as any, { time_frame: timeFrame });
+
+      if (returnRateError) {
+        // Fallback to direct query if RPC doesn't exist
+        const { data: returnRateFallback, error: returnRateError2 } = await supabase
+          .from("hp_return_rate_windows" as any)
+          .select("pct_returned, still_out, total")
+          .eq("window", timeFrame)
+          .maybeSingle();
+        
+        if (returnRateError2) throw returnRateError2;
+        
+        // Compute percentage client-side
+        const computed = returnRateFallback ? {
+          return_rate_pct: Math.round((returnRateFallback as any).pct_returned * 100 * 10) / 10,
+          still_out: (returnRateFallback as any).still_out,
+          total: (returnRateFallback as any).total
+        } : null;
+        
+        setReturnRateData(computed as unknown as ReturnRateData | null);
+      } else {
+        setReturnRateData(returnRate as unknown as ReturnRateData | null);
+      }
+
+      // Load average data
+      const { data: avg, error: avgError } = await supabase
+        .from("hp_summary_windows" as any)
+        .select(`
+          CASE WHEN passes = 0 THEN NULL
+               ELSE ROUND(minutes_out::numeric / passes, 1) END AS avg_minutes
+        `)
         .eq("window", timeFrame)
         .maybeSingle();
 
-      if (returnRateError) throw returnRateError;
-      setReturnRateData(returnRate as unknown as ReturnRateData | null);
+      if (avgError) {
+        // Fallback calculation
+        const avgCalc = summary && (summary as any).passes > 0 ? 
+          Math.round(((summary as any).total_minutes / (summary as any).passes) * 10) / 10 : null;
+        setAvgData({ avg_minutes: avgCalc });
+      } else {
+        setAvgData(avg as unknown as AvgData | null);
+      }
 
-      // Load period data with custom labels
+      // Load period data with labels and calculations
       const { data: periods, error: periodError } = await supabase
         .from("hp_by_period_windows" as any)
         .select("period, passes, minutes_out")
@@ -111,11 +152,12 @@ const AnalyticsView = () => {
 
       if (periodError) throw periodError;
       
-      // Transform periods with labels on client side
+      // Transform periods with labels and calculations on client side
       const transformedPeriods = (periods as unknown as any[] || []).map((row: any) => ({
         period_label: row.period?.toLowerCase().includes('house') ? 'House Small Group' : `Period ${row.period}`,
         passes: row.passes,
-        minutes_out: row.minutes_out
+        total_minutes: row.minutes_out,
+        avg_minutes: row.passes > 0 ? Math.round((row.minutes_out / row.passes) * 10) / 10 : null
       }));
       
       setPeriodData(transformedPeriods);
@@ -128,7 +170,16 @@ const AnalyticsView = () => {
         .order("passes", { ascending: false });
 
       if (destinationError) throw destinationError;
-      setDestinationData((destinations as unknown as DestinationData[]) || []);
+      
+      const transformedDestinations = (destinations as unknown as any[] || []).map((row: any) => ({
+        destination: row.destination,
+        passes: row.passes,
+        total_minutes: row.minutes_out,
+        median_minutes: row.median_min,
+        p90_minutes: row.p90_min
+      }));
+      
+      setDestinationData(transformedDestinations);
 
       // Load frequent flyer data
       const { data: frequentFlyers, error: frequentFlyerError } = await supabase
@@ -138,7 +189,14 @@ const AnalyticsView = () => {
         .limit(10);
 
       if (frequentFlyerError) throw frequentFlyerError;
-      setFrequentFlyerData((frequentFlyers as unknown as FrequentFlyerData[]) || []);
+      
+      const transformedFlyers = (frequentFlyers as unknown as any[] || []).map((row: any) => ({
+        student_name: row.student_name,
+        passes: row.passes,
+        total_minutes: row.minutes_out
+      }));
+      
+      setFrequentFlyerData(transformedFlyers);
 
       // Load longest pass data
       const { data: longestPasses, error: longestError } = await supabase
@@ -150,7 +208,17 @@ const AnalyticsView = () => {
         .limit(10);
 
       if (longestError) throw longestError;
-      setLongestPassData((longestPasses as unknown as LongestPassData[]) || []);
+      
+      const transformedLongest = (longestPasses as unknown as any[] || []).map((row: any) => ({
+        student_name: row.student_name,
+        period: row.period,
+        destination: row.destination,
+        duration_minutes: row.duration,
+        timeout: row.timeout,
+        timein: row.timein
+      }));
+      
+      setLongestPassData(transformedLongest);
 
     } catch (err) {
       console.error("Analytics data loading error:", err);
@@ -169,7 +237,7 @@ const AnalyticsView = () => {
   };
 
   const formatReturnRate = (rate: number) => {
-    return `${Math.round(rate * 100 * 10) / 10}%`;
+    return `${rate}%`;
   };
 
   return (
@@ -212,7 +280,7 @@ const AnalyticsView = () => {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Passes Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -225,14 +293,14 @@ const AnalyticsView = () => {
           </CardContent>
         </Card>
 
-        {/* Minutes Out Card */}
+        {/* Total Minutes Out Card */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Minutes Out</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Minutes Out</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {summaryData?.minutes_out ?? 0} min
+              {summaryData?.total_minutes ?? 0} min
             </div>
           </CardContent>
         </Card>
@@ -244,7 +312,7 @@ const AnalyticsView = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {returnRateData ? formatReturnRate(returnRateData.pct_returned) : "No data"}
+              {returnRateData ? formatReturnRate(returnRateData.return_rate_pct) : "No data"}
             </div>
             {returnRateData && returnRateData.total > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
@@ -256,6 +324,18 @@ const AnalyticsView = () => {
                 No data in this window
               </p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Avg Minutes per Trip Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Avg Minutes per Trip</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {avgData?.avg_minutes !== null ? `${avgData?.avg_minutes ?? 0} min` : "No data"}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -296,6 +376,32 @@ const AnalyticsView = () => {
               </ResponsiveContainer>
             </ChartContainer>
           )}
+          
+          {/* Period Table */}
+          {periodData.length > 0 && (
+            <div className="mt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Passes</TableHead>
+                    <TableHead>Total Minutes</TableHead>
+                    <TableHead>Avg Minutes</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {periodData.map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{row.period_label}</TableCell>
+                      <TableCell>{row.passes}</TableCell>
+                      <TableCell>{row.total_minutes} min</TableCell>
+                      <TableCell>{row.avg_minutes ? `${row.avg_minutes} min` : 'N/A'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -320,22 +426,22 @@ const AnalyticsView = () => {
                   <TableRow>
                     <TableHead>Destination</TableHead>
                     <TableHead>Passes</TableHead>
-                    <TableHead>Minutes</TableHead>
-                    <TableHead>Median</TableHead>
-                    <TableHead>P90</TableHead>
+                    <TableHead>Total Minutes</TableHead>
+                    <TableHead>Median Minutes</TableHead>
+                    <TableHead>P90 Minutes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {destinationData.map((row, index) => (
                     <TableRow 
                       key={index}
-                      className={row.p90_min > 12 ? "bg-orange-50 dark:bg-orange-950/20" : ""}
+                      className={row.p90_minutes > 12 ? "bg-orange-50 dark:bg-orange-950/20" : ""}
                     >
                       <TableCell className="font-medium">{row.destination}</TableCell>
                       <TableCell>{row.passes}</TableCell>
-                      <TableCell>{row.minutes_out} min</TableCell>
-                      <TableCell>{row.median_min} min</TableCell>
-                      <TableCell>{row.p90_min} min</TableCell>
+                      <TableCell>{row.total_minutes} min</TableCell>
+                      <TableCell>{row.median_minutes} min</TableCell>
+                      <TableCell>{row.p90_minutes} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -363,7 +469,7 @@ const AnalyticsView = () => {
                   <TableRow>
                     <TableHead>Student</TableHead>
                     <TableHead>Passes</TableHead>
-                    <TableHead>Minutes</TableHead>
+                    <TableHead>Total Minutes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -371,7 +477,7 @@ const AnalyticsView = () => {
                     <TableRow key={index}>
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.passes}</TableCell>
-                      <TableCell>{row.minutes_out} min</TableCell>
+                      <TableCell>{row.total_minutes} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -397,26 +503,26 @@ const AnalyticsView = () => {
           ) : (
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Out</TableHead>
-                  <TableHead>In</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {longestPassData.slice(0, 10).map((row, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{row.student_name}</TableCell>
-                    <TableCell>{row.period}</TableCell>
-                    <TableCell>{row.destination}</TableCell>
-                    <TableCell>{row.duration} min</TableCell>
-                    <TableCell className="text-sm">{formatDateTime(row.timeout)}</TableCell>
-                    <TableCell className="text-sm">{formatDateTime(row.timein)}</TableCell>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Destination</TableHead>
+                    <TableHead>Duration (min)</TableHead>
+                    <TableHead>Out</TableHead>
+                    <TableHead>In</TableHead>
                   </TableRow>
-                ))}
+                </TableHeader>
+                <TableBody>
+                  {longestPassData.slice(0, 10).map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{row.student_name}</TableCell>
+                      <TableCell>{row.period}</TableCell>
+                      <TableCell>{row.destination}</TableCell>
+                      <TableCell>{row.duration_minutes} min</TableCell>
+                      <TableCell className="text-sm">{formatDateTime(row.timeout)}</TableCell>
+                      <TableCell className="text-sm">{formatDateTime(row.timein)}</TableCell>
+                    </TableRow>
+                  ))}
               </TableBody>
             </Table>
           )}
