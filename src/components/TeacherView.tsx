@@ -1,14 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Users, BarChart3, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
-import AnalyticsPanel from "./AnalyticsPanel";
-import { getCurrentlyOutRecords, getAnalytics, updateReturnTime } from "@/lib/supabaseDataManager";
+import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { centralTodayBoundsISO, fmtHMS } from "@/utils/time";
+
+type PassRow = {
+  id: string | number;
+  period: string;
+  studentName: string;
+  timeOut: string;   // ISO
+  timeIn: string | null; // ISO or null
+};
+
+const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
 interface TeacherViewProps {
   onBack: () => void;
@@ -19,19 +29,11 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const { toast } = useToast();
   const [currentlyOutCount, setCurrentlyOutCount] = useState(0);
   const [currentlyOutStudents, setCurrentlyOutStudents] = useState([]);
-  const [analytics, setAnalytics] = useState({
-    totalTripsToday: 0,
-    mostFrequentToday: [],
-    mostFrequentWeek: [],
-    longestTripToday: {
-      duration: 0,
-      student: '',
-      durationFormatted: '00:00:00'
-    },
-    tripsPerPeriod: {},
-    averageDuration: 0,
-    averageDurationFormatted: '00:00:00'
-  });
+  const [{ startISO, endISO }] = useState(centralTodayBoundsISO());
+  const [rows, setRows] = useState<PassRow[]>([]);
+  const [openRows, setOpenRows] = useState<PassRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'overview' | 'analytics'>('overview');
 
   const loadCurrentlyOutCount = async () => {
@@ -46,8 +48,35 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   };
 
   const loadAnalytics = async () => {
-    const analyticsData = await getAnalytics();
-    setAnalytics(analyticsData);
+    let alive = true;
+
+    setLoading(true);
+    setErr(null);
+
+    // Today's rows (based on timeOut)
+    const { data: today, error: e1 } = await supabase
+      .from("Hall_Passes")
+      .select("id, period, studentName, timeOut, timeIn")
+      .gte("timeOut", startISO)
+      .lt("timeOut", endISO);
+
+    if (e1) { if (alive) { setErr(e1.message); setLoading(false); } return; }
+
+    // Still-out rows older than 30 minutes
+    const thirtyAgoISO = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const { data: opens, error: e2 } = await supabase
+      .from("Hall_Passes")
+      .select("id, period, studentName, timeOut, timeIn")
+      .is("timeIn", null)
+      .lt("timeOut", thirtyAgoISO);
+
+    if (e2) { if (alive) { setErr(e2.message); setLoading(false); } return; }
+
+    if (alive) {
+      setRows((today ?? []) as PassRow[]);
+      setOpenRows((opens ?? []) as PassRow[]);
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -56,9 +85,9 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     const interval = setInterval(() => {
       loadCurrentlyOutCount();
       loadAnalytics();
-    }, 10000);
+    }, 60000); // 60s refresh for analytics
     return () => clearInterval(interval);
-  }, []);
+  }, [startISO, endISO]);
 
   const handleBackClick = () => {
     onBack();
@@ -122,6 +151,31 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       });
     }
   };
+
+  const byPeriod = useMemo(() => {
+    const map: Record<string, number> = Object.fromEntries(PERIODS.map(p => [p, 0]));
+    for (const r of rows) {
+      map[r.period] = (map[r.period] ?? 0) + 1;
+    }
+    return map;
+  }, [rows]);
+
+  const topLeavers = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of rows) {
+      counts.set(r.studentName, (counts.get(r.studentName) ?? 0) + 1);
+    }
+    return Array.from(counts.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  }, [rows]);
+
+  const { totalTrips, longestMs, avgMs } = useMemo(() => {
+    const finished = rows.filter(r => !!r.timeIn);
+    const durs = finished.map(r => new Date(r.timeIn as string).getTime() - new Date(r.timeOut).getTime());
+    const total = rows.length;
+    const longest = durs.length ? Math.max(...durs) : 0;
+    const avg = durs.length ? durs.reduce((a,b)=>a+b,0) / durs.length : 0;
+    return { totalTrips: total, longestMs: longest, avgMs: avg };
+  }, [rows]);
 
   const handleCloseCurrentlyOut = () => {
     // This could be used to hide the currently out display if needed
@@ -195,11 +249,113 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
         )}
 
         {activeView === 'analytics' && (
-          <AnalyticsPanel analytics={analytics} />
+          <div className="space-y-6">
+            <div className="mb-4">
+              <h2 className="text-2xl font-semibold text-gray-800">Today's Analytics (Chicago Time)</h2>
+              {err && <div className="mt-2 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-800">{err}</div>}
+              {loading && <div className="mt-2 text-sm opacity-60">Loading…</div>}
+            </div>
+
+            {/* Stats cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <StatCard label="Total trips" value={String(totalTrips)} />
+              <StatCard label="Longest" value={fmtHMS(longestMs)} />
+              <StatCard label="Average" value={fmtHMS(avgMs)} />
+            </div>
+
+            {/* Trips by Period (bar row) */}
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <BarChart3 className="w-5 h-5 mr-2" />
+                  Trips by Period (Today)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {PERIODS.map(p => (
+                    <BarRow key={p} label={p} value={byPeriod[p] ?? 0} max={Math.max(1, ...Object.values(byPeriod))} />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Most Frequent Leavers */}
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Users className="w-5 h-5 mr-2" />
+                  Most Frequent Leavers (Today)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y">
+                  {topLeavers.length === 0 && <div className="p-3 text-sm opacity-60">No trips yet.</div>}
+                  {topLeavers.map(([name, count]) => (
+                    <div key={name} className="flex items-center justify-between py-3">
+                      <span className="text-sm font-medium">{name}</span>
+                      <span className="text-sm font-semibold bg-muted px-2 py-1 rounded">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Still Out 30+ Minutes */}
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <UserCheck className="w-5 h-5 mr-2" />
+                  Still Out 30+ Minutes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="divide-y">
+                  {openRows.length === 0 && <div className="p-3 text-sm opacity-60">All clear.</div>}
+                  {openRows.map(r => {
+                    const elapsedMs = Date.now() - new Date(r.timeOut).getTime();
+                    return (
+                      <div key={r.id} className="flex items-center justify-between py-3">
+                        <div className="text-sm">
+                          <div className="font-medium">{r.studentName}</div>
+                          <div className="opacity-70">Period {r.period} • Out at {new Date(r.timeOut).toLocaleTimeString()}</div>
+                        </div>
+                        <div className="text-sm font-semibold bg-orange-100 text-orange-800 px-2 py-1 rounded">{fmtHMS(elapsedMs)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </div>
   );
 };
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card className="shadow-lg">
+      <CardContent className="p-4">
+        <div className="text-sm opacity-70 mb-1">{label}</div>
+        <div className="text-2xl font-semibold">{value}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BarRow({ label, value, max }: { label: string; value: number; max: number }) {
+  const widthPct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-32 text-sm font-medium">{label === 'House Small Group' ? label : `Period ${label}`}</div>
+      <div className="flex-1 h-3 rounded bg-muted">
+        <div className="h-3 rounded bg-primary transition-all duration-300" style={{ width: `${widthPct}%` }} />
+      </div>
+      <div className="w-8 text-right text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
 
 export default TeacherView;
