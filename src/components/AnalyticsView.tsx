@@ -87,21 +87,18 @@ const AnalyticsView = () => {
     setError(null);
 
     try {
-      // Load summary data using CTE pattern
+      // Load summary data using LEFT JOIN pattern
       const { data: summary, error: summaryError } = await supabase.rpc('exec_sql' as any, {
         query: `
           WITH tf AS (
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
           )
-          SELECT COALESCE((
-            SELECT passes
-            FROM public.hp_summary_windows
-            WHERE lower("window") = (SELECT k FROM tf)
-          ), 0) AS passes, COALESCE((
-            SELECT minutes_out
-            FROM public.hp_summary_windows
-            WHERE lower("window") = (SELECT k FROM tf)
-          ), 0)::bigint AS total_minutes;
+          SELECT 
+            COALESCE(s.passes, 0) AS passes,
+            COALESCE(s.minutes_out, 0)::bigint AS total_minutes
+          FROM tf
+          LEFT JOIN public.hp_summary_windows s
+            ON lower(s."window") = tf.k;
         `
       });
 
@@ -109,28 +106,19 @@ const AnalyticsView = () => {
       const summaryResult = summary?.[0] || { passes: 0, total_minutes: 0 };
       setSummaryData(summaryResult);
 
-      // Load return rate data using CTE pattern
+      // Load return rate data using LEFT JOIN pattern
       const { data: returnRate, error: returnRateError } = await supabase.rpc('exec_sql' as any, {
         query: `
           WITH tf AS (
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
           )
           SELECT
-            ROUND(COALESCE((
-              SELECT pct_returned
-              FROM public.hp_return_rate_windows
-              WHERE lower("window") = (SELECT k FROM tf)
-            ), 0) * 100.0, 1) AS return_rate_pct,
-            COALESCE((
-              SELECT still_out
-              FROM public.hp_return_rate_windows
-              WHERE lower("window") = (SELECT k FROM tf)
-            ), 0) AS still_out,
-            COALESCE((
-              SELECT total
-              FROM public.hp_return_rate_windows
-              WHERE lower("window") = (SELECT k FROM tf)
-            ), 0) AS total;
+            ROUND(COALESCE(r.pct_returned, 0) * 100.0, 1) AS return_rate_pct,
+            COALESCE(r.still_out, 0) AS still_out,
+            COALESCE(r.total, 0)     AS total
+          FROM tf
+          LEFT JOIN public.hp_return_rate_windows r
+            ON lower(r."window") = tf.k;
         `
       });
 
@@ -237,7 +225,7 @@ const AnalyticsView = () => {
             timein
           FROM public.hp_longest_windows
           WHERE lower("window") = (SELECT k FROM tf)
-          ORDER BY duration DESC, timeout DESC
+          ORDER BY duration_minutes DESC, timeout DESC
           LIMIT 10;
         `
       });
