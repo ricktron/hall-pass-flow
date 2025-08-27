@@ -86,7 +86,7 @@ const AnalyticsView = () => {
     setLoading(true);
     setError(null);
     
-    // Ensure timeFrame defaults to "Week" if empty/null
+    // Use the robust timeFrame handling from the spec
     const effectiveTimeFrame = timeFrame || "Week";
 
     try {
@@ -161,60 +161,34 @@ const AnalyticsView = () => {
       // Load destination data
       const { data: destinations, error: destinationError } = await supabase
         .from("hp_by_destination_windows" as any)
-        .select("destination, passes, minutes_out, median_min, p90_min")
+        .select("destination, passes, minutes_out AS total_minutes, median_min AS median_minutes, p90_min AS p90_minutes")
         .eq("window", effectiveTimeFrame)
         .order("passes", { ascending: false });
 
       if (destinationError) throw destinationError;
-      
-      const transformedDestinations = (destinations as unknown as any[] || []).map((row: any) => ({
-        destination: row.destination,
-        passes: row.passes,
-        total_minutes: row.minutes_out,
-        median_minutes: row.median_min,
-        p90_minutes: row.p90_min
-      }));
-      
-      setDestinationData(transformedDestinations);
+      setDestinationData(destinations as unknown as DestinationData[]);
 
       // Load frequent flyer data
       const { data: frequentFlyers, error: frequentFlyerError } = await supabase
         .from("hp_frequent_flyers_windows" as any)
-        .select("student_name, passes, minutes_out")
+        .select("student_name, passes, minutes_out AS total_minutes")
         .eq("window", effectiveTimeFrame)
         .limit(10);
 
       if (frequentFlyerError) throw frequentFlyerError;
-      
-      const transformedFlyers = (frequentFlyers as unknown as any[] || []).map((row: any) => ({
-        student_name: row.student_name,
-        passes: row.passes,
-        total_minutes: row.minutes_out
-      }));
-      
-      setFrequentFlyerData(transformedFlyers);
+      setFrequentFlyerData(frequentFlyers as unknown as FrequentFlyerData[]);
 
       // Load longest pass data
       const { data: longestPasses, error: longestError } = await supabase
         .from("hp_longest_windows" as any)
-        .select("student_name, period, destination, duration, timeout, timein")
+        .select("student_name, period, destination, duration AS duration_minutes, timeout, timein")
         .eq("window", effectiveTimeFrame)
         .order("duration", { ascending: false })
         .order("timeout", { ascending: false })
         .limit(10);
 
       if (longestError) throw longestError;
-      
-      const transformedLongest = (longestPasses as unknown as any[] || []).map((row: any) => ({
-        student_name: row.student_name,
-        period: row.period,
-        destination: row.destination,
-        duration_minutes: row.duration,
-        timeout: row.timeout,
-        timein: row.timein
-      }));
-      
-      setLongestPassData(transformedLongest);
+      setLongestPassData(longestPasses as unknown as LongestPassData[]);
 
     } catch (err) {
       console.error("Analytics data loading error:", err);
