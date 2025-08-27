@@ -93,9 +93,15 @@ const AnalyticsView = () => {
           WITH tf AS (
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
           )
-          SELECT COALESCE(s.passes, 0) AS passes, COALESCE(s.minutes_out, 0) AS total_minutes
-          FROM tf
-          LEFT JOIN public.hp_summary_windows s ON s."window" = tf.k
+          SELECT COALESCE((
+            SELECT passes
+            FROM public.hp_summary_windows
+            WHERE lower("window") = (SELECT k FROM tf)
+          ), 0) AS passes, COALESCE((
+            SELECT minutes_out
+            FROM public.hp_summary_windows
+            WHERE lower("window") = (SELECT k FROM tf)
+          ), 0)::bigint AS total_minutes;
         `
       });
 
@@ -110,11 +116,21 @@ const AnalyticsView = () => {
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
           )
           SELECT
-            ROUND(COALESCE(r.pct_returned, 0) * 100.0, 1) AS return_rate_pct,
-            COALESCE(r.still_out, 0) AS still_out,
-            COALESCE(r.total, 0) AS total
-          FROM tf
-          LEFT JOIN public.hp_return_rate_windows r ON r."window" = tf.k
+            ROUND(COALESCE((
+              SELECT pct_returned
+              FROM public.hp_return_rate_windows
+              WHERE lower("window") = (SELECT k FROM tf)
+            ), 0) * 100.0, 1) AS return_rate_pct,
+            COALESCE((
+              SELECT still_out
+              FROM public.hp_return_rate_windows
+              WHERE lower("window") = (SELECT k FROM tf)
+            ), 0) AS still_out,
+            COALESCE((
+              SELECT total
+              FROM public.hp_return_rate_windows
+              WHERE lower("window") = (SELECT k FROM tf)
+            ), 0) AS total;
         `
       });
 
@@ -127,13 +143,15 @@ const AnalyticsView = () => {
         query: `
           WITH tf AS (
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
+          ),
+          s AS (
+            SELECT passes, minutes_out
+            FROM public.hp_summary_windows
+            WHERE lower("window") = (SELECT k FROM tf)
           )
-          SELECT
-            CASE WHEN s.passes IS NULL OR s.passes = 0 THEN NULL
-                 ELSE ROUND(s.minutes_out::numeric / s.passes, 1)
-            END AS avg_minutes
-          FROM tf
-          LEFT JOIN public.hp_summary_windows s ON s."window" = tf.k
+          SELECT CASE WHEN COALESCE((SELECT passes FROM s),0)=0 THEN NULL
+                      ELSE ROUND((SELECT minutes_out FROM s)::numeric / (SELECT passes FROM s), 1)
+                 END AS avg_minutes;
         `
       });
 
@@ -148,15 +166,15 @@ const AnalyticsView = () => {
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
           )
           SELECT
-            p.period,
-            CASE WHEN p.period ILIKE 'house%' THEN 'House Small Group'
-                 ELSE 'Period ' || p.period END AS period_label,
-            p.passes,
-            p.minutes_out AS total_minutes,
-            ROUND(p.minutes_out::numeric / NULLIF(p.passes,0), 1) AS avg_minutes
-          FROM public.hp_by_period_windows p
-          JOIN tf ON p."window" = tf.k
-          ORDER BY p.passes DESC, period_label
+            period,
+            CASE WHEN period ILIKE 'house%' THEN 'House Small Group'
+                 ELSE 'Period ' || period END AS period_label,
+            passes,
+            minutes_out AS total_minutes,
+            ROUND(minutes_out::numeric / NULLIF(passes,0), 1) AS avg_minutes
+          FROM public.hp_by_period_windows
+          WHERE lower("window") = (SELECT k FROM tf)
+          ORDER BY passes DESC, period_label;
         `
       });
 
@@ -170,14 +188,14 @@ const AnalyticsView = () => {
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
           )
           SELECT
-            d.destination,
-            d.passes,
-            d.minutes_out AS total_minutes,
-            d.median_min AS median_minutes,
-            d.p90_min AS p90_minutes
-          FROM public.hp_by_destination_windows d
-          JOIN tf ON d."window" = tf.k
-          ORDER BY d.passes DESC
+            destination,
+            passes,
+            minutes_out  AS total_minutes,
+            median_min   AS median_minutes,
+            p90_min      AS p90_minutes
+          FROM public.hp_by_destination_windows
+          WHERE lower("window") = (SELECT k FROM tf)
+          ORDER BY passes DESC;
         `
       });
 
@@ -191,13 +209,13 @@ const AnalyticsView = () => {
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
           )
           SELECT
-            f.student_name,
-            f.passes,
-            f.minutes_out AS total_minutes
-          FROM public.hp_frequent_flyers_windows f
-          JOIN tf ON f."window" = tf.k
-          ORDER BY f.passes DESC, f.minutes_out DESC
-          LIMIT 10
+            student_name,
+            passes,
+            minutes_out AS total_minutes
+          FROM public.hp_frequent_flyers_windows
+          WHERE lower("window") = (SELECT k FROM tf)
+          ORDER BY passes DESC, minutes_out DESC
+          LIMIT 10;
         `
       });
 
@@ -211,16 +229,16 @@ const AnalyticsView = () => {
             SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
           )
           SELECT
-            l.student_name,
-            l.period,
-            l.destination,
-            l.duration AS duration_minutes,
-            l.timeout,
-            l.timein
-          FROM public.hp_longest_windows l
-          JOIN tf ON l."window" = tf.k
-          ORDER BY l.duration DESC, l.timeout DESC
-          LIMIT 10
+            student_name,
+            period,
+            destination,
+            duration AS duration_minutes,
+            timeout,
+            timein
+          FROM public.hp_longest_windows
+          WHERE lower("window") = (SELECT k FROM tf)
+          ORDER BY duration DESC, timeout DESC
+          LIMIT 10;
         `
       });
 
