@@ -85,110 +85,147 @@ const AnalyticsView = () => {
   const loadData = async () => {
     setLoading(true);
     setError(null);
-    
-    // Use the robust timeFrame handling from the spec
-    const effectiveTimeFrame = timeFrame || "week";
 
     try {
-      // Load summary data
-      const { data: summary, error: summaryError } = await supabase
-        .from("hp_summary_windows" as any)
-        .select("passes, minutes_out AS total_minutes")
-        .eq("window", effectiveTimeFrame)
-        .maybeSingle();
+      // Load summary data using CTE pattern
+      const { data: summary, error: summaryError } = await supabase.rpc('exec_sql' as any, {
+        query: `
+          WITH tf AS (
+            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
+          )
+          SELECT COALESCE(s.passes, 0) AS passes, COALESCE(s.minutes_out, 0) AS total_minutes
+          FROM tf
+          LEFT JOIN public.hp_summary_windows s ON s."window" = tf.k
+        `
+      });
 
       if (summaryError) throw summaryError;
-      setSummaryData(summary as unknown as SummaryData | null);
+      const summaryResult = summary?.[0] || { passes: 0, total_minutes: 0 };
+      setSummaryData(summaryResult);
 
-      // Load return rate data with computed percentage
-      const { data: returnRate, error: returnRateError } = await supabase
-        .from("hp_return_rate_windows" as any)
-        .select("pct_returned, still_out, total")
-        .eq("window", effectiveTimeFrame)
-        .maybeSingle();
+      // Load return rate data using CTE pattern
+      const { data: returnRate, error: returnRateError } = await supabase.rpc('exec_sql' as any, {
+        query: `
+          WITH tf AS (
+            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
+          )
+          SELECT
+            ROUND(COALESCE(r.pct_returned, 0) * 100.0, 1) AS return_rate_pct,
+            COALESCE(r.still_out, 0) AS still_out,
+            COALESCE(r.total, 0) AS total
+          FROM tf
+          LEFT JOIN public.hp_return_rate_windows r ON r."window" = tf.k
+        `
+      });
 
       if (returnRateError) throw returnRateError;
-      
-      // Compute percentage client-side (pct_returned is 0-1 range)
-      const computed = returnRate ? {
-        return_rate_pct: Math.round((returnRate as any).pct_returned * 100.0 * 10) / 10,
-        still_out: (returnRate as any).still_out,
-        total: (returnRate as any).total
-      } : null;
-      
-      setReturnRateData(computed as unknown as ReturnRateData | null);
+      const returnRateResult = returnRate?.[0] || { return_rate_pct: 0, still_out: 0, total: 0 };
+      setReturnRateData(returnRateResult);
 
-      // Load average data
-      const { data: avg, error: avgError } = await supabase
-        .from("hp_summary_windows" as any)
-        .select(`
-          CASE WHEN passes = 0 THEN NULL
-               ELSE ROUND(minutes_out::numeric / passes, 1) END AS avg_minutes
-        `)
-        .eq("window", effectiveTimeFrame)
-        .maybeSingle();
+      // Load average data using CTE pattern
+      const { data: avg, error: avgError } = await supabase.rpc('exec_sql' as any, {
+        query: `
+          WITH tf AS (
+            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
+          )
+          SELECT
+            CASE WHEN s.passes IS NULL OR s.passes = 0 THEN NULL
+                 ELSE ROUND(s.minutes_out::numeric / s.passes, 1)
+            END AS avg_minutes
+          FROM tf
+          LEFT JOIN public.hp_summary_windows s ON s."window" = tf.k
+        `
+      });
 
-      if (avgError) {
-        // Fallback calculation
-        const avgCalc = summary && (summary as any).passes > 0 ? 
-          Math.round(((summary as any).total_minutes / (summary as any).passes) * 10) / 10 : null;
-        setAvgData({ avg_minutes: avgCalc });
-      } else {
-        setAvgData(avg as unknown as AvgData | null);
-      }
+      if (avgError) throw avgError;
+      const avgResult = avg?.[0] || { avg_minutes: null };
+      setAvgData(avgResult);
 
-      // Load period data with labels and calculations
-      const { data: periods, error: periodError } = await supabase
-        .from("hp_by_period_windows" as any)
-        .select("period, passes, minutes_out AS total_minutes")
-        .eq("window", effectiveTimeFrame)
-        .order("passes", { ascending: false })
-        .order("period");
+      // Load period data using CTE pattern
+      const { data: periods, error: periodError } = await supabase.rpc('exec_sql' as any, {
+        query: `
+          WITH tf AS (
+            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
+          )
+          SELECT
+            p.period,
+            CASE WHEN p.period ILIKE 'house%' THEN 'House Small Group'
+                 ELSE 'Period ' || p.period END AS period_label,
+            p.passes,
+            p.minutes_out AS total_minutes,
+            ROUND(p.minutes_out::numeric / NULLIF(p.passes,0), 1) AS avg_minutes
+          FROM public.hp_by_period_windows p
+          JOIN tf ON p."window" = tf.k
+          ORDER BY p.passes DESC, period_label
+        `
+      });
 
       if (periodError) throw periodError;
-      
-      // Transform periods with labels and calculations on client side
-      const transformedPeriods = (periods as unknown as any[] || []).map((row: any) => ({
-        period: row.period, // Keep raw period
-        period_label: row.period?.toLowerCase().includes('house') ? 'House Small Group' : `Period ${row.period}`,
-        passes: row.passes,
-        total_minutes: row.total_minutes,
-        avg_minutes: row.passes > 0 ? Math.round((row.total_minutes / row.passes) * 10) / 10 : null
-      }));
-      
-      setPeriodData(transformedPeriods);
+      setPeriodData(periods || []);
 
-      // Load destination data
-      const { data: destinations, error: destinationError } = await supabase
-        .from("hp_by_destination_windows" as any)
-        .select("destination, passes, minutes_out AS total_minutes, median_min AS median_minutes, p90_min AS p90_minutes")
-        .eq("window", effectiveTimeFrame)
-        .order("passes", { ascending: false });
+      // Load destination data using CTE pattern
+      const { data: destinations, error: destinationError } = await supabase.rpc('exec_sql' as any, {
+        query: `
+          WITH tf AS (
+            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
+          )
+          SELECT
+            d.destination,
+            d.passes,
+            d.minutes_out AS total_minutes,
+            d.median_min AS median_minutes,
+            d.p90_min AS p90_minutes
+          FROM public.hp_by_destination_windows d
+          JOIN tf ON d."window" = tf.k
+          ORDER BY d.passes DESC
+        `
+      });
 
       if (destinationError) throw destinationError;
-      setDestinationData(destinations as unknown as DestinationData[]);
+      setDestinationData(destinations || []);
 
-      // Load frequent flyer data
-      const { data: frequentFlyers, error: frequentFlyerError } = await supabase
-        .from("hp_frequent_flyers_windows" as any)
-        .select("student_name, passes, minutes_out AS total_minutes")
-        .eq("window", effectiveTimeFrame)
-        .limit(10);
+      // Load frequent flyer data using CTE pattern
+      const { data: frequentFlyers, error: frequentFlyerError } = await supabase.rpc('exec_sql' as any, {
+        query: `
+          WITH tf AS (
+            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
+          )
+          SELECT
+            f.student_name,
+            f.passes,
+            f.minutes_out AS total_minutes
+          FROM public.hp_frequent_flyers_windows f
+          JOIN tf ON f."window" = tf.k
+          ORDER BY f.passes DESC, f.minutes_out DESC
+          LIMIT 10
+        `
+      });
 
       if (frequentFlyerError) throw frequentFlyerError;
-      setFrequentFlyerData(frequentFlyers as unknown as FrequentFlyerData[]);
+      setFrequentFlyerData(frequentFlyers || []);
 
-      // Load longest pass data
-      const { data: longestPasses, error: longestError } = await supabase
-        .from("hp_longest_windows" as any)
-        .select("student_name, period, destination, duration AS duration_minutes, timeout, timein")
-        .eq("window", effectiveTimeFrame)
-        .order("duration", { ascending: false })
-        .order("timeout", { ascending: false })
-        .limit(10);
+      // Load longest pass data using CTE pattern
+      const { data: longestPasses, error: longestError } = await supabase.rpc('exec_sql' as any, {
+        query: `
+          WITH tf AS (
+            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
+          )
+          SELECT
+            l.student_name,
+            l.period,
+            l.destination,
+            l.duration AS duration_minutes,
+            l.timeout,
+            l.timein
+          FROM public.hp_longest_windows l
+          JOIN tf ON l."window" = tf.k
+          ORDER BY l.duration DESC, l.timeout DESC
+          LIMIT 10
+        `
+      });
 
       if (longestError) throw longestError;
-      setLongestPassData(longestPasses as unknown as LongestPassData[]);
+      setLongestPassData(longestPasses || []);
 
     } catch (err) {
       console.error("Analytics data loading error:", err);
