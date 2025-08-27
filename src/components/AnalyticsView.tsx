@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 
-type TimeFrame = "Day" | "Week" | "Month" | "Quarter" | "All";
+type TimeFrame = "day" | "week" | "month" | "quarter" | "all";
 
 interface SummaryData {
   passes: number;
@@ -67,7 +67,7 @@ interface LongestPassData {
 }
 
 const AnalyticsView = () => {
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>("Week");
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>("week");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -80,14 +80,14 @@ const AnalyticsView = () => {
   const [frequentFlyerData, setFrequentFlyerData] = useState<FrequentFlyerData[]>([]);
   const [longestPassData, setLongestPassData] = useState<LongestPassData[]>([]);
 
-  const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
+  const timeFrameOptions: TimeFrame[] = ["day", "week", "month", "quarter", "all"];
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     
     // Use the robust timeFrame handling from the spec
-    const effectiveTimeFrame = timeFrame || "Week";
+    const effectiveTimeFrame = timeFrame || "week";
 
     try {
       // Load summary data
@@ -219,7 +219,6 @@ const AnalyticsView = () => {
           <p className="text-muted-foreground">Windowed stats for passes and minutes</p>
         </div>
         
-        {/* Time Frame Toggle */}
         <div className="flex rounded-lg bg-muted p-1">
           {timeFrameOptions.map((option) => (
             <Button
@@ -229,7 +228,7 @@ const AnalyticsView = () => {
               onClick={() => setTimeFrame(option)}
               className="relative"
             >
-              {option}
+              {option.charAt(0).toUpperCase() + option.slice(1)}
             </Button>
           ))}
         </div>
@@ -257,7 +256,7 @@ const AnalyticsView = () => {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-mono">
-              "{timeFrame || "Week"}"
+              "{timeFrame || "week"}"
             </div>
           </CardContent>
         </Card>
