@@ -54,6 +54,7 @@ interface FrequentFlyerData {
   student_name: string;
   passes: number;
   total_minutes: number;
+  avg_minutes_per_trip: number;
 }
 
 interface LongestPassData {
@@ -415,6 +416,7 @@ const AnalyticsView = () => {
                     <TableHead>Student</TableHead>
                     <TableHead>Passes</TableHead>
                     <TableHead>Total Minutes</TableHead>
+                    <TableHead>Avg per Trip</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -423,6 +425,7 @@ const AnalyticsView = () => {
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.passes}</TableCell>
                       <TableCell>{row.total_minutes} min</TableCell>
+                      <TableCell>{row.avg_minutes_per_trip} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
