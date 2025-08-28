@@ -723,8 +723,9 @@ export type Database = {
         Returns: {
           destination: string
           median_minutes: number
-          p90_minutes: number
           passes: number
+          q1_minutes: number
+          q3_minutes: number
           total_minutes: number
         }[]
       }

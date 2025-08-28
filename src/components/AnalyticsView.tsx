@@ -47,7 +47,8 @@ interface DestinationData {
   passes: number;
   total_minutes: number;
   median_minutes: number;
-  p90_minutes: number;
+  q1_minutes: number;
+  q3_minutes: number;
 }
 
 interface FrequentFlyerData {
@@ -64,6 +65,17 @@ interface LongestPassData {
   duration_minutes: number;
   timeout: string;
   timein: string;
+}
+
+interface BehavioralInsightsData {
+  insight_type: string;
+  pass_count: number;
+  avg_duration: number;
+}
+
+interface DayOfWeekData {
+  day_of_week: string;
+  pass_count: number;
 }
 
 interface SafeLoaderData {
@@ -84,6 +96,8 @@ const AnalyticsView = () => {
   const [destinationData, setDestinationData] = useState<DestinationData[]>([]);
   const [frequentFlyerData, setFrequentFlyerData] = useState<FrequentFlyerData[]>([]);
   const [longestPassData, setLongestPassData] = useState<LongestPassData[]>([]);
+  const [behavioralInsightsData, setBehavioralInsightsData] = useState<BehavioralInsightsData[]>([]);
+  const [dayOfWeekData, setDayOfWeekData] = useState<DayOfWeekData[]>([]);
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
 
@@ -166,6 +180,22 @@ const AnalyticsView = () => {
       if (longestError) throw longestError;
       setLongestPassData(longestPasses || []);
 
+      // Load behavioral insights data using parameterized RPC function
+      const { data: behavioralInsights, error: behavioralError } = await supabase.rpc('get_behavioral_insights', {
+        time_frame_arg: timeFrame
+      });
+
+      if (behavioralError) throw behavioralError;
+      setBehavioralInsightsData(behavioralInsights || []);
+
+      // Load day of week data using parameterized RPC function
+      const { data: dayOfWeek, error: dayOfWeekError } = await supabase.rpc('get_passes_by_day_of_week', {
+        time_frame_arg: timeFrame
+      });
+
+      if (dayOfWeekError) throw dayOfWeekError;
+      setDayOfWeekData(dayOfWeek || []);
+
     } catch (err) {
       console.error("Analytics data loading error:", err);
       setError(err instanceof Error ? err.message : "Failed to load analytics data");
@@ -185,6 +215,11 @@ const AnalyticsView = () => {
 
   const formatReturnRate = (rate: number) => {
     return `${rate}%`;
+  };
+
+  const formatIQR = (q1: number, q3: number) => {
+    if (q1 === 0 && q3 === 0) return "No data";
+    return `${Math.round(q1)}-${Math.round(q3)} min`;
   };
 
   return (
@@ -226,7 +261,7 @@ const AnalyticsView = () => {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Passes Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -235,18 +270,6 @@ const AnalyticsView = () => {
           <CardContent>
             <div className="text-2xl font-bold">
               {summaryData?.passes ?? 0}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Total Minutes Out Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Total Minutes Out</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {summaryData?.total_minutes ?? 0} min
             </div>
           </CardContent>
         </Card>
@@ -374,20 +397,20 @@ const AnalyticsView = () => {
                     <TableHead>Passes</TableHead>
                     <TableHead>Total Minutes</TableHead>
                     <TableHead>Median Minutes</TableHead>
-                    <TableHead>P90 Minutes</TableHead>
+                    <TableHead>Typical Duration (IQR)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {destinationData.map((row, index) => (
                     <TableRow 
                       key={index}
-                      className={row.p90_minutes > 12 ? "bg-orange-50 dark:bg-orange-950/20" : ""}
+                      className={row.q3_minutes > 12 ? "bg-orange-50 dark:bg-orange-950/20" : ""}
                     >
                       <TableCell className="font-medium">{row.destination}</TableCell>
                       <TableCell>{row.passes}</TableCell>
                       <TableCell>{row.total_minutes} min</TableCell>
                       <TableCell>{row.median_minutes} min</TableCell>
-                      <TableCell>{row.p90_minutes} min</TableCell>
+                      <TableCell>{formatIQR(row.q1_minutes, row.q3_minutes)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -452,6 +475,7 @@ const AnalyticsView = () => {
             <Table>
               <TableHeader>
                   <TableRow>
+                    <TableHead>#</TableHead>
                     <TableHead>Student</TableHead>
                     <TableHead>Period</TableHead>
                     <TableHead>Destination</TableHead>
@@ -463,6 +487,7 @@ const AnalyticsView = () => {
                 <TableBody>
                   {longestPassData.slice(0, 10).map((row, index) => (
                     <TableRow key={index}>
+                      <TableCell className="font-medium">{index + 1}</TableCell>
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.period}</TableCell>
                       <TableCell>{row.destination}</TableCell>
@@ -476,6 +501,87 @@ const AnalyticsView = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* New Analytics Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Behavioral Insights Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Behavioral Insights
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Pass patterns by time of day
+            </p>
+          </CardHeader>
+          <CardContent>
+            {behavioralInsightsData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No behavioral data available
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time Period</TableHead>
+                    <TableHead>Pass Count</TableHead>
+                    <TableHead>Avg Duration</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {behavioralInsightsData.map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{row.insight_type}</TableCell>
+                      <TableCell>{row.pass_count}</TableCell>
+                      <TableCell>{row.avg_duration} min</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Day of Week Chart Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Passes by Day of Week
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Weekly pass distribution
+            </p>
+          </CardHeader>
+          <CardContent>
+            {dayOfWeekData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No day-of-week data available
+              </div>
+            ) : (
+              <ChartContainer
+                config={{
+                  pass_count: {
+                    label: "Passes",
+                    color: "hsl(var(--primary))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={dayOfWeekData}>
+                    <XAxis dataKey="day_of_week" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="pass_count" fill="var(--color-pass_count)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
