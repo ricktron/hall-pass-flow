@@ -106,133 +106,60 @@ const AnalyticsView = () => {
     setError(null);
 
     try {
-      // Load summary data using LEFT JOIN pattern
-      const { data: summary, error: summaryError } = await supabase.rpc('exec_sql' as any, {
-        query: `
-          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
-          SELECT 
-            COALESCE(s.passes, 0) AS passes,
-            COALESCE(s.minutes_out, 0)::bigint AS total_minutes
-          FROM tf
-          LEFT JOIN public.hp_summary_windows s
-            ON lower(s."window") = tf.k;
-        `
+      // Load summary data using parameterized RPC function
+      const { data: summary, error: summaryError } = await supabase.rpc('get_analytics_summary', {
+        time_frame_arg: timeFrame
       });
 
       if (summaryError) throw summaryError;
       const summaryResult = summary?.[0] || { passes: 0, total_minutes: 0 };
       setSummaryData(summaryResult);
 
-      // Load return rate data using LEFT JOIN pattern
-      const { data: returnRate, error: returnRateError } = await supabase.rpc('exec_sql' as any, {
-        query: `
-          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
-          SELECT
-            ROUND(COALESCE(r.pct_returned, 0) * 100.0, 1) AS return_rate_pct,
-            COALESCE(r.still_out, 0) AS still_out,
-            COALESCE(r.total, 0)     AS total
-          FROM tf
-          LEFT JOIN public.hp_return_rate_windows r
-            ON lower(r."window") = tf.k;
-        `
+      // Load return rate data using parameterized RPC function
+      const { data: returnRate, error: returnRateError } = await supabase.rpc('get_analytics_return_rate', {
+        time_frame_arg: timeFrame
       });
 
       if (returnRateError) throw returnRateError;
       const returnRateResult = returnRate?.[0] || { return_rate_pct: 0, still_out: 0, total: 0 };
       setReturnRateData(returnRateResult);
 
-      // Load average data using CTE pattern
-      const { data: avg, error: avgError } = await supabase.rpc('exec_sql' as any, {
-        query: `
-          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k),
-          s AS (
-            SELECT passes, minutes_out
-            FROM public.hp_summary_windows
-            WHERE lower("window") = (SELECT k FROM tf)
-          )
-          SELECT CASE WHEN COALESCE((SELECT passes FROM s),0)=0 THEN NULL
-                      ELSE ROUND((SELECT minutes_out FROM s)::numeric / (SELECT passes FROM s), 1)
-                 END AS avg_minutes;
-        `
+      // Load average data using parameterized RPC function
+      const { data: avg, error: avgError } = await supabase.rpc('get_analytics_avg_minutes', {
+        time_frame_arg: timeFrame
       });
 
       if (avgError) throw avgError;
       const avgResult = avg?.[0] || { avg_minutes: null };
       setAvgData(avgResult);
 
-      // Load period data using CTE pattern
-      const { data: periods, error: periodError } = await supabase.rpc('exec_sql' as any, {
-        query: `
-          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
-          SELECT
-            period,
-            CASE WHEN period ILIKE 'house%' THEN 'House Small Group'
-                 ELSE 'Period ' || period END AS period_label,
-            passes,
-            minutes_out AS total_minutes,
-            ROUND(minutes_out::numeric / NULLIF(passes,0), 1) AS avg_minutes
-          FROM public.hp_by_period_windows
-          WHERE lower("window") = (SELECT k FROM tf)
-          ORDER BY passes DESC, period_label;
-        `
+      // Load period data using parameterized RPC function
+      const { data: periods, error: periodError } = await supabase.rpc('get_analytics_by_period', {
+        time_frame_arg: timeFrame
       });
 
       if (periodError) throw periodError;
       setPeriodData(periods || []);
 
-      // Load destination data using CTE pattern
-      const { data: destinations, error: destinationError } = await supabase.rpc('exec_sql' as any, {
-        query: `
-          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
-          SELECT
-            destination,
-            passes,
-            minutes_out  AS total_minutes,
-            median_min   AS median_minutes,
-            p90_min      AS p90_minutes
-          FROM public.hp_by_destination_windows
-          WHERE lower("window") = (SELECT k FROM tf)
-          ORDER BY passes DESC;
-        `
+      // Load destination data using parameterized RPC function
+      const { data: destinations, error: destinationError } = await supabase.rpc('get_analytics_by_destination', {
+        time_frame_arg: timeFrame
       });
 
       if (destinationError) throw destinationError;
       setDestinationData(destinations || []);
 
-      // Load frequent flyer data using CTE pattern
-      const { data: frequentFlyers, error: frequentFlyerError } = await supabase.rpc('exec_sql' as any, {
-        query: `
-          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
-          SELECT
-            student_name,
-            passes,
-            minutes_out AS total_minutes
-          FROM public.hp_frequent_flyers_windows
-          WHERE lower("window") = (SELECT k FROM tf)
-          ORDER BY passes DESC, minutes_out DESC
-          LIMIT 10;
-        `
+      // Load frequent flyer data using parameterized RPC function
+      const { data: frequentFlyers, error: frequentFlyerError } = await supabase.rpc('get_analytics_frequent_flyers', {
+        time_frame_arg: timeFrame
       });
 
       if (frequentFlyerError) throw frequentFlyerError;
       setFrequentFlyerData(frequentFlyers || []);
 
-      // Load longest pass data using CTE pattern
-      const { data: longestPasses, error: longestError } = await supabase.rpc('exec_sql' as any, {
-        query: `
-          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
-          SELECT
-            student_name,
-            period,
-            destination,
-            duration AS duration_minutes,
-            timeout,
-            timein
-          FROM public.hp_longest_windows
-          WHERE lower("window") = (SELECT k FROM tf)
-          ORDER BY duration_minutes DESC, timeout DESC
-          LIMIT 10;
-        `
+      // Load longest pass data using parameterized RPC function
+      const { data: longestPasses, error: longestError } = await supabase.rpc('get_analytics_longest_passes', {
+        time_frame_arg: timeFrame
       });
 
       if (longestError) throw longestError;
