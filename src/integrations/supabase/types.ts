@@ -741,6 +741,7 @@ export type Database = {
       get_analytics_frequent_flyers: {
         Args: { time_frame_arg: string }
         Returns: {
+          avg_minutes_per_trip: number
           passes: number
           student_name: string
           total_minutes: number
@@ -770,6 +771,21 @@ export type Database = {
         Returns: {
           passes: number
           total_minutes: number
+        }[]
+      }
+      get_behavioral_insights: {
+        Args: { time_frame_arg: string }
+        Returns: {
+          avg_duration: number
+          insight_type: string
+          pass_count: number
+        }[]
+      }
+      get_passes_by_day_of_week: {
+        Args: { time_frame_arg: string }
+        Returns: {
+          day_of_week: string
+          pass_count: number
         }[]
       }
       normalize_name: {
