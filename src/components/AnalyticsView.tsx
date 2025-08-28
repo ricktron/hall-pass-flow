@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Clock, Users, TrendingUp } from "lucide-react";
+import { BarChart3, Clock, Users, TrendingUp, Flame, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Table, 
@@ -78,6 +78,19 @@ interface DayOfWeekData {
   pass_count: number;
 }
 
+interface HeatmapData {
+  day_of_week: string;
+  period: string;
+  pass_count: number;
+}
+
+interface ScheduleAnalysisData {
+  schedule_type: string;
+  total_passes: number;
+  instructional_minutes: number;
+  passes_per_100_min: number;
+}
+
 interface SafeLoaderData {
   ok: number;
 }
@@ -98,6 +111,8 @@ const AnalyticsView = () => {
   const [longestPassData, setLongestPassData] = useState<LongestPassData[]>([]);
   const [behavioralInsightsData, setBehavioralInsightsData] = useState<BehavioralInsightsData[]>([]);
   const [dayOfWeekData, setDayOfWeekData] = useState<DayOfWeekData[]>([]);
+  const [heatmapData, setHeatmapData] = useState<HeatmapData[]>([]);
+  const [scheduleAnalysisData, setScheduleAnalysisData] = useState<ScheduleAnalysisData[]>([]);
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
 
@@ -196,6 +211,22 @@ const AnalyticsView = () => {
       if (dayOfWeekError) throw dayOfWeekError;
       setDayOfWeekData(dayOfWeek || []);
 
+      // Load heatmap data using parameterized RPC function
+      const { data: heatmap, error: heatmapError } = await supabase.rpc('get_weekly_heatmap_data', {
+        time_frame_arg: timeFrame
+      });
+
+      if (heatmapError) throw heatmapError;
+      setHeatmapData(heatmap || []);
+
+      // Load schedule analysis data using parameterized RPC function
+      const { data: scheduleAnalysis, error: scheduleAnalysisError } = await supabase.rpc('get_schedule_type_analysis', {
+        time_frame_arg: timeFrame
+      });
+
+      if (scheduleAnalysisError) throw scheduleAnalysisError;
+      setScheduleAnalysisData(scheduleAnalysis || []);
+
     } catch (err) {
       console.error("Analytics data loading error:", err);
       setError(err instanceof Error ? err.message : "Failed to load analytics data");
@@ -221,6 +252,23 @@ const AnalyticsView = () => {
     if (q1 === 0 && q3 === 0) return "No data";
     return `${Math.round(q1)}-${Math.round(q3)} min`;
   };
+
+  // Helper functions for heatmap
+  const getHeatmapIntensity = (passCount: number, maxCount: number) => {
+    if (passCount === 0) return "bg-muted/20";
+    const intensity = Math.min(passCount / maxCount, 1);
+    if (intensity <= 0.25) return "bg-orange-100 dark:bg-orange-950/30";
+    if (intensity <= 0.5) return "bg-orange-200 dark:bg-orange-900/50";
+    if (intensity <= 0.75) return "bg-orange-300 dark:bg-orange-800/70";
+    return "bg-orange-400 dark:bg-orange-700";
+  };
+
+  const getHeatmapValue = (day: string, period: string) => {
+    const item = heatmapData.find(d => d.day_of_week === day && d.period === period);
+    return item ? item.pass_count : 0;
+  };
+
+  const maxHeatmapValue = Math.max(...heatmapData.map(d => d.pass_count), 1);
 
   return (
     <div className="space-y-6">
@@ -578,6 +626,108 @@ const AnalyticsView = () => {
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Advanced Analytics Row */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Weekly Hot Spots Heatmap */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Flame className="h-5 w-5" />
+              Weekly Hot Spots
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Pass frequency by period and day
+            </p>
+          </CardHeader>
+          <CardContent>
+            {heatmapData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No heatmap data available
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="text-left p-2 text-sm font-medium">Period</th>
+                      <th className="text-center p-2 text-sm font-medium">Mon</th>
+                      <th className="text-center p-2 text-sm font-medium">Tue</th>
+                      <th className="text-center p-2 text-sm font-medium">Wed</th>
+                      <th className="text-center p-2 text-sm font-medium">Thu</th>
+                      <th className="text-center p-2 text-sm font-medium">Fri</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((period) => (
+                      <tr key={period}>
+                        <td className="p-2 text-sm font-medium">{period}</td>
+                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
+                          const value = getHeatmapValue(day, period);
+                          return (
+                            <td
+                              key={day}
+                              className={`p-2 text-center text-sm border rounded ${getHeatmapIntensity(value, maxHeatmapValue)}`}
+                            >
+                              {value || ''}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Schedule Analysis */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Schedule Analysis
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Comparing pass rates between schedule types
+            </p>
+          </CardHeader>
+          <CardContent>
+            {scheduleAnalysisData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No schedule analysis data available
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {scheduleAnalysisData.map((item, index) => (
+                  <div key={index} className="p-4 rounded-lg bg-muted/50">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium">{item.schedule_type}</h4>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-primary">
+                          {item.passes_per_100_min}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          passes per 100 min
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                      <div>
+                        <span className="font-medium">Total Passes:</span> {item.total_passes}
+                      </div>
+                      <div>
+                        <span className="font-medium">Instructional Minutes:</span> {item.instructional_minutes}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>

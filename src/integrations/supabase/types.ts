@@ -789,6 +789,23 @@ export type Database = {
           pass_count: number
         }[]
       }
+      get_schedule_type_analysis: {
+        Args: { time_frame_arg: string }
+        Returns: {
+          instructional_minutes: number
+          passes_per_100_min: number
+          schedule_type: string
+          total_passes: number
+        }[]
+      }
+      get_weekly_heatmap_data: {
+        Args: { time_frame_arg: string }
+        Returns: {
+          day_of_week: string
+          pass_count: number
+          period: string
+        }[]
+      }
       normalize_name: {
         Args: { txt: string }
         Returns: string
