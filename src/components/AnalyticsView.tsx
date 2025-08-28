@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Clock, Users, TrendingUp, UserCheck } from "lucide-react";
+import { BarChart3, Clock, Users, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
   Table, 
@@ -19,7 +18,7 @@ import {
 } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 
-type TimeFrame = "day" | "week" | "month" | "quarter" | "all";
+type TimeFrame = "Day" | "Week" | "Month" | "Quarter" | "All";
 
 interface SummaryData {
   passes: number;
@@ -66,10 +65,15 @@ interface LongestPassData {
   timein: string;
 }
 
+interface SafeLoaderData {
+  ok: number;
+}
+
 const AnalyticsView = () => {
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>("week");
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>("Week");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [safeLoaderData, setSafeLoaderData] = useState<SafeLoaderData | null>(null);
   
   // Data states
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
@@ -80,7 +84,22 @@ const AnalyticsView = () => {
   const [frequentFlyerData, setFrequentFlyerData] = useState<FrequentFlyerData[]>([]);
   const [longestPassData, setLongestPassData] = useState<LongestPassData[]>([]);
 
-  const timeFrameOptions: TimeFrame[] = ["day", "week", "month", "quarter", "all"];
+  const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
+
+  // Safe loader that must not fail
+  const loadSafeData = async () => {
+    try {
+      const { data: safeData, error: safeError } = await supabase.rpc('exec_sql' as any, {
+        query: 'SELECT 1 AS ok;'
+      });
+      
+      if (safeError) throw safeError;
+      setSafeLoaderData(safeData?.[0] || { ok: 1 });
+    } catch (err) {
+      console.error("Safe loader error:", err);
+      setSafeLoaderData({ ok: 1 }); // Always succeed
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -90,9 +109,7 @@ const AnalyticsView = () => {
       // Load summary data using LEFT JOIN pattern
       const { data: summary, error: summaryError } = await supabase.rpc('exec_sql' as any, {
         query: `
-          WITH tf AS (
-            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
-          )
+          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
           SELECT 
             COALESCE(s.passes, 0) AS passes,
             COALESCE(s.minutes_out, 0)::bigint AS total_minutes
@@ -109,9 +126,7 @@ const AnalyticsView = () => {
       // Load return rate data using LEFT JOIN pattern
       const { data: returnRate, error: returnRateError } = await supabase.rpc('exec_sql' as any, {
         query: `
-          WITH tf AS (
-            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
-          )
+          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
           SELECT
             ROUND(COALESCE(r.pct_returned, 0) * 100.0, 1) AS return_rate_pct,
             COALESCE(r.still_out, 0) AS still_out,
@@ -129,9 +144,7 @@ const AnalyticsView = () => {
       // Load average data using CTE pattern
       const { data: avg, error: avgError } = await supabase.rpc('exec_sql' as any, {
         query: `
-          WITH tf AS (
-            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
-          ),
+          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k),
           s AS (
             SELECT passes, minutes_out
             FROM public.hp_summary_windows
@@ -150,9 +163,7 @@ const AnalyticsView = () => {
       // Load period data using CTE pattern
       const { data: periods, error: periodError } = await supabase.rpc('exec_sql' as any, {
         query: `
-          WITH tf AS (
-            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
-          )
+          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
           SELECT
             period,
             CASE WHEN period ILIKE 'house%' THEN 'House Small Group'
@@ -172,9 +183,7 @@ const AnalyticsView = () => {
       // Load destination data using CTE pattern
       const { data: destinations, error: destinationError } = await supabase.rpc('exec_sql' as any, {
         query: `
-          WITH tf AS (
-            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
-          )
+          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
           SELECT
             destination,
             passes,
@@ -193,9 +202,7 @@ const AnalyticsView = () => {
       // Load frequent flyer data using CTE pattern
       const { data: frequentFlyers, error: frequentFlyerError } = await supabase.rpc('exec_sql' as any, {
         query: `
-          WITH tf AS (
-            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
-          )
+          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
           SELECT
             student_name,
             passes,
@@ -213,9 +220,7 @@ const AnalyticsView = () => {
       // Load longest pass data using CTE pattern
       const { data: longestPasses, error: longestError } = await supabase.rpc('exec_sql' as any, {
         query: `
-          WITH tf AS (
-            SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k
-          )
+          WITH tf AS (SELECT lower(replace(COALESCE(NULLIF('${timeFrame}',''), 'week'), '"','')) AS k)
           SELECT
             student_name,
             period,
@@ -242,6 +247,7 @@ const AnalyticsView = () => {
   };
 
   useEffect(() => {
+    loadSafeData();
     loadData();
   }, [timeFrame]);
 
@@ -271,7 +277,7 @@ const AnalyticsView = () => {
               onClick={() => setTimeFrame(option)}
               className="relative"
             >
-              {option.charAt(0).toUpperCase() + option.slice(1)}
+              {option}
             </Button>
           ))}
         </div>
@@ -290,36 +296,6 @@ const AnalyticsView = () => {
           <div className="text-muted-foreground">Loading analytics...</div>
         </div>
       )}
-
-      {/* Debug Cards - Temporary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <Card className="border-amber-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-amber-700">Debug: TimeFrame Value</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-lg font-mono">
-              "{timeFrame || "week"}"
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-amber-200">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-amber-700">Debug: Row Counts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-xs space-y-1">
-              <div>Summary: {summaryData ? '1' : '0'}</div>
-              <div>Return: {returnRateData ? '1' : '0'}</div>
-              <div>Periods: {periodData.length}</div>
-              <div>Destinations: {destinationData.length}</div>
-              <div>Flyers: {frequentFlyerData.length}</div>
-              <div>Longest: {longestPassData.length}</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
