@@ -14,6 +14,32 @@ export interface HallPassRecord {
   classroom?: string;
 }
 
+export const addArrivalRecord = async (data: {
+  studentName: string;
+  period: string;
+  arrivalReason: string;
+}): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('classroom_arrivals')
+      .insert({
+        student_name: data.studentName,
+        period: data.period,
+        arrival_reason: data.arrivalReason,
+        time_in: new Date().toISOString()
+      });
+
+    if (error) {
+      console.error("Error adding arrival record:", error);
+      throw error;
+    }
+    return true;
+  } catch (error) {
+    console.error("Error adding arrival record:", error);
+    throw error;
+  }
+};
+
 export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
   try {
     // First, check if the student already has an open trip

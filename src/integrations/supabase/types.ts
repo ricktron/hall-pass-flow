@@ -101,6 +101,33 @@ export type Database = {
           },
         ]
       }
+      classroom_arrivals: {
+        Row: {
+          arrival_reason: string | null
+          created_at: string
+          id: string
+          period: string
+          student_name: string
+          time_in: string
+        }
+        Insert: {
+          arrival_reason?: string | null
+          created_at?: string
+          id?: string
+          period: string
+          student_name: string
+          time_in?: string
+        }
+        Update: {
+          arrival_reason?: string | null
+          created_at?: string
+          id?: string
+          period?: string
+          student_name?: string
+          time_in?: string
+        }
+        Relationships: []
+      }
       classrooms: {
         Row: {
           id: string
