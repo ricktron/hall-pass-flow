@@ -101,6 +101,16 @@ const AnalyticsView = () => {
   const [error, setError] = useState<string | null>(null);
   const [safeLoaderData, setSafeLoaderData] = useState<SafeLoaderData | null>(null);
   
+  // Teaching and Meeting Schedules
+  const planningPeriods = ['B', 'E', 'F'];
+  const weeklyMeetingPattern: { [key: string]: string[] } = {
+    'A': ['Monday', 'Tuesday', 'Thursday'],
+    'C': ['Monday', 'Tuesday', 'Thursday'],
+    'D': ['Monday', 'Tuesday', 'Thursday'],
+    'G': ['Monday', 'Wednesday', 'Friday'],
+    'H': ['Monday', 'Wednesday', 'Friday']
+  };
+  
   // Data states
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [returnRateData, setReturnRateData] = useState<ReturnRateData | null>(null);
@@ -668,10 +678,22 @@ const AnalyticsView = () => {
                         <td className="p-2 text-sm font-medium">{period}</td>
                         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
                           const value = getHeatmapValue(day, period);
+                          
+                          // Check if this cell should be greyed out
+                          const isPlanningPeriod = planningPeriods.includes(period);
+                          const isInstructionalPeriodNotMeeting = 
+                            weeklyMeetingPattern[period] && 
+                            !weeklyMeetingPattern[period].includes(day);
+                          const shouldGreyOut = isPlanningPeriod || isInstructionalPeriodNotMeeting;
+                          
                           return (
                             <td
                               key={day}
-                              className={`p-2 text-center text-sm border rounded ${getHeatmapIntensity(value, maxHeatmapValue)}`}
+                              className={`p-2 text-center text-sm border rounded ${
+                                shouldGreyOut 
+                                  ? 'bg-muted/50' 
+                                  : getHeatmapIntensity(value, maxHeatmapValue)
+                              }`}
                             >
                               {value || ''}
                             </td>
