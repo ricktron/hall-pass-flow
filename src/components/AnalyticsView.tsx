@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Clock, Users, TrendingUp, Flame, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { 
   Table, 
   TableBody, 
@@ -679,21 +680,15 @@ const AnalyticsView = () => {
                         {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
                           const value = getHeatmapValue(day, period);
                           
-                          // Check if this cell should be greyed out
-                          const isPlanningPeriod = planningPeriods.includes(period);
-                          const isInstructionalPeriodNotMeeting = 
-                            weeklyMeetingPattern[period] && 
-                            !weeklyMeetingPattern[period].includes(day);
-                          const shouldGreyOut = isPlanningPeriod || isInstructionalPeriodNotMeeting;
-                          
                           return (
                             <td
                               key={day}
-                              className={`p-2 text-center text-sm border rounded ${
-                                shouldGreyOut 
-                                  ? 'bg-muted/50' 
+                              className={cn(
+                                "p-2 text-center text-sm border rounded",
+                                planningPeriods.includes(period) || !weeklyMeetingPattern[period]?.includes(day)
+                                  ? "bg-slate-100 dark:bg-slate-800"
                                   : getHeatmapIntensity(value, maxHeatmapValue)
-                              }`}
+                              )}
                             >
                               {value || ''}
                             </td>
