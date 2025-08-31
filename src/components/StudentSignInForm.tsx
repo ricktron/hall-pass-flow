@@ -2,17 +2,18 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { LogIn } from "lucide-react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import StudentNameInput from "./StudentNameInput";
 import { getStudentNames, addArrivalRecord } from "@/lib/supabaseDataManager";
 import { PERIOD_OPTIONS } from "@/constants/formOptions";
-import StudentNameInput from "./StudentNameInput";
 import { useToast } from "@/hooks/use-toast";
 
 const ARRIVAL_REASONS = [
   "Late School Arrival",
-  "Nurse", 
+  "Nurse",
   "Front Office",
   "Counselor",
   "Student Leadership",
@@ -22,15 +23,15 @@ const ARRIVAL_REASONS = [
 ];
 
 const StudentSignInForm = () => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [selectedPeriod, setSelectedPeriod] = useState("");
-  const [selectedReason, setSelectedReason] = useState("");
+  const [selectedArrivalReason, setSelectedArrivalReason] = useState("");
   const [studentNames, setStudentNames] = useState<string[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadStudentNames = async () => {
@@ -40,7 +41,16 @@ const StudentSignInForm = () => {
     loadStudentNames();
   }, []);
 
-  const handleSubmit = () => {
+  const resetForm = () => {
+    setFirstName("");
+    setLastName("");
+    setSelectedPeriod("");
+    setSelectedArrivalReason("");
+  };
+
+  const isFormValid = firstName.trim() && lastName.trim() && selectedPeriod && selectedArrivalReason;
+
+  const handleFormSubmit = () => {
     if (isFormValid) {
       setShowConfirmDialog(true);
     }
@@ -48,42 +58,34 @@ const StudentSignInForm = () => {
 
   const handleConfirmSubmit = async () => {
     setIsSubmitting(true);
+    setShowConfirmDialog(false);
+
     try {
-      const studentName = `${firstName.trim()} ${lastName.trim()}`;
-      
-      await addArrivalRecord({
-        studentName,
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
+      const success = await addArrivalRecord({
+        studentName: fullName,
         period: selectedPeriod,
-        arrivalReason: selectedReason
+        arrivalReason: selectedArrivalReason
       });
 
-      toast({
-        title: "Success!",
-        description: `${studentName} has been signed in successfully.`,
-      });
-
-      // Reset form
-      setFirstName("");
-      setLastName("");
-      setSelectedPeriod("");
-      setSelectedReason("");
-      setShowConfirmDialog(false);
-
-      // Navigate back to home
-      navigate("/");
+      if (success) {
+        toast({
+          title: "Sign In Successful",
+          description: `${fullName} has been signed in successfully.`,
+        });
+        resetForm();
+        navigate("/");
+      }
     } catch (error) {
-      console.error("Error signing in student:", error);
       toast({
         title: "Error",
-        description: "Failed to sign in student. Please try again.",
+        description: "There was an error signing in. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  const isFormValid = firstName.trim() && lastName.trim() && selectedPeriod && selectedReason;
 
   const handleKeyDown = (e: React.KeyboardEvent, nextFieldId?: string) => {
     if (e.key === 'Enter') {
@@ -98,7 +100,7 @@ const StudentSignInForm = () => {
         }
       } else {
         if (isFormValid) {
-          handleSubmit();
+          handleFormSubmit();
         }
       }
     }
@@ -123,60 +125,56 @@ const StudentSignInForm = () => {
             onKeyDown={handleKeyDown}
           />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label htmlFor="period-select" className="text-sm font-medium">
-                Class Period
-              </label>
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger id="period-select">
-                  <SelectValue placeholder="Select period" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PERIOD_OPTIONS.map((period) => (
-                    <SelectItem key={period.value} value={period.value}>
-                      {period.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="period">Class Period</Label>
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger id="period-select" onKeyDown={(e) => handleKeyDown(e, 'arrival-reason-select')}>
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent className="bg-white z-50">
+                {PERIOD_OPTIONS.map((period) => (
+                  <SelectItem key={period.value} value={period.value}>
+                    {period.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <label htmlFor="reason-select" className="text-sm font-medium">
-                Coming From
-              </label>
-              <Select value={selectedReason} onValueChange={setSelectedReason}>
-                <SelectTrigger id="reason-select">
-                  <SelectValue placeholder="Select reason" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ARRIVAL_REASONS.map((reason) => (
-                    <SelectItem key={reason} value={reason}>
-                      {reason}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="arrival-reason">Coming From</Label>
+            <Select value={selectedArrivalReason} onValueChange={setSelectedArrivalReason}>
+              <SelectTrigger id="arrival-reason-select" onKeyDown={(e) => handleKeyDown(e, 'signInButton')}>
+                <SelectValue placeholder="Select where you're coming from" />
+              </SelectTrigger>
+              <SelectContent className="bg-white z-50">
+                {ARRIVAL_REASONS.map((reason) => (
+                  <SelectItem key={reason} value={reason}>
+                    {reason}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <Button 
             type="button"
+            id="signInButton"
             className="w-full py-3 text-lg" 
-            onClick={handleSubmit}
-            disabled={!isFormValid}
+            onClick={handleFormSubmit}
+            onKeyDown={(e) => handleKeyDown(e)}
+            disabled={isSubmitting || !isFormValid}
           >
-            Sign In
+            {isSubmitting ? "Processing..." : "Sign In"}
           </Button>
 
-          <div className="text-center">
-            <Link 
-              to="/" 
+          <div className="text-center mt-4">
+            <a 
+              href="/" 
               className="text-sm text-blue-600 hover:text-blue-800 underline"
             >
               Back to Sign Out
-            </Link>
+            </a>
           </div>
         </CardContent>
       </Card>
@@ -190,18 +188,15 @@ const StudentSignInForm = () => {
               <br /><br />
               <strong>Student:</strong> {firstName.trim()} {lastName.trim()}
               <br />
-              <strong>Period:</strong> {selectedPeriod}
+              <strong>Period:</strong> {PERIOD_OPTIONS.find(p => p.value === selectedPeriod)?.label}
               <br />
-              <strong>Coming From:</strong> {selectedReason}
+              <strong>Coming From:</strong> {selectedArrivalReason}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Signing In..." : "Confirm Sign In"}
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSubmit}>
+              Confirm Sign In
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
