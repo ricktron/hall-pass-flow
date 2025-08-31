@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PinEntryDialogProps {
   isOpen: boolean;
@@ -16,26 +17,44 @@ const PinEntryDialog = ({ isOpen, onSuccess, onCancel }: PinEntryDialogProps) =>
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const TEACHER_PIN = "4311";
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Small delay for UX
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      // Call the secure PIN verification function
+      const { data, error } = await supabase.rpc('verify_teacher_pin', {
+        pin_to_check: pin
+      });
 
-    if (pin === TEACHER_PIN) {
-      onSuccess();
-      setPin("");
-    } else {
+      if (error) {
+        console.error('PIN verification error:', error);
+        toast({
+          title: "Verification Error",
+          description: "Unable to verify PIN. Please try again.",
+          variant: "destructive",
+        });
+      } else if (data === true) {
+        onSuccess();
+        setPin("");
+      } else {
+        toast({
+          title: "Incorrect PIN",
+          description: "Please enter the correct teacher PIN.",
+          variant: "destructive",
+        });
+        setPin("");
+      }
+    } catch (error) {
+      console.error('PIN verification error:', error);
       toast({
-        title: "Incorrect PIN",
-        description: "Please enter the correct teacher PIN.",
+        title: "Verification Error",
+        description: "Unable to verify PIN. Please try again.",
         variant: "destructive",
       });
       setPin("");
     }
+    
     setIsLoading(false);
   };
 

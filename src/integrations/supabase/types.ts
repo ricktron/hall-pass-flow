@@ -841,6 +841,10 @@ export type Database = {
         Args: { ts: string }
         Returns: string
       }
+      verify_teacher_pin: {
+        Args: { pin_to_check: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
