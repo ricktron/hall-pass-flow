@@ -160,6 +160,15 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
           >
             {isSubmitting ? "Processing..." : "Sign Out"}
           </Button>
+
+          <div className="text-center mt-4">
+            <a 
+              href="/sign-in" 
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              Arriving late? Sign in instead.
+            </a>
+          </div>
         </CardContent>
       </Card>
 

@@ -102,7 +102,7 @@ const Index = () => {
             )}
           </div>
           
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={handleStudentModeClick}>
               <CardHeader className="text-center pb-4">
                 <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
@@ -137,6 +137,16 @@ const Index = () => {
                 </Button>
               </CardContent>
             </Card>
+          </div>
+
+          <div className="w-full">
+            <Button 
+              variant="outline" 
+              className="w-full py-3 text-lg"
+              onClick={() => window.location.href = '/sign-in'}
+            >
+              Sign In to Class (Late Arrival)
+            </Button>
           </div>
         </div>
       </div>
