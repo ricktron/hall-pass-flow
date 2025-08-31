@@ -686,7 +686,7 @@ const AnalyticsView = () => {
                               className={cn(
                                 "p-2 text-center text-sm border rounded",
                                 planningPeriods.includes(period) || !weeklyMeetingPattern[period]?.includes(day)
-                                  ? "bg-slate-100 dark:bg-slate-800"
+                                  ? "bg-slate-300 dark:bg-slate-700"
                                   : getHeatmapIntensity(value, maxHeatmapValue)
                               )}
                             >
