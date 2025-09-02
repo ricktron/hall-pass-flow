@@ -40,18 +40,25 @@ const ConditionalVideoPlayer = ({ destination, onComplete }: ConditionalVideoPla
   };
 
   useEffect(() => {
+    if (destination !== "Bathroom") {
+      onComplete();
+      return;
+    }
+    
     const videoArray = videoMap[destination] || videoMap["default"];
     const randomIndex = Math.floor(Math.random() * videoArray.length);
     setSelectedVideo(videoArray[randomIndex]);
-  }, [destination]);
+  }, [destination, onComplete]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      onComplete();
-    }, 7000);
+    if (destination === "Bathroom" && selectedVideo) {
+      const timer = setTimeout(() => {
+        onComplete();
+      }, 7000);
 
-    return () => clearTimeout(timer);
-  }, [onComplete]);
+      return () => clearTimeout(timer);
+    }
+  }, [onComplete, selectedVideo, destination]);
 
   if (!selectedVideo) return null;
 
