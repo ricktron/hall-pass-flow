@@ -50,15 +50,6 @@ const ConditionalVideoPlayer = ({ destination, onComplete }: ConditionalVideoPla
     setSelectedVideo(videoArray[randomIndex]);
   }, [destination, onComplete]);
 
-  useEffect(() => {
-    if (destination === "Bathroom" && selectedVideo) {
-      const timer = setTimeout(() => {
-        onComplete();
-      }, 7000);
-
-      return () => clearTimeout(timer);
-    }
-  }, [onComplete, selectedVideo, destination]);
 
   if (!selectedVideo) return null;
 
@@ -68,8 +59,8 @@ const ConditionalVideoPlayer = ({ destination, onComplete }: ConditionalVideoPla
         src={selectedVideo}
         autoPlay
         muted
-        loop
         className="w-full h-full object-cover"
+        onEnded={onComplete}
         onError={(e) => {
           console.error("Video loading error:", e);
           // Fallback to default video if current video fails
