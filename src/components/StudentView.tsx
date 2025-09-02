@@ -46,8 +46,11 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   }, []);
 
   const handleSignOut = async (studentRecord: StudentRecord) => {
-    // After successful sign out, return to main screen
-    onBack();
+    // Refresh the list of currently out students
+    const updatedStudents = await loadCurrentStudents();
+    
+    // Hide the form and show the appropriate "currently out" view
+    setShowForm(false);
   };
 
   const handleEarlyDismissal = (studentName: string) => {
