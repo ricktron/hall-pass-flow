@@ -219,8 +219,8 @@ export const getStudentNames = async (): Promise<string[]> => {
   try {
     const { data, error } = await (supabase as any)
       .from('Hall_Passes')
-      .select('student_name')
-      .order('student_name');
+      .select('studentName')
+      .order('studentName');
 
     if (error) {
       console.error("Error fetching student names:", error);
@@ -228,7 +228,7 @@ export const getStudentNames = async (): Promise<string[]> => {
     }
 
     // Get unique student names
-    const uniqueNames = [...new Set((data || []).map((record: any) => record.student_name).filter(Boolean))] as string[];
+    const uniqueNames = [...new Set((data || []).map((record: any) => record.studentName).filter(Boolean))] as string[];
     return uniqueNames;
   } catch (error) {
     console.error("Error fetching student names:", error);
