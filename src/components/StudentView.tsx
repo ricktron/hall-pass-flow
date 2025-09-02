@@ -7,7 +7,6 @@ import StudentSignOutForm from "./StudentSignOutForm";
 import CurrentOutList from "./CurrentOutList";
 import SoloStudentView from "./SoloStudentView";
 import HaveAGreatDayMessage from "./HaveAGreatDayMessage";
-import ConditionalVideoPlayer from "./ConditionalVideoPlayer";
 import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 
 interface StudentViewProps {
@@ -27,7 +26,6 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [showGreatDayMessage, setShowGreatDayMessage] = useState(false);
   const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
   const [showForm, setShowForm] = useState(true);
-  const [videoDestination, setVideoDestination] = useState<string | null>(null);
 
   const loadCurrentStudents = async () => {
     const records = await getCurrentlyOutRecords();
@@ -48,8 +46,8 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   }, []);
 
   const handleSignOut = async (studentRecord: StudentRecord) => {
-    // Set the video destination to show the video player
-    setVideoDestination(studentRecord.destination);
+    // After successful sign out, return to main screen
+    onBack();
   };
 
   const handleEarlyDismissal = (studentName: string) => {
@@ -83,27 +81,6 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const handleBackClick = () => {
     onBack();
   };
-
-  // Show video player after sign out
-  if (videoDestination) {
-    return (
-      <ConditionalVideoPlayer
-        destination={videoDestination}
-        onComplete={async () => {
-          setVideoDestination(null);
-          // Reload the current students to get the most up-to-date list
-          const updatedStudents = await loadCurrentStudents();
-          
-          // Show the appropriate view based on student count
-          if (updatedStudents.length === 1) {
-            setShowForm(false); // Show solo view
-          } else if (updatedStudents.length >= 2) {
-            setShowForm(false); // Show list view
-          }
-        }}
-      />
-    );
-  }
 
   // Show "Have a Great Day" message for early dismissals
   if (showGreatDayMessage) {
