@@ -1,11 +1,11 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import StudentSignOutForm from "./StudentSignOutForm";
 import CurrentOutList from "./CurrentOutList";
 import SoloStudentView from "./SoloStudentView";
-import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
+import HaveAGreatDayMessage from "./HaveAGreatDayMessage";
+import { getCurrentlyOutRecords, HallPassRecord } from "@/lib/supabaseDataManager";
 
 interface StudentViewProps {
   onBack: () => void;
@@ -19,63 +19,70 @@ interface StudentRecord {
 }
 
 const StudentView = ({ onBack }: StudentViewProps) => {
-  // State Management
   const [currentStudents, setCurrentStudents] = useState<StudentRecord[]>([]);
   const [showForm, setShowForm] = useState(true);
+  const [showGreatDayMessage, setShowGreatDayMessage] = useState(false);
+  const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
 
-  // Data Fetching
   const loadCurrentStudents = async () => {
     const records = await getCurrentlyOutRecords();
-    const studentRecords = records.map(record => ({
-      studentName: record.studentName,
-      period: record.period,
-      timeOut: record.timeOut,
+    const transformedRecords = records.map(record => ({
+      ...record,
       destination: record.destination || 'Unknown'
     }));
-    setCurrentStudents(studentRecords);
-    return studentRecords;
+    setCurrentStudents(transformedRecords);
+    return transformedRecords;
   };
 
-  // Initial data load
   useEffect(() => {
     loadCurrentStudents();
   }, []);
 
-  // Event Handlers
   const handleSignOut = async (studentRecord: StudentRecord) => {
-    // Sign-out operation is completed by StudentSignOutForm before calling this callback
     await loadCurrentStudents();
     setShowForm(false);
   };
 
   const handleEarlyDismissal = (studentName: string) => {
-    // Handle early dismissal - set form back to show for next student
+    setEarlyDismissalStudent(studentName);
+    setShowGreatDayMessage(true);
+  };
+
+  const handleGreatDayComplete = () => {
+    setShowGreatDayMessage(false);
+    setEarlyDismissalStudent("");
     setShowForm(true);
+    onBack();
   };
 
   const handleStudentReturn = async (studentName: string, period: string) => {
-    // Reload students after return
-    await loadCurrentStudents();
-    setShowForm(true);
+    const updatedStudents = await loadCurrentStudents();
+    if (updatedStudents.length === 0) {
+      setShowForm(true);
+    }
   };
 
   const handleSignOutAnother = () => {
     setShowForm(true);
   };
 
-  const handleBackClick = () => {
-    onBack();
-  };
+  if (showGreatDayMessage) {
+    return (
+      <HaveAGreatDayMessage
+        studentName={earlyDismissalStudent}
+        onComplete={handleGreatDayComplete}
+      />
+    );
+  }
 
-  // Rendering Logic
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center mb-6">
-          <Button 
+          <Button
             type="button"
-            variant="outline" 
-            onClick={handleBackClick}
+            variant="outline"
+            onClick={onBack}
             className="mr-4"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -86,12 +93,29 @@ const StudentView = ({ onBack }: StudentViewProps) => {
 
         <div className="space-y-6">
           {showForm ? (
-            <StudentSignOutForm onSignOut={handleSignOut} onEarlyDismissal={handleEarlyDismissal} />
+            <StudentSignOutForm
+              onSignOut={handleSignOut}
+              onEarlyDismissal={handleEarlyDismissal}
+            />
           ) : currentStudents.length === 1 ? (
-            <SoloStudentView student={currentStudents[0]} onStudentReturn={handleStudentReturn} onSignOutAnother={handleSignOutAnother} />
+            <SoloStudentView
+              student={currentStudents[0]}
+              onStudentReturn={handleStudentReturn}
+              onSignOutAnother={handleSignOutAnother}
+            />
           ) : currentStudents.length > 1 ? (
-            <CurrentOutList students={currentStudents} onStudentReturn={handleStudentReturn} onSignOutAnother={handleSignOutAnother} />
-          ) : null}
+            <CurrentOutList
+              students={currentStudents}
+              onStudentReturn={handleStudentReturn}
+              onSignOutAnother={handleSignOutAnother}
+            />
+          ) : (
+            // Fallback: If no students are out, show the form again.
+            <StudentSignOutForm
+              onSignOut={handleSignOut}
+              onEarlyDismissal={handleEarlyDismissal}
+            />
+          )}
         </div>
       </div>
     </div>
