@@ -126,17 +126,6 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     );
   }
 
-  // Show solo view for single student (when form is not showing and exactly 1 student)
-  if (currentStudents.length === 1 && !showForm) {
-    return (
-      <SoloStudentView
-        student={currentStudents[0]}
-        onStudentReturn={handleStudentReturn}
-        onSignOutAnother={handleSignOutAnother}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-4xl mx-auto">
@@ -160,7 +149,14 @@ const StudentView = ({ onBack }: StudentViewProps) => {
               onEarlyDismissal={handleEarlyDismissal}
             />
           )}
-          {currentStudents.length >= 2 && !showForm && (
+          {!showForm && currentStudents.length === 1 && (
+            <SoloStudentView
+              student={currentStudents[0]}
+              onStudentReturn={handleStudentReturn}
+              onSignOutAnother={handleSignOutAnother}
+            />
+          )}
+          {!showForm && currentStudents.length > 1 && (
             <CurrentOutList 
               students={currentStudents}
               onStudentReturn={handleStudentReturn}
