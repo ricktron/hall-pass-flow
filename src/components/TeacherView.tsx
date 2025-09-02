@@ -21,6 +21,7 @@ interface DashboardData {
     period: string;
     timeOut: string;
     destination: string;
+    minutesOut: number;
   }>;
   currentlyOutCount: number;
   todayStats: {
@@ -32,7 +33,11 @@ interface DashboardData {
     }>;
     avgDurationMinutes: number;
     longestDurationMinutes: number;
+    totalStudentsOut: number;
+    returnRate: number;
   };
+  lastUpdated: string;
+  refreshInterval: number;
 }
 
 const TeacherView = ({ onBack }: TeacherViewProps) => {
@@ -66,9 +71,12 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
   useEffect(() => {
     loadDashboardData();
-    const interval = setInterval(loadDashboardData, 60000); // 60s refresh
+    
+    // Use dynamic refresh interval from the response or default to 60s
+    const refreshMs = dashboardData?.refreshInterval || 60000;
+    const interval = setInterval(loadDashboardData, refreshMs);
     return () => clearInterval(interval);
-  }, []);
+  }, [dashboardData?.refreshInterval]);
 
   const handleBackClick = () => {
     onBack();
@@ -215,6 +223,27 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
         {activeView === 'overview' && (
           <div className="space-y-6">
+            {/* Quick Stats Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <StatCard 
+                label="Total Passes Today" 
+                value={dashboardData.todayStats.totalPasses.toString()}
+              />
+              <StatCard 
+                label="Return Rate" 
+                value={`${dashboardData.todayStats.returnRate}%`}
+              />
+              <StatCard 
+                label="Avg Duration" 
+                value={`${dashboardData.todayStats.avgDurationMinutes} min`}
+              />
+              <StatCard 
+                label="Students Out Today" 
+                value={dashboardData.todayStats.totalStudentsOut.toString()}
+              />
+            </div>
+
+            {/* Currently Out Students */}
             {dashboardData.currentlyOutCount === 0 ? (
               <Card className="shadow-lg">
                 <CardContent className="py-16">
