@@ -85,7 +85,12 @@ const StudentView = ({ onBack }: StudentViewProps) => {
 
   const handlePostSignoutComplete = () => {
     setSignedOutStudent(null);
-    setShowForm(true);
+    // Determine view based on current students count
+    if (currentStudents.length <= 1) {
+      setShowForm(true);
+    } else {
+      setShowForm(false); // Show CurrentOutList for multiple students
+    }
   };
 
   const handlePostSignoutAnother = (students: StudentRecord[]) => {
