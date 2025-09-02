@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Users, BarChart3, UserCheck } from "lucide-react";
@@ -15,6 +15,7 @@ interface TeacherViewProps {
   onBack: () => void;
 }
 
+// Enhanced interface matching the optimized RPC function
 interface DashboardData {
   currentlyOutStudents: Array<{
     studentName: string;
@@ -71,10 +72,9 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
   useEffect(() => {
     loadDashboardData();
-    
-    // Use dynamic refresh interval from the response or default to 60s
-    const refreshMs = dashboardData?.refreshInterval || 60000;
-    const interval = setInterval(loadDashboardData, refreshMs);
+    // Use dynamic refresh interval from server, fallback to 60s
+    const refreshInterval = dashboardData?.refreshInterval || 60000;
+    const interval = setInterval(loadDashboardData, refreshInterval);
     return () => clearInterval(interval);
   }, [dashboardData?.refreshInterval]);
 
@@ -223,27 +223,26 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
         {activeView === 'overview' && (
           <div className="space-y-6">
-            {/* Quick Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Enhanced Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
               <StatCard 
-                label="Total Passes Today" 
-                value={dashboardData.todayStats.totalPasses.toString()}
+                label="Currently Out" 
+                value={dashboardData.currentlyOutCount.toString()} 
+              />
+              <StatCard 
+                label="Today's Passes" 
+                value={dashboardData.todayStats.totalPasses.toString()} 
               />
               <StatCard 
                 label="Return Rate" 
-                value={`${dashboardData.todayStats.returnRate}%`}
+                value={`${dashboardData.todayStats.returnRate}%`} 
               />
               <StatCard 
                 label="Avg Duration" 
-                value={`${dashboardData.todayStats.avgDurationMinutes} min`}
-              />
-              <StatCard 
-                label="Students Out Today" 
-                value={dashboardData.todayStats.totalStudentsOut.toString()}
+                value={`${dashboardData.todayStats.avgDurationMinutes}m`} 
               />
             </div>
 
-            {/* Currently Out Students */}
             {dashboardData.currentlyOutCount === 0 ? (
               <Card className="shadow-lg">
                 <CardContent className="py-16">
@@ -267,6 +266,25 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 onStudentReturn={handleStudentReturn}
                 onClose={handleCloseCurrentlyOut}
               />
+            )}
+
+            {/* Today's Top Students */}
+            {dashboardData.todayStats.topLeavers.length > 0 && (
+              <Card className="shadow-lg">
+                <CardHeader>
+                  <CardTitle>Today's Most Active Students</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {dashboardData.todayStats.topLeavers.map((student, index) => (
+                      <div key={student.studentName} className="flex justify-between items-center p-2 rounded bg-gray-50">
+                        <span className="font-medium">#{index + 1} {student.studentName}</span>
+                        <span className="text-sm text-gray-600">{student.tripCount} trips</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
         )}
