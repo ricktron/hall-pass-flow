@@ -5,19 +5,9 @@ import { ArrowLeft, Users, BarChart3, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import AnalyticsView from "./AnalyticsView";
-import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { centralTodayBoundsISO, fmtHMS } from "@/utils/time";
-
-type PassRow = {
-  id: string | number;
-  period: string;
-  studentName: string;
-  timeOut: string;   // ISO
-  timeIn: string | null; // ISO or null
-};
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
@@ -25,70 +15,60 @@ interface TeacherViewProps {
   onBack: () => void;
 }
 
+interface DashboardData {
+  currentlyOutStudents: Array<{
+    studentName: string;
+    period: string;
+    timeOut: string;
+    destination: string;
+  }>;
+  currentlyOutCount: number;
+  todayStats: {
+    totalPasses: number;
+    byPeriod: Record<string, number>;
+    topLeavers: Array<{
+      studentName: string;
+      tripCount: number;
+    }>;
+    avgDurationMinutes: number;
+    longestDurationMinutes: number;
+  };
+}
+
 const TeacherView = ({ onBack }: TeacherViewProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [currentlyOutCount, setCurrentlyOutCount] = useState(0);
-  const [currentlyOutStudents, setCurrentlyOutStudents] = useState([]);
-  const [{ startISO, endISO }] = useState(centralTodayBoundsISO());
-  const [rows, setRows] = useState<PassRow[]>([]);
-  const [openRows, setOpenRows] = useState<PassRow[]>([]);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'overview' | 'analytics'>('overview');
 
-  const loadCurrentlyOutCount = async () => {
-    const records = await getCurrentlyOutRecords();
-    setCurrentlyOutCount(records.length);
-    setCurrentlyOutStudents(records.map(record => ({
-      studentName: record.studentName,
-      period: record.period,
-      timeOut: record.timeOut,
-      destination: record.destination || 'Unknown'
-    })));
-  };
-
-  const loadAnalytics = async () => {
-    let alive = true;
-
+  const loadDashboardData = async () => {
     setLoading(true);
     setErr(null);
 
-    // Today's rows (based on timeOut)
-    const { data: today, error: e1 } = await supabase
-      .from("Hall_Passes")
-      .select("id, period, studentName, timeOut, timeIn")
-      .gte("timeOut", startISO)
-      .lt("timeOut", endISO);
+    try {
+      const { data, error } = await supabase.rpc('get_teacher_dashboard_data');
+      
+      if (error) {
+        setErr(error.message);
+        setLoading(false);
+        return;
+      }
 
-    if (e1) { if (alive) { setErr(e1.message); setLoading(false); } return; }
-
-    // Still-out rows older than 30 minutes
-    const thirtyAgoISO = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-    const { data: opens, error: e2 } = await supabase
-      .from("Hall_Passes")
-      .select("id, period, studentName, timeOut, timeIn")
-      .is("timeIn", null)
-      .lt("timeOut", thirtyAgoISO);
-
-    if (e2) { if (alive) { setErr(e2.message); setLoading(false); } return; }
-
-    if (alive) {
-      setRows((today ?? []) as PassRow[]);
-      setOpenRows((opens ?? []) as PassRow[]);
+      setDashboardData(data as unknown as DashboardData);
+      setLoading(false);
+    } catch (error) {
+      setErr('Failed to load dashboard data');
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadCurrentlyOutCount();
-    loadAnalytics();
-    const interval = setInterval(() => {
-      loadCurrentlyOutCount();
-      loadAnalytics();
-    }, 60000); // 60s refresh for analytics
+    loadDashboardData();
+    const interval = setInterval(loadDashboardData, 60000); // 60s refresh
     return () => clearInterval(interval);
-  }, [startISO, endISO]);
+  }, []);
 
   const handleBackClick = () => {
     onBack();
@@ -142,8 +122,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
         title: "Student Returned",
         description: `${studentName} has been marked as returned.`,
       });
-      loadCurrentlyOutCount();
-      loadAnalytics();
+      loadDashboardData();
     } catch (error) {
       toast({ 
         variant: 'destructive', 
@@ -153,35 +132,46 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     }
   };
 
-  const byPeriod = useMemo(() => {
-    const map: Record<string, number> = Object.fromEntries(PERIODS.map(p => [p, 0]));
-    for (const r of rows) {
-      map[r.period] = (map[r.period] ?? 0) + 1;
-    }
-    return map;
-  }, [rows]);
-
-  const topLeavers = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const r of rows) {
-      counts.set(r.studentName, (counts.get(r.studentName) ?? 0) + 1);
-    }
-    return Array.from(counts.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  }, [rows]);
-
-  const { totalTrips, longestMs, avgMs } = useMemo(() => {
-    const finished = rows.filter(r => !!r.timeIn);
-    const durs = finished.map(r => new Date(r.timeIn as string).getTime() - new Date(r.timeOut).getTime());
-    const total = rows.length;
-    const longest = durs.length ? Math.max(...durs) : 0;
-    const avg = durs.length ? durs.reduce((a,b)=>a+b,0) / durs.length : 0;
-    return { totalTrips: total, longestMs: longest, avgMs: avg };
-  }, [rows]);
-
   const handleCloseCurrentlyOut = () => {
     // This could be used to hide the currently out display if needed
     // For now, we'll keep it always visible in the teacher view
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-center py-16">
+            <div className="text-lg text-gray-600">Loading dashboard data...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (err) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-center py-16">
+            <div className="text-lg text-red-600">Error: {err}</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-center py-16">
+            <div className="text-lg text-gray-600">No data available</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-100 p-4">
@@ -225,7 +215,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
         {activeView === 'overview' && (
           <div className="space-y-6">
-            {currentlyOutCount === 0 ? (
+            {dashboardData.currentlyOutCount === 0 ? (
               <Card className="shadow-lg">
                 <CardContent className="py-16">
                   <div className="text-center">
@@ -241,7 +231,10 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
               </Card>
             ) : (
               <CurrentlyOutDisplay 
-                students={currentlyOutStudents}
+                students={dashboardData.currentlyOutStudents.map(student => ({
+                  ...student,
+                  timeOut: new Date(student.timeOut)
+                }))}
                 onStudentReturn={handleStudentReturn}
                 onClose={handleCloseCurrentlyOut}
               />

@@ -825,6 +825,10 @@ export type Database = {
           total_passes: number
         }[]
       }
+      get_teacher_dashboard_data: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_weekly_heatmap_data: {
         Args: { time_frame_arg: string }
         Returns: {
