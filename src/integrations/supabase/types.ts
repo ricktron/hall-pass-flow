@@ -395,6 +395,48 @@ export type Database = {
           },
         ]
       }
+      hp_by_destination_windows: {
+        Row: {
+          avg_min: number | null
+          destination: string | null
+          median_min: number | null
+          minutes_out: number | null
+          passes: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_by_period_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          period: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_frequent_flyers_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          student_name: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_longest_windows: {
+        Row: {
+          destination: string | null
+          duration: number | null
+          id: string | null
+          period: string | null
+          student_name: string | null
+          timein: string | null
+          timeout: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
       hp_month_window: {
         Row: {
           end_ct: string | null
@@ -406,6 +448,24 @@ export type Database = {
         Row: {
           end_ct: string | null
           start_ct: string | null
+        }
+        Relationships: []
+      }
+      hp_return_rate_windows: {
+        Row: {
+          pct_returned: number | null
+          returned: number | null
+          still_out: number | null
+          total: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_summary_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          window: string | null
         }
         Relationships: []
       }
