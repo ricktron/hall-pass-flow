@@ -143,26 +143,13 @@ const StudentView = ({ onBack }: StudentViewProps) => {
         </div>
 
         <div className="space-y-6">
-          {showForm && (
-            <StudentSignOutForm 
-              onSignOut={handleSignOut} 
-              onEarlyDismissal={handleEarlyDismissal}
-            />
-          )}
-          {!showForm && currentStudents.length === 1 && (
-            <SoloStudentView
-              student={currentStudents[0]}
-              onStudentReturn={handleStudentReturn}
-              onSignOutAnother={handleSignOutAnother}
-            />
-          )}
-          {!showForm && currentStudents.length > 1 && (
-            <CurrentOutList 
-              students={currentStudents}
-              onStudentReturn={handleStudentReturn}
-              onSignOutAnother={handleSignOutAnother}
-            />
-          )}
+          {showForm ? (
+            <StudentSignOutForm onSignOut={handleSignOut} onEarlyDismissal={handleEarlyDismissal} />
+          ) : currentStudents.length === 1 ? (
+            <SoloStudentView student={currentStudents[0]} onStudentReturn={handleStudentReturn} onSignOutAnother={handleSignOutAnother} />
+          ) : currentStudents.length > 1 ? (
+            <CurrentOutList students={currentStudents} onStudentReturn={handleStudentReturn} onSignOutAnother={handleSignOutAnother} />
+          ) : null}
         </div>
       </div>
     </div>
