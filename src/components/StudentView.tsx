@@ -2,12 +2,9 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import StudentSignOutForm from "./StudentSignOutForm";
 import CurrentOutList from "./CurrentOutList";
 import SoloStudentView from "./SoloStudentView";
-import HaveAGreatDayMessage from "./HaveAGreatDayMessage";
-import PostSignoutConfirmation from "./PostSignoutConfirmation";
 import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 
 interface StudentViewProps {
@@ -22,13 +19,11 @@ interface StudentRecord {
 }
 
 const StudentView = ({ onBack }: StudentViewProps) => {
-  const navigate = useNavigate();
+  // State Management
   const [currentStudents, setCurrentStudents] = useState<StudentRecord[]>([]);
-  const [showGreatDayMessage, setShowGreatDayMessage] = useState(false);
-  const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
   const [showForm, setShowForm] = useState(true);
-  const [signedOutStudent, setSignedOutStudent] = useState<StudentRecord | null>(null);
 
+  // Data Fetching
   const loadCurrentStudents = async () => {
     const records = await getCurrentlyOutRecords();
     const studentRecords = records.map(record => ({
@@ -41,60 +36,30 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     return studentRecords;
   };
 
+  // Initial data load
   useEffect(() => {
     loadCurrentStudents();
-    const interval = setInterval(loadCurrentStudents, 5000);
-    return () => clearInterval(interval);
   }, []);
 
+  // Event Handlers
   const handleSignOut = async (studentRecord: StudentRecord) => {
     // Sign-out operation is completed by StudentSignOutForm before calling this callback
-    
-    // Set the signed out student to show PostSignoutConfirmation
-    setSignedOutStudent(studentRecord);
+    await loadCurrentStudents();
+    setShowForm(false);
   };
 
   const handleEarlyDismissal = (studentName: string) => {
-    setEarlyDismissalStudent(studentName);
-    setShowGreatDayMessage(true);
-  };
-
-  const handleGreatDayComplete = () => {
-    setShowGreatDayMessage(false);
-    setEarlyDismissalStudent("");
+    // Handle early dismissal - set form back to show for next student
     setShowForm(true);
   };
 
   const handleStudentReturn = async (studentName: string, period: string) => {
-    // Reload students after return to get accurate list
-    const updatedStudents = await loadCurrentStudents();
-    
-    // Adjust view based on remaining students
-    if (updatedStudents.length === 0) {
-      setShowForm(true);
-    } else if (updatedStudents.length === 1) {
-      setShowForm(false); // Show solo view
-    }
-    // If multiple students remain, stay in list view (showForm remains false)
+    // Reload students after return
+    await loadCurrentStudents();
+    setShowForm(true);
   };
 
   const handleSignOutAnother = () => {
-    setShowForm(true);
-    setSignedOutStudent(null);
-  };
-
-  const handlePostSignoutComplete = () => {
-    setSignedOutStudent(null);
-    // Determine view based on current students count
-    if (currentStudents.length <= 1) {
-      setShowForm(true);
-    } else {
-      setShowForm(false); // Show CurrentOutList for multiple students
-    }
-  };
-
-  const handlePostSignoutAnother = (students: StudentRecord[]) => {
-    setSignedOutStudent(null);
     setShowForm(true);
   };
 
@@ -102,30 +67,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
     onBack();
   };
 
-  // Show "Have a Great Day" message for early dismissals
-  if (showGreatDayMessage) {
-    return (
-      <HaveAGreatDayMessage 
-        studentName={earlyDismissalStudent}
-        onComplete={handleGreatDayComplete}
-      />
-    );
-  }
-
-  // Show PostSignoutConfirmation after a student signs out
-  if (signedOutStudent) {
-    return (
-      <PostSignoutConfirmation
-        studentName={signedOutStudent.studentName}
-        period={signedOutStudent.period}
-        timeOut={signedOutStudent.timeOut}
-        destination={signedOutStudent.destination}
-        onComplete={handlePostSignoutComplete}
-        onSignOutAnother={handlePostSignoutAnother}
-      />
-    );
-  }
-
+  // Rendering Logic
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-4xl mx-auto">
