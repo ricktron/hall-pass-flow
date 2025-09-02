@@ -7,6 +7,7 @@ import StudentSignOutForm from "./StudentSignOutForm";
 import CurrentOutList from "./CurrentOutList";
 import SoloStudentView from "./SoloStudentView";
 import HaveAGreatDayMessage from "./HaveAGreatDayMessage";
+import PostSignoutConfirmation from "./PostSignoutConfirmation";
 import { getCurrentlyOutRecords } from "@/lib/supabaseDataManager";
 
 interface StudentViewProps {
@@ -26,6 +27,7 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const [showGreatDayMessage, setShowGreatDayMessage] = useState(false);
   const [earlyDismissalStudent, setEarlyDismissalStudent] = useState("");
   const [showForm, setShowForm] = useState(true);
+  const [signedOutStudent, setSignedOutStudent] = useState<StudentRecord | null>(null);
 
   const loadCurrentStudents = async () => {
     const records = await getCurrentlyOutRecords();
@@ -48,11 +50,8 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   const handleSignOut = async (studentRecord: StudentRecord) => {
     // Sign-out operation is completed by StudentSignOutForm before calling this callback
     
-    // After sign-out is complete, refresh the list of currently out students
-    const updatedStudents = await loadCurrentStudents();
-    
-    // Hide the sign-out form and trigger re-render to show the "Currently Out" view
-    setShowForm(false);
+    // Set the signed out student to show PostSignoutConfirmation
+    setSignedOutStudent(studentRecord);
   };
 
   const handleEarlyDismissal = (studentName: string) => {
@@ -81,6 +80,17 @@ const StudentView = ({ onBack }: StudentViewProps) => {
 
   const handleSignOutAnother = () => {
     setShowForm(true);
+    setSignedOutStudent(null);
+  };
+
+  const handlePostSignoutComplete = () => {
+    setSignedOutStudent(null);
+    setShowForm(true);
+  };
+
+  const handlePostSignoutAnother = (students: StudentRecord[]) => {
+    setSignedOutStudent(null);
+    setShowForm(true);
   };
 
   const handleBackClick = () => {
@@ -93,6 +103,20 @@ const StudentView = ({ onBack }: StudentViewProps) => {
       <HaveAGreatDayMessage 
         studentName={earlyDismissalStudent}
         onComplete={handleGreatDayComplete}
+      />
+    );
+  }
+
+  // Show PostSignoutConfirmation after a student signs out
+  if (signedOutStudent) {
+    return (
+      <PostSignoutConfirmation
+        studentName={signedOutStudent.studentName}
+        period={signedOutStudent.period}
+        timeOut={signedOutStudent.timeOut}
+        destination={signedOutStudent.destination}
+        onComplete={handlePostSignoutComplete}
+        onSignOutAnother={handlePostSignoutAnother}
       />
     );
   }
