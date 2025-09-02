@@ -46,10 +46,12 @@ const StudentView = ({ onBack }: StudentViewProps) => {
   }, []);
 
   const handleSignOut = async (studentRecord: StudentRecord) => {
-    // Refresh the list of currently out students
+    // Sign-out operation is completed by StudentSignOutForm before calling this callback
+    
+    // After sign-out is complete, refresh the list of currently out students
     const updatedStudents = await loadCurrentStudents();
     
-    // Hide the form and show the appropriate "currently out" view
+    // Hide the sign-out form and trigger re-render to show the "Currently Out" view
     setShowForm(false);
   };
 
