@@ -357,6 +357,34 @@ export type Database = {
           timeOut: string | null
           typedName: string | null
         }
+        Insert: {
+          destination?: string | null
+          duration?: number | null
+          firstName?: never
+          id?: string | null
+          lastName?: never
+          needsReview?: never
+          period?: string | null
+          studentId?: string | null
+          studentName?: string | null
+          timeIn?: string | null
+          timeOut?: string | null
+          typedName?: string | null
+        }
+        Update: {
+          destination?: string | null
+          duration?: number | null
+          firstName?: never
+          id?: string | null
+          lastName?: never
+          needsReview?: never
+          period?: string | null
+          studentId?: string | null
+          studentName?: string | null
+          timeIn?: string | null
+          timeOut?: string | null
+          typedName?: string | null
+        }
         Relationships: [
           {
             foreignKeyName: "bathroom_passes_student_id_fkey"
@@ -366,134 +394,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      hp_base: {
-        Row: {
-          destination: string | null
-          duration_min: number | null
-          id: string | null
-          period: string | null
-          student_name: string | null
-          timein: string | null
-          timeout: string | null
-          timeout_ct: string | null
-        }
-        Insert: {
-          destination?: string | null
-          duration_min?: never
-          id?: string | null
-          period?: string | null
-          student_name?: string | null
-          timein?: string | null
-          timeout?: string | null
-          timeout_ct?: never
-        }
-        Update: {
-          destination?: string | null
-          duration_min?: never
-          id?: string | null
-          period?: string | null
-          student_name?: string | null
-          timein?: string | null
-          timeout?: string | null
-          timeout_ct?: never
-        }
-        Relationships: []
-      }
-      hp_by_destination_windows: {
-        Row: {
-          destination: string | null
-          median_min: number | null
-          minutes_out: number | null
-          p90_min: number | null
-          passes: number | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_by_period_windows: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          period: string | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_frequent_flyers_windows: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          student_name: string | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_longest_windows: {
-        Row: {
-          destination: string | null
-          duration: number | null
-          id: string | null
-          period: string | null
-          student_name: string | null
-          timein: string | null
-          timeout: string | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_month_by_destination: {
-        Row: {
-          destination: string | null
-          median_min: number | null
-          minutes_out: number | null
-          p90_min: number | null
-          passes: number | null
-        }
-        Relationships: []
-      }
-      hp_month_by_period: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          period: string | null
-        }
-        Relationships: []
-      }
-      hp_month_frequent_flyers: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          studentname: string | null
-        }
-        Relationships: []
-      }
-      hp_month_longest: {
-        Row: {
-          destination: string | null
-          duration: number | null
-          id: string | null
-          period: string | null
-          studentname: string | null
-          timeIn: string | null
-          timeOut: string | null
-        }
-        Relationships: []
-      }
-      hp_month_return_rate: {
-        Row: {
-          pct_returned: number | null
-          still_out: number | null
-          total: number | null
-        }
-        Relationships: []
-      }
-      hp_month_summary: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-        }
-        Relationships: []
       }
       hp_month_window: {
         Row: {
@@ -502,223 +402,10 @@ export type Database = {
         }
         Relationships: []
       }
-      hp_passes_month: {
-        Row: {
-          classroom: string | null
-          destination: string | null
-          duration_min: number | null
-          id: string | null
-          notes: string | null
-          period: string | null
-          studentId: string | null
-          studentName: string | null
-          timeIn: string | null
-          timeOut: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bathroom_passes_student_id_fkey"
-            columns: ["studentId"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bathroom_passes_classroom"
-            columns: ["classroom"]
-            isOneToOne: false
-            referencedRelation: "classrooms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hp_passes_quarter: {
-        Row: {
-          classroom: string | null
-          destination: string | null
-          duration_min: number | null
-          id: string | null
-          notes: string | null
-          period: string | null
-          studentId: string | null
-          studentName: string | null
-          timeIn: string | null
-          timeOut: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bathroom_passes_student_id_fkey"
-            columns: ["studentId"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bathroom_passes_classroom"
-            columns: ["classroom"]
-            isOneToOne: false
-            referencedRelation: "classrooms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hp_passes_week: {
-        Row: {
-          classroom: string | null
-          destination: string | null
-          duration_min: number | null
-          id: string | null
-          notes: string | null
-          period: string | null
-          studentId: string | null
-          studentName: string | null
-          timeIn: string | null
-          timeOut: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "bathroom_passes_student_id_fkey"
-            columns: ["studentId"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_bathroom_passes_classroom"
-            columns: ["classroom"]
-            isOneToOne: false
-            referencedRelation: "classrooms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hp_quarter_by_destination: {
-        Row: {
-          destination: string | null
-          median_min: number | null
-          minutes_out: number | null
-          p90_min: number | null
-          passes: number | null
-        }
-        Relationships: []
-      }
-      hp_quarter_by_period: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          period: string | null
-        }
-        Relationships: []
-      }
-      hp_quarter_frequent_flyers: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          studentname: string | null
-        }
-        Relationships: []
-      }
-      hp_quarter_longest: {
-        Row: {
-          destination: string | null
-          duration: number | null
-          id: string | null
-          period: string | null
-          studentname: string | null
-          timeIn: string | null
-          timeOut: string | null
-        }
-        Relationships: []
-      }
-      hp_quarter_return_rate: {
-        Row: {
-          pct_returned: number | null
-          still_out: number | null
-          total: number | null
-        }
-        Relationships: []
-      }
-      hp_quarter_summary: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-        }
-        Relationships: []
-      }
       hp_quarter_window: {
         Row: {
           end_ct: string | null
           start_ct: string | null
-        }
-        Relationships: []
-      }
-      hp_return_rate_windows: {
-        Row: {
-          pct_returned: number | null
-          still_out: number | null
-          total: number | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_summary_windows: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_week_by_destination: {
-        Row: {
-          destination: string | null
-          median_min: number | null
-          minutes_out: number | null
-          p90_min: number | null
-          passes: number | null
-        }
-        Relationships: []
-      }
-      hp_week_by_period: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          period: string | null
-        }
-        Relationships: []
-      }
-      hp_week_frequent_flyers: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          studentname: string | null
-        }
-        Relationships: []
-      }
-      hp_week_longest: {
-        Row: {
-          destination: string | null
-          duration: number | null
-          id: string | null
-          period: string | null
-          studentname: string | null
-          timeIn: string | null
-          timeOut: string | null
-        }
-        Relationships: []
-      }
-      hp_week_return_rate: {
-        Row: {
-          pct_returned: number | null
-          still_out: number | null
-          total: number | null
-        }
-        Relationships: []
-      }
-      hp_week_summary: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
         }
         Relationships: []
       }
