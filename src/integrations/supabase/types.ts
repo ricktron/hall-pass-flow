@@ -469,16 +469,6 @@ export type Database = {
           },
         ]
       }
-      hp_by_destination_windows: {
-        Row: {
-          destination: string | null
-          median_min: number | null
-          minutes_out: number | null
-          passes: number | null
-          window: string | null
-        }
-        Relationships: []
-      }
       hp_by_period_windows: {
         Row: {
           minutes_out: number | null
