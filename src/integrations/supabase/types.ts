@@ -422,94 +422,6 @@ export type Database = {
           },
         ]
       }
-      hp_base: {
-        Row: {
-          classroom: string | null
-          dayOfWeek: string | null
-          destination: string | null
-          duration: number | null
-          earlyDismissal: boolean | null
-          id: string | null
-          period: string | null
-          student_name: string | null
-          timein: string | null
-          timeout: string | null
-        }
-        Insert: {
-          classroom?: string | null
-          dayOfWeek?: never
-          destination?: string | null
-          duration?: number | null
-          earlyDismissal?: boolean | null
-          id?: string | null
-          period?: string | null
-          student_name?: string | null
-          timein?: string | null
-          timeout?: string | null
-        }
-        Update: {
-          classroom?: string | null
-          dayOfWeek?: never
-          destination?: string | null
-          duration?: number | null
-          earlyDismissal?: boolean | null
-          id?: string | null
-          period?: string | null
-          student_name?: string | null
-          timein?: string | null
-          timeout?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_bathroom_passes_classroom"
-            columns: ["classroom"]
-            isOneToOne: false
-            referencedRelation: "classrooms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hp_by_destination_windows: {
-        Row: {
-          destination: string | null
-          median_min: number | null
-          minutes_out: number | null
-          passes: number | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_by_period_windows: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          period: string | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_frequent_flyers_windows: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          student_name: string | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_longest_windows: {
-        Row: {
-          destination: string | null
-          duration: number | null
-          id: string | null
-          period: string | null
-          student_name: string | null
-          timein: string | null
-          timeout: string | null
-          window: string | null
-        }
-        Relationships: []
-      }
       hp_month_window: {
         Row: {
           end_ct: string | null
@@ -521,23 +433,6 @@ export type Database = {
         Row: {
           end_ct: string | null
           start_ct: string | null
-        }
-        Relationships: []
-      }
-      hp_return_rate_windows: {
-        Row: {
-          pct_returned: number | null
-          still_out: number | null
-          total: number | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_summary_windows: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          window: string | null
         }
         Relationships: []
       }
@@ -558,103 +453,13 @@ export type Database = {
       }
     }
     Functions: {
-      get_analytics_avg_minutes: {
+      get_full_analytics: {
         Args: { time_frame_arg: string }
-        Returns: {
-          avg_minutes: number
-        }[]
-      }
-      get_analytics_by_destination: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          destination: string
-          median_minutes: number
-          passes: number
-          q1_minutes: number
-          q3_minutes: number
-          total_minutes: number
-        }[]
-      }
-      get_analytics_by_period: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          avg_minutes: number
-          passes: number
-          period: string
-          period_label: string
-          total_minutes: number
-        }[]
-      }
-      get_analytics_frequent_flyers: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          avg_minutes_per_trip: number
-          passes: number
-          student_name: string
-          total_minutes: number
-        }[]
-      }
-      get_analytics_longest_passes: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          destination: string
-          duration_minutes: number
-          period: string
-          student_name: string
-          timein: string
-          timeout: string
-        }[]
-      }
-      get_analytics_return_rate: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          return_rate_pct: number
-          still_out: number
-          total: number
-        }[]
-      }
-      get_analytics_summary: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          passes: number
-          total_minutes: number
-        }[]
-      }
-      get_behavioral_insights: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          avg_duration: number
-          insight_type: string
-          pass_count: number
-        }[]
-      }
-      get_passes_by_day_of_week: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          day_of_week: string
-          pass_count: number
-        }[]
-      }
-      get_schedule_type_analysis: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          instructional_minutes: number
-          passes_per_100_min: number
-          schedule_type: string
-          total_passes: number
-        }[]
+        Returns: Json
       }
       get_teacher_dashboard_data: {
         Args: Record<PropertyKey, never>
         Returns: Json
-      }
-      get_weekly_heatmap_data: {
-        Args: { time_frame_arg: string }
-        Returns: {
-          day_of_week: string
-          pass_count: number
-          period: string
-        }[]
       }
       normalize_name: {
         Args: { txt: string }
