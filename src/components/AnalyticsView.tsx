@@ -323,8 +323,8 @@ const AnalyticsView = () => {
                     <TableRow key={index}>
                       <TableCell className="font-medium">{row.period_label}</TableCell>
                       <TableCell>{row.passes}</TableCell>
-                      <TableCell>{row.total_minutes} min</TableCell>
-                      <TableCell>{row.avg_minutes ? `${row.avg_minutes} min` : 'N/A'}</TableCell>
+                      <TableCell>{row.total_minutes ? `${row.total_minutes.toFixed(1)} min` : 'N/A'}</TableCell>
+                      <TableCell>{row.avg_minutes ? `${row.avg_minutes.toFixed(1)} min` : 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
