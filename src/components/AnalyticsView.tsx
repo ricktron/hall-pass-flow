@@ -368,8 +368,8 @@ const AnalyticsView = () => {
                     >
                       <TableCell className="font-medium">{row.destination}</TableCell>
                       <TableCell>{row.passes}</TableCell>
-                      <TableCell>{row.total_minutes} min</TableCell>
-                      <TableCell>{row.median_minutes} min</TableCell>
+                      <TableCell>{Number(row.total_minutes).toFixed(1)} min</TableCell>
+                      <TableCell>{Number(row.median_minutes).toFixed(1)} min</TableCell>
                       <TableCell>{formatIQR(row.q1_minutes, row.q3_minutes)}</TableCell>
                     </TableRow>
                   ))}
@@ -407,7 +407,7 @@ const AnalyticsView = () => {
                     <TableRow key={index}>
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.passes}</TableCell>
-                      <TableCell>{row.total_minutes} min</TableCell>
+                      <TableCell>{Number(row.total_minutes).toFixed(1)} min</TableCell>
                       <TableCell>{row.avg_minutes_per_trip} min</TableCell>
                     </TableRow>
                   ))}
