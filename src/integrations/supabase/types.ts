@@ -474,7 +474,6 @@ export type Database = {
           destination: string | null
           median_min: number | null
           minutes_out: number | null
-          p90_min: number | null
           passes: number | null
           window: string | null
         }
