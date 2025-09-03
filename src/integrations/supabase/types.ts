@@ -128,6 +128,33 @@ export type Database = {
         }
         Relationships: []
       }
+      Classroom_Arrivals: {
+        Row: {
+          arrival_reason: string | null
+          created_at: string
+          id: string
+          period: string | null
+          student_name: string | null
+          time_in: string | null
+        }
+        Insert: {
+          arrival_reason?: string | null
+          created_at?: string
+          id?: string
+          period?: string | null
+          student_name?: string | null
+          time_in?: string | null
+        }
+        Update: {
+          arrival_reason?: string | null
+          created_at?: string
+          id?: string
+          period?: string | null
+          student_name?: string | null
+          time_in?: string | null
+        }
+        Relationships: []
+      }
       classrooms: {
         Row: {
           id: string
@@ -395,12 +422,59 @@ export type Database = {
           },
         ]
       }
+      hp_base: {
+        Row: {
+          classroom: string | null
+          dayOfWeek: string | null
+          destination: string | null
+          duration: number | null
+          earlyDismissal: boolean | null
+          id: string | null
+          period: string | null
+          student_name: string | null
+          timein: string | null
+          timeout: string | null
+        }
+        Insert: {
+          classroom?: string | null
+          dayOfWeek?: never
+          destination?: string | null
+          duration?: number | null
+          earlyDismissal?: boolean | null
+          id?: string | null
+          period?: string | null
+          student_name?: string | null
+          timein?: string | null
+          timeout?: string | null
+        }
+        Update: {
+          classroom?: string | null
+          dayOfWeek?: never
+          destination?: string | null
+          duration?: number | null
+          earlyDismissal?: boolean | null
+          id?: string | null
+          period?: string | null
+          student_name?: string | null
+          timein?: string | null
+          timeout?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bathroom_passes_classroom"
+            columns: ["classroom"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hp_by_destination_windows: {
         Row: {
-          avg_min: number | null
           destination: string | null
           median_min: number | null
           minutes_out: number | null
+          p90_min: number | null
           passes: number | null
           window: string | null
         }
@@ -454,7 +528,6 @@ export type Database = {
       hp_return_rate_windows: {
         Row: {
           pct_returned: number | null
-          returned: number | null
           still_out: number | null
           total: number | null
           window: string | null
