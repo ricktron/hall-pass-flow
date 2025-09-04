@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import StudentSignIn from "./pages/StudentSignIn";
 import NotFound from "./pages/NotFound";
+import DataProcessor from "./pages/DataProcessor";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/sign-in" element={<StudentSignIn />} />
+          <Route path="/data-processor" element={<DataProcessor />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
