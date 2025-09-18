@@ -13,9 +13,10 @@ interface MultipleStudentsViewProps {
   records: HallPassRecord[];
   onBack: () => void;
   onRefresh: () => void;
+  onSignOutAnother: () => void;
 }
 
-const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsViewProps) => {
+const MultipleStudentsView = ({ records, onBack, onRefresh, onSignOutAnother }: MultipleStudentsViewProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -33,7 +34,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
   };
 
   const handleSignOutAnother = () => {
-    onBack(); // This will return to role selector, where they can choose student mode
+    onSignOutAnother();
   };
 
   const handleStudentReturn = async (studentName: string, period: string) => {
@@ -93,7 +94,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
               >
                 <UserPlus className="w-4 h-4" />
-                Sign Out Another
+                Another Out
               </Button>
             </div>
           </div>
@@ -157,7 +158,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh }: MultipleStudentsVi
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
             >
               <UserPlus className="w-4 h-4" />
-              Sign Out Another
+              Another Out
             </Button>
           </div>
         </div>

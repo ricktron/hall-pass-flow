@@ -82,6 +82,7 @@ const Index = () => {
         records={currentlyOutRecords}
         onBack={handleBackToSelection}
         onRefresh={loadCurrentlyOut}
+        onSignOutAnother={handleBackToSelection}
       />
     );
   }
