@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_terms: {
+        Row: {
+          end_date: string
+          id: number
+          name: string
+          start_date: string
+        }
+        Insert: {
+          end_date: string
+          id?: number
+          name: string
+          start_date: string
+        }
+        Update: {
+          end_date?: string
+          id?: number
+          name?: string
+          start_date?: string
+        }
+        Relationships: []
+      }
       bathroom_passes: {
         Row: {
           classroom: string | null
@@ -85,13 +106,6 @@ export type Database = {
           was_auto_closed?: boolean
         }
         Relationships: [
-          {
-            foreignKeyName: "bathroom_passes_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "fk_bathroom_passes_classroom"
             columns: ["classroom"]
@@ -170,6 +184,24 @@ export type Database = {
         }
         Relationships: []
       }
+      courses: {
+        Row: {
+          course_code: string
+          course_name: string | null
+          id: number
+        }
+        Insert: {
+          course_code: string
+          course_name?: string | null
+          id?: number
+        }
+        Update: {
+          course_code?: string
+          course_name?: string | null
+          id?: number
+        }
+        Relationships: []
+      }
       hall_pass_corrections: {
         Row: {
           corrected_at: string | null
@@ -193,6 +225,68 @@ export type Database = {
           pass_id?: string
         }
         Relationships: []
+      }
+      hall_passes: {
+        Row: {
+          destination_id: number
+          id: number
+          issued_by: string
+          origin_id: number
+          status: Database["public"]["Enums"]["pass_status"]
+          student_id: string
+          time_in: string | null
+          time_out: string
+        }
+        Insert: {
+          destination_id: number
+          id?: number
+          issued_by: string
+          origin_id: number
+          status?: Database["public"]["Enums"]["pass_status"]
+          student_id: string
+          time_in?: string | null
+          time_out?: string
+        }
+        Update: {
+          destination_id?: number
+          id?: number
+          issued_by?: string
+          origin_id?: number
+          status?: Database["public"]["Enums"]["pass_status"]
+          student_id?: string
+          time_in?: string | null
+          time_out?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hall_passes_destination_id_fkey"
+            columns: ["destination_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_passes_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_passes_origin_id_fkey"
+            columns: ["origin_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hall_passes_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       Hall_Passes_deleted_backup: {
         Row: {
@@ -230,6 +324,102 @@ export type Database = {
         }
         Relationships: []
       }
+      locations: {
+        Row: {
+          id: number
+          name: string
+          type: Database["public"]["Enums"]["location_type"] | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: number
+          name: string
+          type?: Database["public"]["Enums"]["location_type"] | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: number
+          name?: string
+          type?: Database["public"]["Enums"]["location_type"] | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "locations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      rosters: {
+        Row: {
+          academic_term_id: number
+          course_id: number
+          id: number
+          period_code: string | null
+          student_id: string
+        }
+        Insert: {
+          academic_term_id: number
+          course_id: number
+          id?: number
+          period_code?: string | null
+          student_id: string
+        }
+        Update: {
+          academic_term_id?: number
+          course_id?: number
+          id?: number
+          period_code?: string | null
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rosters_academic_term_id_fkey"
+            columns: ["academic_term_id"]
+            isOneToOne: false
+            referencedRelation: "academic_terms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rosters_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rosters_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settings: {
+        Row: {
+          description: string | null
+          id: number
+          setting_name: string
+          value: string | null
+        }
+        Insert: {
+          description?: string | null
+          id?: number
+          setting_name: string
+          value?: string | null
+        }
+        Update: {
+          description?: string | null
+          id?: number
+          setting_name?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
       student_name_synonyms: {
         Row: {
           created_at: string
@@ -249,70 +439,58 @@ export type Database = {
           raw_input?: string
           student_id?: string
         }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          grade_level: number | null
+          id: string
+          sis_id: string | null
+        }
+        Insert: {
+          grade_level?: number | null
+          id: string
+          sis_id?: string | null
+        }
+        Update: {
+          grade_level?: number | null
+          id?: string
+          sis_id?: string | null
+        }
         Relationships: [
           {
-            foreignKeyName: "student_name_synonyms_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "students"
+            foreignKeyName: "students_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
       }
-      students: {
+      users: {
         Row: {
-          active: boolean
-          created_at: string
-          email: string | null
-          external_ref: string | null
-          first_name: string | null
-          first_norm: string | null
-          full_name: string | null
-          full_name_norm: string | null
+          email: string
+          first_name: string
           id: string
-          last_name: string | null
-          last_norm: string | null
-          period_code: string | null
-          preferred_name: string | null
-          roster_block: string
-          sis_id: string | null
-          updated_at: string
+          last_name: string
+          nickname: string | null
+          role: Database["public"]["Enums"]["user_role"]
         }
         Insert: {
-          active?: boolean
-          created_at?: string
-          email?: string | null
-          external_ref?: string | null
-          first_name?: string | null
-          first_norm?: string | null
-          full_name?: string | null
-          full_name_norm?: string | null
+          email: string
+          first_name: string
           id?: string
-          last_name?: string | null
-          last_norm?: string | null
-          period_code?: string | null
-          preferred_name?: string | null
-          roster_block?: string
-          sis_id?: string | null
-          updated_at?: string
+          last_name: string
+          nickname?: string | null
+          role: Database["public"]["Enums"]["user_role"]
         }
         Update: {
-          active?: boolean
-          created_at?: string
-          email?: string | null
-          external_ref?: string | null
-          first_name?: string | null
-          first_norm?: string | null
-          full_name?: string | null
-          full_name_norm?: string | null
+          email?: string
+          first_name?: string
           id?: string
-          last_name?: string | null
-          last_norm?: string | null
-          period_code?: string | null
-          preferred_name?: string | null
-          roster_block?: string
-          sis_id?: string | null
-          updated_at?: string
+          last_name?: string
+          nickname?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
         }
         Relationships: []
       }
@@ -353,13 +531,6 @@ export type Database = {
           timeOut?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "bathroom_passes_student_id_fkey"
-            columns: ["studentId"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "fk_bathroom_passes_classroom"
             columns: ["classroom"]
@@ -412,15 +583,7 @@ export type Database = {
           timeOut?: string | null
           typedName?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "bathroom_passes_student_id_fkey"
-            columns: ["studentId"]
-            isOneToOne: false
-            referencedRelation: "students"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       hp_month_window: {
         Row: {
@@ -475,7 +638,18 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      location_type:
+        | "classroom"
+        | "restroom"
+        | "library"
+        | "office"
+        | "other"
+        | "athletics"
+        | "hallway"
+        | "chapel"
+        | "theater"
+      pass_status: "ACTIVE" | "RETURNED" | "LATE"
+      user_role: "student" | "teacher" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -602,6 +776,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      location_type: [
+        "classroom",
+        "restroom",
+        "library",
+        "office",
+        "other",
+        "athletics",
+        "hallway",
+        "chapel",
+        "theater",
+      ],
+      pass_status: ["ACTIVE", "RETURNED", "LATE"],
+      user_role: ["student", "teacher", "admin"],
+    },
   },
 } as const
