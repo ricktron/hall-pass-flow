@@ -58,6 +58,10 @@ const Index = () => {
     setShowPinDialog(false);
   };
 
+  const handleSignOutAnother = () => {
+    setCurrentView('student');
+  };
+
   // Clear teacher authentication on page reload
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -82,7 +86,7 @@ const Index = () => {
         records={currentlyOutRecords}
         onBack={handleBackToSelection}
         onRefresh={loadCurrentlyOut}
-        onSignOutAnother={handleBackToSelection}
+        onSignOutAnother={handleSignOutAnother}
       />
     );
   }
