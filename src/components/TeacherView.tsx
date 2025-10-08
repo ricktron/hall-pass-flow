@@ -268,11 +268,11 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
               />
             )}
 
-            {/* Today's Top Students */}
+            {/* This Week's Top Students */}
             {dashboardData.todayStats.topLeavers.length > 0 && (
               <Card className="shadow-lg">
                 <CardHeader>
-                  <CardTitle>Today's Most Active Students</CardTitle>
+                  <CardTitle>This Week's Most Active Students</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
