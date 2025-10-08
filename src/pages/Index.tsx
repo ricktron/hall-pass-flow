@@ -33,7 +33,11 @@ const Index = () => {
   };
 
   const handleStudentModeClick = () => {
-    setCurrentView('student');
+    if (currentlyOutRecords.length > 0) {
+      setCurrentView('multiple');
+    } else {
+      setCurrentView('student');
+    }
   };
 
   const handleTeacherModeClick = () => {

@@ -30,7 +30,7 @@ interface DashboardData {
     byPeriod: Record<string, number>;
     topLeavers: Array<{
       studentName: string;
-      tripCount: number;
+      totalMinutes: number;
     }>;
     avgDurationMinutes: number;
     longestDurationMinutes: number;
@@ -279,7 +279,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                     {dashboardData.todayStats.topLeavers.map((student, index) => (
                       <div key={student.studentName} className="flex justify-between items-center p-2 rounded bg-gray-50">
                         <span className="font-medium">#{index + 1} {student.studentName}</span>
-                        <span className="text-sm text-gray-600">{student.tripCount} trips</span>
+                        <span className="text-sm text-gray-600">{student.totalMinutes} min</span>
                       </div>
                     ))}
                   </div>
