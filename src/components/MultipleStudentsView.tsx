@@ -33,9 +33,6 @@ const MultipleStudentsView = ({ records, onBack, onRefresh, onSignOutAnother }: 
     onBack(); // Use the provided onBack function
   };
 
-  const handleSignOutAnother = () => {
-    onSignOutAnother();
-  };
 
   const handleStudentReturn = async (studentName: string, period: string) => {
     const success = await updateReturnTime(studentName, period);
@@ -90,7 +87,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh, onSignOutAnother }: 
                 Refresh
               </Button>
               <Button 
-                onClick={handleSignOutAnother}
+                onClick={onSignOutAnother}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
               >
                 <UserPlus className="w-4 h-4" />
@@ -154,7 +151,7 @@ const MultipleStudentsView = ({ records, onBack, onRefresh, onSignOutAnother }: 
               Refresh
             </Button>
             <Button 
-              onClick={handleSignOutAnother}
+              onClick={onSignOutAnother}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
             >
               <UserPlus className="w-4 h-4" />
