@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Clock, Users, TrendingUp, Flame, Calendar } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -165,17 +165,13 @@ const AnalyticsView = () => {
     return `${Math.round(q1)}-${Math.round(q3)} min`;
   };
 
-  // Helper functions for heatmap
-  const getHeatmapIntensity = (passCount: number) => {
-    if (passCount === 0) return "bg-muted/20";
-    if (passCount === 1) return "bg-orange-200 dark:bg-orange-900/50";
-    if (passCount === 2) return "bg-orange-300 dark:bg-orange-800/70";
-    return "bg-orange-400 dark:bg-orange-700";
-  };
-
-  const getHeatmapValue = (day: string, period: string) => {
-    const item = analyticsData?.heatmap?.find(d => d.day_of_week === day && d.period === period);
-    return item ? item.pass_count : 0;
+  // Helper function for heatmap color coding
+  const getHeatmapColor = (count: number | undefined) => {
+    if (!count || count === 0) return '';
+    if (count >= 3) return 'bg-orange-400 text-white';
+    if (count === 2) return 'bg-orange-300';
+    if (count === 1) return 'bg-orange-200';
+    return '';
   };
 
   return (
@@ -544,57 +540,55 @@ const AnalyticsView = () => {
         {/* Weekly Hot Spots Heatmap */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Flame className="h-5 w-5" />
+            <CardTitle className="flex items-center">
+              <Flame className="w-5 h-5 mr-2 text-orange-500" />
               Weekly Hot Spots
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <CardDescription>
               Pass frequency by period and day
-            </p>
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {(analyticsData?.heatmap?.length ?? 0) === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No heatmap data available
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr>
-                      <th className="text-left p-2 text-sm font-medium">Period</th>
-                      <th className="text-center p-2 text-sm font-medium">Mon</th>
-                      <th className="text-center p-2 text-sm font-medium">Tue</th>
-                      <th className="text-center p-2 text-sm font-medium">Wed</th>
-                      <th className="text-center p-2 text-sm font-medium">Thu</th>
-                      <th className="text-center p-2 text-sm font-medium">Fri</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map((period) => (
-                      <tr key={period}>
-                        <td className="p-2 text-sm font-medium">{period}</td>
-                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((day) => {
-                          const value = getHeatmapValue(day, period);
-                          
-                          return (
-                            <td
-                              key={day}
-                              className={cn(
-                                "p-2 text-center text-sm border rounded",
-                                planningPeriods.includes(period) || !weeklyMeetingPattern[period]?.includes(day)
-                                  ? "bg-slate-300 dark:bg-slate-700"
-                                  : getHeatmapIntensity(value)
-                              )}
-                            >
-                              {value || ''}
-                            </td>
-                          );
-                        })}
-                      </tr>
+            {analyticsData?.heatmap && analyticsData.heatmap.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">Period</TableHead>
+                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => (
+                      <TableHead key={day} className="text-center">{day.substring(0, 3)}</TableHead>
                     ))}
-                  </tbody>
-                </table>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(period => (
+                    <TableRow key={period}>
+                      <TableCell className="font-medium">{period}</TableCell>
+                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => {
+                        const cellData = analyticsData.heatmap.find(d => d.period === period && d.day_of_week.trim() === day);
+                        const isPlanning = planningPeriods.includes(period);
+                        const meetsOnDay = weeklyMeetingPattern[period]?.includes(day);
+                        const isGreyedOut = isPlanning || !meetsOnDay;
+                        
+                        return (
+                          <TableCell 
+                            key={day} 
+                            className={cn(
+                              "text-center font-semibold",
+                              isGreyedOut ? 'bg-slate-100 dark:bg-slate-800' : getHeatmapColor(cellData?.pass_count),
+                              "transition-colors duration-300"
+                            )}
+                          >
+                            {!isGreyedOut ? cellData?.pass_count || null : null}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No heatmap data available
               </div>
             )}
           </CardContent>
