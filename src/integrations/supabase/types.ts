@@ -585,6 +585,73 @@ export type Database = {
         }
         Relationships: []
       }
+      hp_base: {
+        Row: {
+          classroom: string | null
+          dayOfWeek: string | null
+          destination: string | null
+          duration: number | null
+          earlyDismissal: boolean | null
+          id: string | null
+          period: string | null
+          student_name: string | null
+          timein: string | null
+          timeout: string | null
+        }
+        Insert: {
+          classroom?: string | null
+          dayOfWeek?: never
+          destination?: string | null
+          duration?: number | null
+          earlyDismissal?: boolean | null
+          id?: string | null
+          period?: string | null
+          student_name?: string | null
+          timein?: string | null
+          timeout?: string | null
+        }
+        Update: {
+          classroom?: string | null
+          dayOfWeek?: never
+          destination?: string | null
+          duration?: number | null
+          earlyDismissal?: boolean | null
+          id?: string | null
+          period?: string | null
+          student_name?: string | null
+          timein?: string | null
+          timeout?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bathroom_passes_classroom"
+            columns: ["classroom"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hp_by_destination_windows: {
+        Row: {
+          destination: string | null
+          median_min: number | null
+          minutes_out: number | null
+          p90_min: number | null
+          passes: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_by_period_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          period: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
       hp_month_window: {
         Row: {
           end_ct: string | null
@@ -596,6 +663,14 @@ export type Database = {
         Row: {
           end_ct: string | null
           start_ct: string | null
+        }
+        Relationships: []
+      }
+      hp_summary_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          window: string | null
         }
         Relationships: []
       }
