@@ -632,26 +632,6 @@ export type Database = {
           },
         ]
       }
-      hp_by_destination_windows: {
-        Row: {
-          destination: string | null
-          median_min: number | null
-          minutes_out: number | null
-          p90_min: number | null
-          passes: number | null
-          window: string | null
-        }
-        Relationships: []
-      }
-      hp_by_period_windows: {
-        Row: {
-          minutes_out: number | null
-          passes: number | null
-          period: string | null
-          window: string | null
-        }
-        Relationships: []
-      }
       hp_month_window: {
         Row: {
           end_ct: string | null
@@ -691,6 +671,21 @@ export type Database = {
       }
     }
     Functions: {
+      get_analytics_by_period: {
+        Args: { time_frame_arg: string }
+        Returns: {
+          passes: number
+          period: string
+          total_minutes: number
+        }[]
+      }
+      get_analytics_summary: {
+        Args: { time_frame_arg: string }
+        Returns: {
+          passes: number
+          total_minutes: number
+        }[]
+      }
       get_full_analytics: {
         Args: { time_frame_arg: string }
         Returns: Json
