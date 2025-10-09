@@ -48,7 +48,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'overview' | 'analytics'>('overview');
-  const [weeklyTopStudents, setWeeklyTopStudents] = useState<Array<{ studentName: string; totalMinutes: number }>>([]);
+  const [weeklyTopStudents, setWeeklyTopStudents] = useState<Array<{ studentName: string; totalMinutes: number; tripCount: number }>>([]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -68,7 +68,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       // Load weekly top students
       const { data: weeklyData, error: weeklyError } = await supabase.rpc('get_weekly_top_students');
       if (!weeklyError && weeklyData) {
-        setWeeklyTopStudents(weeklyData as Array<{ studentName: string; totalMinutes: number }>);
+        setWeeklyTopStudents(weeklyData as Array<{ studentName: string; totalMinutes: number; tripCount: number }>);
       }
       
       setLoading(false);
@@ -287,7 +287,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                     {weeklyTopStudents.map((student, index) => (
                       <div key={student.studentName} className="flex justify-between items-center p-2 rounded bg-gray-50">
                         <span className="font-medium">#{index + 1} {student.studentName}</span>
-                        <span className="text-sm text-gray-600">{student.totalMinutes} min</span>
+                        <span className="text-sm text-gray-600">{student.totalMinutes} min ({student.tripCount} trips)</span>
                       </div>
                     ))}
                   </div>
