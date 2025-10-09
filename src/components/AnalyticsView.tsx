@@ -166,12 +166,10 @@ const AnalyticsView = () => {
   };
 
   // Helper functions for heatmap
-  const getHeatmapIntensity = (passCount: number, maxCount: number) => {
+  const getHeatmapIntensity = (passCount: number) => {
     if (passCount === 0) return "bg-muted/20";
-    const intensity = Math.min(passCount / maxCount, 1);
-    if (intensity <= 0.25) return "bg-orange-100 dark:bg-orange-950/30";
-    if (intensity <= 0.5) return "bg-orange-200 dark:bg-orange-900/50";
-    if (intensity <= 0.75) return "bg-orange-300 dark:bg-orange-800/70";
+    if (passCount === 1) return "bg-orange-200 dark:bg-orange-900/50";
+    if (passCount === 2) return "bg-orange-300 dark:bg-orange-800/70";
     return "bg-orange-400 dark:bg-orange-700";
   };
 
@@ -179,8 +177,6 @@ const AnalyticsView = () => {
     const item = analyticsData?.heatmap?.find(d => d.day_of_week === day && d.period === period);
     return item ? item.pass_count : 0;
   };
-
-  const maxHeatmapValue = Math.max(...(analyticsData?.heatmap?.map(d => d.pass_count) || [0]), 1);
 
   return (
     <div className="space-y-6">
@@ -588,7 +584,7 @@ const AnalyticsView = () => {
                                 "p-2 text-center text-sm border rounded",
                                 planningPeriods.includes(period) || !weeklyMeetingPattern[period]?.includes(day)
                                   ? "bg-slate-300 dark:bg-slate-700"
-                                  : getHeatmapIntensity(value, maxHeatmapValue)
+                                  : getHeatmapIntensity(value)
                               )}
                             >
                               {value || ''}
