@@ -624,6 +624,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_weekly_top_students: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       normalize_name: {
         Args: { txt: string }
         Returns: string

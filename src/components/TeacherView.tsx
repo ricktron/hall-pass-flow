@@ -48,6 +48,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'overview' | 'analytics'>('overview');
+  const [weeklyTopStudents, setWeeklyTopStudents] = useState<Array<{ studentName: string; totalMinutes: number }>>([]);
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -63,6 +64,13 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       }
 
       setDashboardData(data as unknown as DashboardData);
+      
+      // Load weekly top students
+      const { data: weeklyData, error: weeklyError } = await supabase.rpc('get_weekly_top_students');
+      if (!weeklyError && weeklyData) {
+        setWeeklyTopStudents(weeklyData as Array<{ studentName: string; totalMinutes: number }>);
+      }
+      
       setLoading(false);
     } catch (error) {
       setErr('Failed to load dashboard data');
@@ -269,14 +277,14 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
             )}
 
             {/* This Week's Top Students */}
-            {dashboardData.todayStats.topLeavers.length > 0 && (
+            {weeklyTopStudents.length > 0 && (
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle>This Week's Most Active Students</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {dashboardData.todayStats.topLeavers.map((student, index) => (
+                    {weeklyTopStudents.map((student, index) => (
                       <div key={student.studentName} className="flex justify-between items-center p-2 rounded bg-gray-50">
                         <span className="font-medium">#{index + 1} {student.studentName}</span>
                         <span className="text-sm text-gray-600">{student.totalMinutes} min</span>
