@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Clock, Users, TrendingUp, Flame, Calendar } from "lucide-react";
+import { BarChart3, Clock, Users, TrendingUp, Flame, Calendar, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { 
@@ -92,6 +92,11 @@ interface ScheduleAnalysisData {
   passes_per_100_min: number;
 }
 
+interface DisruptionScoreData {
+  student_name: string;
+  disruption_score: number;
+}
+
 // Consolidated analytics data interface
 interface AnalyticsData {
   summary: SummaryData;
@@ -105,6 +110,7 @@ interface AnalyticsData {
   dayOfWeek: DayOfWeekData[];
   heatmap: HeatmapData[];
   scheduleAnalysis: ScheduleAnalysisData[];
+  disruptionScores: DisruptionScoreData[];
 }
 
 const AnalyticsView = () => {
@@ -534,6 +540,47 @@ const AnalyticsView = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Disruption Score Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-yellow-500" />
+            Disruption Score
+          </CardTitle>
+          <CardDescription>
+            Students with the highest classroom disruption impact
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {(analyticsData?.disruptionScores?.length ?? 0) === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No disruption score data available
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Rank</TableHead>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Disruption Score</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {analyticsData?.disruptionScores?.map((row, index) => (
+                  <TableRow key={index}>
+                    <TableCell className="font-medium">{index + 1}</TableCell>
+                    <TableCell>{row.student_name}</TableCell>
+                    <TableCell className="font-bold text-yellow-600 dark:text-yellow-400">
+                      {row.disruption_score}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Advanced Analytics Row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
