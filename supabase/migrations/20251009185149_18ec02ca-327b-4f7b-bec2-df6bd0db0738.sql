@@ -386,11 +386,11 @@ BEGIN
         SELECT
             bp.student_name,
             bp.duration_min,
-            bp.timeout::time AS timeout_time,
+            timezone('America/Chicago', bp.timeout)::time AS timeout_time,
             pz.period,
             CASE
                 -- Check if timeout is in Red Zone (middle 60%)
-                WHEN bp.timeout::time >= pz.red_start AND bp.timeout::time < pz.red_end 
+                WHEN timezone('America/Chicago', bp.timeout)::time >= pz.red_start AND timezone('America/Chicago', bp.timeout)::time < pz.red_end
                 THEN bp.duration_min * 3
                 -- Otherwise it's in Green Zone (first or last 20%)
                 ELSE bp.duration_min * 1
@@ -402,8 +402,8 @@ BEGIN
           AND bp.duration_min IS NOT NULL
           AND bp.student_name IS NOT NULL
           AND COALESCE(bp.was_auto_closed, false) = false
-          AND bp.timeout::time >= pz.period_start 
-          AND bp.timeout::time < pz.period_end
+          AND timezone('America/Chicago', bp.timeout)::time >= pz.period_start
+          AND timezone('America/Chicago', bp.timeout)::time < pz.period_end
     ),
     student_disruption_totals AS (
         -- Sum up scores per student
