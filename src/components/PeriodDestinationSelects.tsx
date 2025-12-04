@@ -1,7 +1,7 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { PERIOD_OPTIONS, DESTINATIONS } from "@/constants/formOptions";
+import { PERIOD_OPTIONS, DESTINATION_OPTIONS } from "@/constants/formOptions";
 
 interface PeriodDestinationSelectsProps {
   selectedPeriod: string;
@@ -43,9 +43,9 @@ const PeriodDestinationSelects = ({
             <SelectValue placeholder="Select destination" />
           </SelectTrigger>
           <SelectContent>
-            {DESTINATIONS.map((destination) => (
-              <SelectItem key={destination} value={destination}>
-                {destination}
+            {DESTINATION_OPTIONS.map((destination) => (
+              <SelectItem key={destination.value} value={destination.value}>
+                {destination.label}
               </SelectItem>
             ))}
           </SelectContent>
