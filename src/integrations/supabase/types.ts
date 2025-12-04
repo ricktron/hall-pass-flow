@@ -202,6 +202,24 @@ export type Database = {
         }
         Relationships: []
       }
+      destinations: {
+        Row: {
+          active: boolean
+          name: string
+          sort: number
+        }
+        Insert: {
+          active?: boolean
+          name: string
+          sort?: number
+        }
+        Update: {
+          active?: boolean
+          name?: string
+          sort?: number
+        }
+        Relationships: []
+      }
       hall_pass_corrections: {
         Row: {
           corrected_at: string | null
@@ -223,6 +241,33 @@ export type Database = {
           corrected_duration?: number
           corrected_reason?: string | null
           pass_id?: string
+        }
+        Relationships: []
+      }
+      hall_pass_destinations: {
+        Row: {
+          active: boolean
+          created_at: string
+          key: string
+          label: string
+          synonyms: string[]
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          key: string
+          label: string
+          synonyms?: string[]
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          key?: string
+          label?: string
+          synonyms?: string[]
+          updated_at?: string
         }
         Relationships: []
       }
@@ -686,30 +731,12 @@ export type Database = {
           total_minutes: number
         }[]
       }
-      get_full_analytics: {
-        Args: { time_frame_arg: string }
-        Returns: Json
-      }
-      get_teacher_dashboard_data: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      get_weekly_top_students: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      normalize_name: {
-        Args: { txt: string }
-        Returns: string
-      }
-      to_local_date_toronto: {
-        Args: { ts: string }
-        Returns: string
-      }
-      verify_teacher_pin: {
-        Args: { pin_to_check: string }
-        Returns: boolean
-      }
+      get_full_analytics: { Args: { time_frame_arg: string }; Returns: Json }
+      get_teacher_dashboard_data: { Args: never; Returns: Json }
+      get_weekly_top_students: { Args: never; Returns: Json }
+      normalize_name: { Args: { txt: string }; Returns: string }
+      to_local_date_toronto: { Args: { ts: string }; Returns: string }
+      verify_teacher_pin: { Args: { pin_to_check: string }; Returns: boolean }
     }
     Enums: {
       location_type:
