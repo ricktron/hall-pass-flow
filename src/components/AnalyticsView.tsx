@@ -83,6 +83,8 @@ interface HeatmapData {
   day_of_week: string;
   period: string;
   pass_count: number;
+  bucket: number;
+  color_hex: string;
 }
 
 interface ScheduleAnalysisData {
@@ -171,13 +173,10 @@ const AnalyticsView = () => {
     return `${Math.round(q1)}-${Math.round(q3)} min`;
   };
 
-  // Helper function for heatmap color coding
-  const getHeatmapColor = (count: number | undefined) => {
-    if (!count || count === 0) return '';
-    if (count >= 3) return 'bg-orange-400 text-white';
-    if (count === 2) return 'bg-orange-300';
-    if (count === 1) return 'bg-orange-200';
-    return '';
+  // Helper function for heatmap text color based on bucket
+  const getHeatmapTextColor = (bucket: number) => {
+    // Buckets 4 and 5 are dark enough to need white text
+    return bucket >= 4 ? 'text-white' : 'text-foreground';
   };
 
   return (
@@ -588,53 +587,70 @@ const AnalyticsView = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <Flame className="w-5 h-5 mr-2 text-orange-500" />
+              <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
               Weekly Hot Spots
             </CardTitle>
             <CardDescription>
-              Pass frequency by period and day
+              Pass frequency by period and day (Periods A–H, Mon–Fri)
             </CardDescription>
           </CardHeader>
           <CardContent>
             {analyticsData?.heatmap && analyticsData.heatmap.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">Period</TableHead>
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => (
-                      <TableHead key={day} className="text-center">{day.substring(0, 3)}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(period => (
-                    <TableRow key={period}>
-                      <TableCell className="font-medium">{period}</TableCell>
-                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map(day => {
-                        const cellData = analyticsData.heatmap.find(d => d.period === period && d.day_of_week.trim() === day);
-                        const isPlanning = planningPeriods.includes(period);
-                        const meetsOnDay = weeklyMeetingPattern[period]?.includes(day);
-                        const isGreyedOut = isPlanning || !meetsOnDay;
-                        
-                        return (
-                          <TableCell 
-                            key={day} 
-                            className={cn(
-                              "text-center font-semibold",
-                              isGreyedOut ? 'bg-slate-100 dark:bg-slate-800' : getHeatmapColor(cellData?.pass_count),
-                              "transition-colors duration-300"
-                            )}
-                          >
-                            {!isGreyedOut ? cellData?.pass_count || null : null}
-                          </TableCell>
-                        );
-                      })}
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">Period</TableHead>
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => (
+                        <TableHead key={day} className="text-center">{day}</TableHead>
+                      ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].map(period => (
+                      <TableRow key={period}>
+                        <TableCell className="font-medium">{period}</TableCell>
+                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => {
+                          const cellData = analyticsData.heatmap.find(
+                            d => d.period === period && d.day_of_week === day
+                          );
+                          const colorHex = cellData?.color_hex || '#f5f8ff';
+                          const bucket = cellData?.bucket ?? 0;
+                          
+                          return (
+                            <TableCell 
+                              key={day} 
+                              className={cn(
+                                "text-center font-semibold transition-colors duration-300",
+                                getHeatmapTextColor(bucket)
+                              )}
+                              style={{ backgroundColor: colorHex }}
+                            >
+                              {cellData?.pass_count ?? 0}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <span>Fewer</span>
+                  <div className="flex gap-1">
+                    {['#f5f8ff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#2563eb'].map((color, i) => (
+                      <div 
+                        key={i} 
+                        className="w-6 h-4 rounded-sm border border-border"
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                  <span>More passes</span>
+                </div>
+              </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-muted-foreground">
                 No heatmap data available
               </div>
             )}
