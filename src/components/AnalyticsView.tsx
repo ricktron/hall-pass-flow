@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Clock, Users, TrendingUp, Flame, Calendar, Zap } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { BarChart3, Clock, Users, TrendingUp, Calendar, Zap, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { 
@@ -121,6 +123,11 @@ const AnalyticsView = () => {
   const [error, setError] = useState<string | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   
+  // Refresh controls
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshNonce, setRefreshNonce] = useState('init');
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  
   // Teaching and Meeting Schedules
   const planningPeriods = ['B', 'E', 'F'];
   const weeklyMeetingPattern: { [key: string]: string[] } = {
@@ -133,7 +140,7 @@ const AnalyticsView = () => {
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -154,11 +161,36 @@ const AnalyticsView = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [timeFrame]);
 
+  // Load data when timeFrame or refreshNonce changes
   useEffect(() => {
     loadData();
-  }, [timeFrame]);
+  }, [timeFrame, refreshNonce, loadData]);
+
+  // Handle auto-refresh interval
+  useEffect(() => {
+    if (autoRefresh) {
+      intervalRef.current = setInterval(() => {
+        setRefreshNonce(Date.now().toString());
+      }, 60000); // 60 seconds
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [autoRefresh]);
+
+  const handleManualRefresh = () => {
+    setRefreshNonce(Date.now().toString());
+  };
 
   const formatDateTime = (isoString: string) => {
     return new Date(isoString).toLocaleString();
@@ -188,18 +220,44 @@ const AnalyticsView = () => {
           <p className="text-muted-foreground">Windowed stats for passes and minutes</p>
         </div>
         
-        <div className="flex rounded-lg bg-muted p-1">
-          {timeFrameOptions.map((option) => (
+        <div className="flex items-center gap-4">
+          {/* Refresh Controls */}
+          <div className="flex items-center gap-3">
             <Button
-              key={option}
-              variant={timeFrame === option ? "default" : "ghost"}
+              variant="outline"
               size="sm"
-              onClick={() => setTimeFrame(option)}
-              className="relative"
+              onClick={handleManualRefresh}
+              disabled={loading}
+              className="gap-2"
             >
-              {option}
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+              Refresh
             </Button>
-          ))}
+            
+            <div className="flex items-center gap-2">
+              <Switch
+                id="auto-refresh"
+                checked={autoRefresh}
+                onCheckedChange={setAutoRefresh}
+              />
+              <Label htmlFor="auto-refresh" className="text-sm">Auto</Label>
+            </div>
+          </div>
+          
+          {/* Time Frame Chips */}
+          <div className="flex rounded-lg bg-muted p-1">
+            {timeFrameOptions.map((option) => (
+              <Button
+                key={option}
+                variant={timeFrame === option ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setTimeFrame(option)}
+                className="relative"
+              >
+                {option}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 
