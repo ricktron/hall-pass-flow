@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, Clock, Users, TrendingUp, Calendar, Zap, RefreshCw } from "lucide-react";
+import { BarChart3, Clock, Users, TrendingUp, Calendar, Zap, RefreshCw, UserCheck, AlertTriangle, Utensils, Flame, Target, Timer, Stethoscope } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { 
@@ -101,6 +101,66 @@ interface DisruptionScoreData {
   disruption_score: number;
 }
 
+// New card interfaces
+interface BuddyLeavesData {
+  student_a: string;
+  student_b: string;
+  period: string;
+  days: number;
+  avg_gap_min: number;
+  last_seen: string;
+}
+
+interface BellEdgeData {
+  period: string;
+  early_5: number;
+  late_10: number;
+  total: number;
+  early_pct: number;
+  late_pct: number;
+}
+
+interface LunchFrictionData {
+  period: string;
+  first_10_min: number;
+  total: number;
+  share_pct: number;
+}
+
+interface StreakData {
+  student_name: string;
+  period: string;
+  max_streak: number;
+}
+
+interface OutlierData {
+  student_name: string;
+  period: string;
+  destination: string;
+  duration_min: number;
+  personal_median: number;
+  z_robust: number;
+  timeout: string;
+  timein: string;
+}
+
+interface LongTripData {
+  student_name: string;
+  long_count: number;
+  total: number;
+  share_pct: number;
+}
+
+interface NurseDetourData {
+  type: string;
+  student_name: string;
+  period: string;
+  date: string;
+  pattern: string;
+  gap_min: number | null;
+  duration_min: number | null;
+}
+
 // Consolidated analytics data interface
 interface AnalyticsData {
   summary: SummaryData;
@@ -115,6 +175,13 @@ interface AnalyticsData {
   heatmap: HeatmapData[];
   scheduleAnalysis: ScheduleAnalysisData[];
   disruptionScores: DisruptionScoreData[];
+  buddyLeaves: BuddyLeavesData[];
+  bellEdge: BellEdgeData[];
+  lunchFriction: LunchFrictionData[];
+  streaks: StreakData[];
+  outliers: OutlierData[];
+  longTrips: LongTripData[];
+  nurseDetour: NurseDetourData[];
 }
 
 const AnalyticsView = () => {
@@ -757,6 +824,345 @@ const AnalyticsView = () => {
                   </div>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* New Analytics Cards Section */}
+      <div className="space-y-6">
+        <h3 className="text-xl font-semibold text-foreground">Advanced Insights</h3>
+        
+        {/* Row 1: Buddy Leaves & Bell-Edge Leavers */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Card 1: Buddy Leaves */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-purple-500" />
+                Buddy Leaves
+              </CardTitle>
+              <CardDescription>
+                Student pairs leaving within 2 min on ≥3 days
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(analyticsData?.buddyLeaves?.length ?? 0) === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No buddy patterns detected
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student A</TableHead>
+                      <TableHead>Student B</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Days</TableHead>
+                      <TableHead>Avg Gap</TableHead>
+                      <TableHead>Last Seen</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.buddyLeaves?.slice(0, 10).map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{row.student_a}</TableCell>
+                        <TableCell>{row.student_b}</TableCell>
+                        <TableCell>{row.period}</TableCell>
+                        <TableCell className="font-bold text-purple-600">{row.days}</TableCell>
+                        <TableCell>{row.avg_gap_min} min</TableCell>
+                        <TableCell className="text-sm">{row.last_seen}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Bell-Edge Leavers */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                Bell-Edge Leavers
+              </CardTitle>
+              <CardDescription>
+                Passes in first 5 min or last 10 min of period
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(analyticsData?.bellEdge?.length ?? 0) === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No bell-edge data (requires period_meta times)
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Period</TableHead>
+                      <TableHead>First 5 min</TableHead>
+                      <TableHead>Last 10 min</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Early %</TableHead>
+                      <TableHead>Late %</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.bellEdge?.map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{row.period}</TableCell>
+                        <TableCell>{row.early_5}</TableCell>
+                        <TableCell>{row.late_10}</TableCell>
+                        <TableCell>{row.total}</TableCell>
+                        <TableCell>{row.early_pct}%</TableCell>
+                        <TableCell className={cn(
+                          "font-bold",
+                          (row.late_pct ?? 0) > 30 && "text-orange-600"
+                        )}>{row.late_pct}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Row 2: Lunch Friction & Streak Detector */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Card 3: Lunch-Transition Friction */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Utensils className="h-5 w-5 text-green-500" />
+                Lunch-Transition Friction
+              </CardTitle>
+              <CardDescription>
+                Passes in first 10 min after lunch
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(analyticsData?.lunchFriction?.length ?? 0) === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No post-lunch data (set is_after_lunch in period_meta)
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Period</TableHead>
+                      <TableHead>First 10 min</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Share %</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.lunchFriction?.map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{row.period}</TableCell>
+                        <TableCell>{row.first_10_min}</TableCell>
+                        <TableCell>{row.total}</TableCell>
+                        <TableCell className={cn(
+                          "font-bold",
+                          (row.share_pct ?? 0) > 40 && "text-green-600"
+                        )}>{row.share_pct}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 4: Streak Detector */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-red-500" />
+                Streak Detector
+              </CardTitle>
+              <CardDescription>
+                Students with 3+ consecutive days leaving same period
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(analyticsData?.streaks?.length ?? 0) === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No streaks detected
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Max Streak</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.streaks?.slice(0, 15).map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{row.student_name}</TableCell>
+                        <TableCell>{row.period}</TableCell>
+                        <TableCell className="font-bold text-red-600">{row.max_streak} days</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Row 3: Personal Outliers & Long Trips */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Card 5: Personal Outlier Index */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5 text-blue-500" />
+                Personal Outliers
+              </CardTitle>
+              <CardDescription>
+                Passes unusually long for each student (z* ≥ 2)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(analyticsData?.outliers?.length ?? 0) === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No personal outliers detected
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Period</TableHead>
+                      <TableHead>Dest</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead>Median</TableHead>
+                      <TableHead>z*</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.outliers?.slice(0, 10).map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{row.student_name}</TableCell>
+                        <TableCell>{row.period}</TableCell>
+                        <TableCell className="text-sm">{row.destination}</TableCell>
+                        <TableCell>{row.duration_min} min</TableCell>
+                        <TableCell className="text-muted-foreground">{row.personal_median} min</TableCell>
+                        <TableCell className={cn(
+                          "font-bold",
+                          row.z_robust >= 3 ? "text-red-600" : "text-blue-600"
+                        )}>{row.z_robust}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 6: Long-Trip Share */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Timer className="h-5 w-5 text-amber-500" />
+                Long-Trip Share
+              </CardTitle>
+              <CardDescription>
+                Students with high % of trips ≥12 min
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(analyticsData?.longTrips?.length ?? 0) === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No long-trip data available
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Student</TableHead>
+                      <TableHead>Long (≥12m)</TableHead>
+                      <TableHead>Total</TableHead>
+                      <TableHead>Share %</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {analyticsData?.longTrips?.slice(0, 15).map((row, index) => (
+                      <TableRow key={index}>
+                        <TableCell className="font-medium">{row.student_name}</TableCell>
+                        <TableCell>{row.long_count}</TableCell>
+                        <TableCell>{row.total}</TableCell>
+                        <TableCell className={cn(
+                          "font-bold",
+                          (row.share_pct ?? 0) > 50 && "text-amber-600"
+                        )}>{row.share_pct}%</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Card 7: Nurse Detour Detector (full width) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Stethoscope className="h-5 w-5 text-pink-500" />
+              Nurse Detour Detector
+            </CardTitle>
+            <CardDescription>
+              Nurse↔Bathroom pairs within 10 min, or unusually long nurse visits (≥ personal P90)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(analyticsData?.nurseDetour?.length ?? 0) === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No nurse detours detected
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Pattern</TableHead>
+                    <TableHead>Gap / Duration</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {analyticsData?.nurseDetour?.slice(0, 20).map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <span className={cn(
+                          "px-2 py-1 rounded text-xs font-medium",
+                          row.type === 'NURSE↔BATH' 
+                            ? "bg-pink-100 text-pink-700 dark:bg-pink-900 dark:text-pink-300"
+                            : "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300"
+                        )}>
+                          {row.type}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">{row.student_name}</TableCell>
+                      <TableCell>{row.period}</TableCell>
+                      <TableCell className="text-sm">{row.date}</TableCell>
+                      <TableCell>{row.pattern}</TableCell>
+                      <TableCell>
+                        {row.gap_min !== null ? `${row.gap_min} min gap` : ''}
+                        {row.duration_min !== null ? `${row.duration_min} min` : ''}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>

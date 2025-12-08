@@ -398,6 +398,30 @@ export type Database = {
           },
         ]
       }
+      period_meta: {
+        Row: {
+          end_local: string | null
+          is_after_lunch: boolean | null
+          is_last_period: boolean | null
+          period: string
+          start_local: string | null
+        }
+        Insert: {
+          end_local?: string | null
+          is_after_lunch?: boolean | null
+          is_last_period?: boolean | null
+          period: string
+          start_local?: string | null
+        }
+        Update: {
+          end_local?: string | null
+          is_after_lunch?: boolean | null
+          is_last_period?: boolean | null
+          period?: string
+          start_local?: string | null
+        }
+        Relationships: []
+      }
       rosters: {
         Row: {
           academic_term_id: number
