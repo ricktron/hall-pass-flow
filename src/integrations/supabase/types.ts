@@ -701,6 +701,81 @@ export type Database = {
           },
         ]
       }
+      hp_behavior_hourly_windows: {
+        Row: {
+          hour_24: number | null
+          passes: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_by_destination_windows: {
+        Row: {
+          destination: string | null
+          median_min: number | null
+          minutes_out: number | null
+          p90_min: number | null
+          passes: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_by_period_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          period: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_dayofweek_windows: {
+        Row: {
+          dow_short: string | null
+          passes: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_disruption_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          student_name: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_frequent_flyers_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          student_name: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_heatmap_windows: {
+        Row: {
+          day: string | null
+          passes: number | null
+          period: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_longest_windows: {
+        Row: {
+          destination: string | null
+          duration: number | null
+          period: string | null
+          student_name: string | null
+          timein: string | null
+          timeout: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
       hp_month_window: {
         Row: {
           end_ct: string | null
@@ -708,10 +783,30 @@ export type Database = {
         }
         Relationships: []
       }
+      hp_nurse_bathroom_pairs: {
+        Row: {
+          curr_time: string | null
+          first_dest: string | null
+          minutes_between: number | null
+          prev_time: string | null
+          second_dest: string | null
+          student_name: string | null
+        }
+        Relationships: []
+      }
       hp_quarter_window: {
         Row: {
           end_ct: string | null
           start_ct: string | null
+        }
+        Relationships: []
+      }
+      hp_return_rate_windows: {
+        Row: {
+          pct_returned: number | null
+          still_out: number | null
+          total: number | null
+          window: string | null
         }
         Relationships: []
       }
