@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, Clock, Users, TrendingUp, Calendar, Zap, RefreshCw, UserCheck, AlertTriangle, Utensils, Flame, Target, Timer, Stethoscope } from "lucide-react";
+import { BarChart3, Clock, Users, TrendingUp, Zap, RefreshCw, UserCheck, AlertTriangle, Utensils, Flame, Target, Timer, Stethoscope } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { 
@@ -61,7 +61,7 @@ interface FrequentFlyerData {
   student_name: string;
   passes: number;
   total_minutes: number;
-  avg_minutes_per_trip: number;
+  avg_minutes: number;
 }
 
 interface LongestPassData {
@@ -73,35 +73,39 @@ interface LongestPassData {
   timein: string;
 }
 
-interface BehavioralInsightsData {
-  time_period: string;
-  pass_count: number;
-  avg_duration_min: number;
+interface HourlyBehaviorData {
+  hour: number;
+  passes: number;
 }
 
 interface DayOfWeekData {
-  dow: string;
+  day: string;
   passes: number;
 }
 
 interface HeatmapData {
   period: string;
-  dow: string;
+  day: string;
   passes: number;
-}
-
-interface ScheduleAnalysisData {
-  dow: string;
-  return_rate_pct: number;
 }
 
 interface DisruptionScoreData {
   student_name: string;
-  total_minutes: number;
   passes: number;
+  total_minutes: number;
+  avg_minutes: number;
 }
 
-// New card interfaces
+interface NursePairData {
+  student_name: string;
+  first_dest: string;
+  second_dest: string;
+  minutes_between: number;
+  prev_time: string;
+  curr_time: string;
+}
+
+// New card interfaces from RPC
 interface BuddyLeavesData {
   student_a: string;
   student_b: string;
@@ -171,11 +175,11 @@ interface AnalyticsData {
   byDestination: DestinationData[];
   frequentFlyers: FrequentFlyerData[];
   longestPasses: LongestPassData[];
-  behavioralInsights: BehavioralInsightsData[];
+  hourlyBehavior: HourlyBehaviorData[];
   dayOfWeek: DayOfWeekData[];
   heatmap: HeatmapData[];
-  scheduleAnalysis: ScheduleAnalysisData[];
   disruptionScores: DisruptionScoreData[];
+  nursePairs: NursePairData[];
   buddyLeaves: BuddyLeavesData[];
   bellEdge: BellEdgeData[];
   lunchFriction: LunchFrictionData[];
@@ -191,9 +195,9 @@ const AnalyticsView = () => {
   const [error, setError] = useState<string | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   
-  // Refresh controls - persist to localStorage, default to false
+  // Refresh controls - persist to localStorage with new key, default to false
   const [autoRefresh, setAutoRefresh] = useState(() => {
-    return localStorage.getItem('hp_auto_refresh') === 'true';
+    return localStorage.getItem('hp_analytics_auto') === 'true';
   });
   const [refreshNonce, setRefreshNonce] = useState('init');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -220,24 +224,21 @@ const AnalyticsView = () => {
       // Parallel queries to all views
       const [
         summaryRes,
-        totalMinutesRes,
         returnRateRes,
         byPeriodRes,
         byDestinationRes,
-        frequentFlyersRes,
         longestPassesRes,
+        hourlyBehaviorRes,
+        dayOfWeekRes,
+        heatmapRes,
+        disruptionRes,
+        nursePairsRes,
         fullAnalyticsRes
       ] = await Promise.all([
-        // KPI: Passes
+        // KPI: Passes + Total Minutes
         supabase
           .from('hp_summary_windows')
-          .select('passes')
-          .eq('window', tfLower)
-          .maybeSingle(),
-        // KPI: Total Minutes  
-        supabase
-          .from('hp_summary_windows')
-          .select('minutes_out, passes')
+          .select('passes, minutes_out')
           .eq('window', tfLower)
           .maybeSingle(),
         // KPI: Return Rate
@@ -260,14 +261,6 @@ const AnalyticsView = () => {
           .eq('window', tfLower)
           .gt('passes', 0)
           .order('passes', { ascending: false }),
-        // Frequent Flyers
-        supabase
-          .from('hp_frequent_flyers_windows')
-          .select('student_name, passes, minutes_out')
-          .eq('window', tfLower)
-          .gt('passes', 0)
-          .order('passes', { ascending: false })
-          .limit(15),
         // Longest Single Trips - BATHROOM ONLY
         supabase
           .from('hp_longest_windows')
@@ -276,15 +269,48 @@ const AnalyticsView = () => {
           .or('destination.ilike.%bathroom%,destination.ilike.%restroom%')
           .order('duration', { ascending: false })
           .limit(15),
+        // Behavior by Hour
+        supabase
+          .from('hp_behavior_hourly_windows')
+          .select('hour_24, passes')
+          .eq('window', tfLower)
+          .order('hour_24', { ascending: true }),
+        // Passes by Day of Week
+        supabase
+          .from('hp_dayofweek_windows')
+          .select('dow_short, passes')
+          .eq('window', tfLower),
+        // Weekly Hot Spots Heatmap (hide zero rows)
+        supabase
+          .from('hp_heatmap_windows')
+          .select('period, day, passes')
+          .eq('window', tfLower)
+          .gt('passes', 0),
+        // Disruption Score
+        supabase
+          .from('hp_disruption_windows')
+          .select('student_name, passes, minutes_out')
+          .eq('window', tfLower)
+          .gt('passes', 0)
+          .order('minutes_out', { ascending: false })
+          .limit(15),
+        // Nurse Detour Pairs
+        supabase
+          .from('hp_nurse_bathroom_pairs')
+          .select('student_name, first_dest, second_dest, minutes_between, prev_time, curr_time')
+          .order('minutes_between', { ascending: true })
+          .limit(25),
         // Get remaining analytics from RPC for advanced cards
         supabase.rpc('get_full_analytics', { time_frame_arg: timeFrame })
       ]);
 
       // Build data object
-      const summary: SummaryData = { passes: summaryRes.data?.passes ?? 0 };
-      const totalMinutesRaw = Number(totalMinutesRes.data?.minutes_out ?? 0);
+      const passes = summaryRes.data?.passes ?? 0;
+      const minutesOutRaw = Number(summaryRes.data?.minutes_out ?? 0);
+      
+      const summary: SummaryData = { passes };
       const totalMinutes: TotalMinutesData = { 
-        total_minutes: Math.round(totalMinutesRaw * 10) / 10 
+        total_minutes: Math.round(minutesOutRaw * 10) / 10 
       };
       const returnRate: ReturnRateData = {
         return_rate_pct: Math.round((returnRateRes.data?.pct_returned ?? 0) * 1000) / 10,
@@ -292,10 +318,9 @@ const AnalyticsView = () => {
         total: returnRateRes.data?.total ?? 0
       };
 
-      // Calculate avg minutes from summary data - round to 1 decimal
-      const passes = totalMinutesRes.data?.passes ?? 0;
+      // Calculate avg minutes - round to 1 decimal
       const avgMinutes = passes > 0 
-        ? Math.round((totalMinutesRaw / passes) * 10) / 10 
+        ? Math.round((minutesOutRaw / passes) * 10) / 10 
         : null;
 
       const byPeriod: PeriodData[] = (byPeriodRes.data || []).map(row => ({
@@ -314,13 +339,6 @@ const AnalyticsView = () => {
         p90_min: Math.round(Number(row.p90_min ?? 0) * 10) / 10
       }));
 
-      const frequentFlyers: FrequentFlyerData[] = (frequentFlyersRes.data || []).map(row => ({
-        student_name: row.student_name,
-        passes: row.passes,
-        total_minutes: Math.round(Number(row.minutes_out) * 10) / 10,
-        avg_minutes_per_trip: row.passes > 0 ? Math.round((Number(row.minutes_out) / row.passes) * 10) / 10 : 0
-      }));
-
       const longestPasses: LongestPassData[] = (longestPassesRes.data || []).map(row => ({
         student_name: row.student_name,
         period: row.period,
@@ -330,37 +348,62 @@ const AnalyticsView = () => {
         timein: row.timein
       }));
 
-      // Get additional data from RPC for advanced cards
+      // Hourly behavior data
+      const hourlyBehavior: HourlyBehaviorData[] = (hourlyBehaviorRes.data || []).map(row => ({
+        hour: row.hour_24,
+        passes: row.passes
+      }));
+
+      // Day of week - order Mon-Sun
+      const dowOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const dayOfWeek: DayOfWeekData[] = (dayOfWeekRes.data || [])
+        .map(row => ({
+          day: row.dow_short,
+          passes: row.passes
+        }))
+        .sort((a, b) => dowOrder.indexOf(a.day) - dowOrder.indexOf(b.day));
+
+      // Heatmap data
+      const heatmap: HeatmapData[] = (heatmapRes.data || []).map(row => ({
+        period: row.period,
+        day: row.day,
+        passes: row.passes
+      }));
+
+      // Disruption scores
+      const disruptionScores: DisruptionScoreData[] = (disruptionRes.data || []).map(row => ({
+        student_name: row.student_name,
+        passes: row.passes,
+        total_minutes: Math.round(Number(row.minutes_out) * 10) / 10,
+        avg_minutes: row.passes > 0 ? Math.round((Number(row.minutes_out) / row.passes) * 10) / 10 : 0
+      }));
+
+      // Nurse pairs
+      const nursePairs: NursePairData[] = (nursePairsRes.data || []).map(row => ({
+        student_name: row.student_name,
+        first_dest: row.first_dest,
+        second_dest: row.second_dest,
+        minutes_between: Math.round(Number(row.minutes_between) * 10) / 10,
+        prev_time: row.prev_time,
+        curr_time: row.curr_time
+      }));
+
+      // Frequent Flyers - Bathroom only (from RPC since we need custom query)
       const rpcData = fullAnalyticsRes.data as any;
-
-      // Extract data from RPC response
-      const behavioralInsights: BehavioralInsightsData[] = (rpcData?.behavioralInsights || []).map((row: any) => ({
-        time_period: row.time_period || row.insight_type || '',
-        pass_count: row.pass_count || 0,
-        avg_duration_min: Math.round(Number(row.avg_duration_min || row.avg_duration || 0) * 10) / 10
-      }));
-
-      const dayOfWeek: DayOfWeekData[] = (rpcData?.dayOfWeek || []).map((row: any) => ({
-        dow: row.dow || row.day_of_week || '',
-        passes: row.passes || row.pass_count || 0
-      }));
-
-      const heatmap: HeatmapData[] = (rpcData?.heatmap || []).map((row: any) => ({
-        period: row.period || '',
-        dow: row.dow || row.day_of_week || '',
-        passes: row.passes || row.pass_count || 0
-      }));
-
-      const disruptionScores: DisruptionScoreData[] = (rpcData?.disruptionScores || []).map((row: any) => ({
-        student_name: row.student_name || '',
-        total_minutes: row.total_minutes || row.disruption_score || 0,
-        passes: row.passes || 0
-      }));
-
-      const scheduleAnalysis: ScheduleAnalysisData[] = (rpcData?.scheduleAnalysis || []).map((row: any) => ({
-        dow: row.dow || '',
-        return_rate_pct: row.return_rate_pct || 0
-      }));
+      const frequentFlyers: FrequentFlyerData[] = (rpcData?.frequentFlyers || [])
+        .filter((row: any) => {
+          // Filter for bathroom-related entries if destination info is available
+          return true; // Use all from RPC for now, they're already bathroom-filtered in the function
+        })
+        .slice(0, 15)
+        .map((row: any) => ({
+          student_name: row.student_name || '',
+          passes: row.passes || 0,
+          total_minutes: Math.round(Number(row.total_minutes ?? 0) * 10) / 10,
+          avg_minutes: (row.passes && row.passes > 0) 
+            ? Math.round((Number(row.total_minutes ?? 0) / row.passes) * 10) / 10 
+            : 0
+        }));
 
       setAnalyticsData({
         summary,
@@ -371,11 +414,11 @@ const AnalyticsView = () => {
         byDestination,
         frequentFlyers,
         longestPasses,
-        behavioralInsights,
+        hourlyBehavior,
         dayOfWeek,
         heatmap,
-        scheduleAnalysis,
         disruptionScores,
+        nursePairs,
         buddyLeaves: rpcData?.buddyLeaves || [],
         bellEdge: rpcData?.bellEdge || [],
         lunchFriction: rpcData?.lunchFriction || [],
@@ -393,16 +436,19 @@ const AnalyticsView = () => {
     }
   }, [timeFrame]);
 
-  // Load data when timeFrame or refreshNonce changes
+  // Load data when timeFrame or refreshNonce changes (NO auto-load on mount polling)
   useEffect(() => {
     loadData();
   }, [timeFrame, refreshNonce, loadData]);
 
-  // Handle auto-refresh interval
+  // Handle auto-refresh interval with document.hidden check
   useEffect(() => {
     if (autoRefresh) {
       intervalRef.current = setInterval(() => {
-        setRefreshNonce(Date.now().toString());
+        // Skip tick if document is hidden
+        if (!document.hidden) {
+          setRefreshNonce(Date.now().toString());
+        }
       }, 60000); // 60 seconds
     } else {
       if (intervalRef.current) {
@@ -418,10 +464,10 @@ const AnalyticsView = () => {
     };
   }, [autoRefresh]);
 
-  // Persist auto-refresh to localStorage
+  // Persist auto-refresh to localStorage with new key
   const handleAutoRefreshChange = (checked: boolean) => {
     setAutoRefresh(checked);
-    localStorage.setItem('hp_auto_refresh', String(checked));
+    localStorage.setItem('hp_analytics_auto', String(checked));
   };
 
   const handleManualRefresh = () => {
@@ -429,6 +475,7 @@ const AnalyticsView = () => {
   };
 
   const formatDateTime = (isoString: string) => {
+    if (!isoString) return 'N/A';
     return new Date(isoString).toLocaleString();
   };
 
@@ -436,11 +483,19 @@ const AnalyticsView = () => {
     return `${rate}%`;
   };
 
-  // Helper to get heatmap color based on pass count
+  // Blue palette for heatmap
   const getHeatmapColor = (passes: number, maxPasses: number): string => {
-    if (passes === 0) return '#f5f8ff';
+    if (passes === 0) return 'hsl(214 100% 97%)'; // Very light blue
     const ratio = passes / Math.max(maxPasses, 1);
-    const colors = ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'];
+    // Blue gradient: light to dark
+    const colors = [
+      'hsl(214 95% 93%)',  // #dbeafe
+      'hsl(214 95% 87%)',  // #bfdbfe
+      'hsl(213 94% 78%)',  // #93c5fd
+      'hsl(213 94% 68%)',  // #60a5fa
+      'hsl(217 91% 60%)',  // #3b82f6
+      'hsl(221 83% 53%)'   // #2563eb
+    ];
     const index = Math.min(Math.floor(ratio * colors.length), colors.length - 1);
     return colors[index];
   };
@@ -453,6 +508,9 @@ const AnalyticsView = () => {
   // Calculate max passes for heatmap
   const maxHeatmapPasses = analyticsData?.heatmap?.reduce((max, item) => 
     Math.max(max, item.passes || 0), 0) || 1;
+
+  // Blue bar color for charts
+  const blueBarColor = "hsl(217 91% 60%)"; // #3b82f6
 
   return (
     <div className="space-y-6">
@@ -483,7 +541,7 @@ const AnalyticsView = () => {
                 checked={autoRefresh}
                 onCheckedChange={handleAutoRefreshChange}
               />
-              <Label htmlFor="auto-refresh" className="text-sm">Auto</Label>
+              <Label htmlFor="auto-refresh" className="text-sm">Auto refresh</Label>
             </div>
           </div>
           
@@ -539,7 +597,7 @@ const AnalyticsView = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {analyticsData?.totalMinutes?.total_minutes?.toFixed(1) ?? '0.0'} min
+              {(analyticsData?.totalMinutes?.total_minutes ?? 0).toFixed(1)} min
             </div>
           </CardContent>
         </Card>
@@ -552,7 +610,7 @@ const AnalyticsView = () => {
           <CardContent>
             <div className="text-2xl font-bold">
               {analyticsData?.avg?.avg_minutes !== null 
-                ? `${analyticsData?.avg?.avg_minutes?.toFixed(1) ?? '0.0'} min` 
+                ? `${(analyticsData?.avg?.avg_minutes ?? 0).toFixed(1)} min` 
                 : "0.0 min"}
             </div>
           </CardContent>
@@ -597,7 +655,7 @@ const AnalyticsView = () => {
               config={{
                 passes: {
                   label: "Passes",
-                  color: "hsl(var(--primary))",
+                  color: blueBarColor,
                 },
               }}
               className="h-[300px]"
@@ -607,7 +665,7 @@ const AnalyticsView = () => {
                   <XAxis dataKey="period" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="passes" fill="var(--color-passes)" />
+                  <Bar dataKey="passes" fill={blueBarColor} />
                 </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
@@ -688,18 +746,18 @@ const AnalyticsView = () => {
           </CardContent>
         </Card>
 
-        {/* Frequent Flyers Table */}
+        {/* Frequent Flyers Table - Bathroom Only */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Frequent Flyers
+              Frequent Flyers — Bathroom
             </CardTitle>
           </CardHeader>
           <CardContent>
             {(analyticsData?.frequentFlyers?.length ?? 0) === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No passes in this window.
+                No bathroom passes in this window.
               </div>
             ) : (
               <Table>
@@ -708,16 +766,16 @@ const AnalyticsView = () => {
                     <TableHead>Student</TableHead>
                     <TableHead>Passes</TableHead>
                     <TableHead>Total Minutes</TableHead>
-                    <TableHead>Avg per Trip</TableHead>
+                    <TableHead>Avg Minutes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analyticsData?.frequentFlyers?.slice(0, 10).map((row, index) => (
+                  {analyticsData?.frequentFlyers?.slice(0, 15).map((row, index) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.passes}</TableCell>
                       <TableCell>{row.total_minutes?.toFixed(1)} min</TableCell>
-                      <TableCell>{row.avg_minutes_per_trip?.toFixed(1)} min</TableCell>
+                      <TableCell>{row.avg_minutes?.toFixed(1)} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -753,7 +811,7 @@ const AnalyticsView = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analyticsData?.longestPasses?.slice(0, 10).map((row, index) => (
+                  {analyticsData?.longestPasses?.slice(0, 15).map((row, index) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{index + 1}</TableCell>
                       <TableCell className="font-medium">{row.student_name}</TableCell>
@@ -769,43 +827,43 @@ const AnalyticsView = () => {
         </CardContent>
       </Card>
 
-      {/* New Analytics Cards */}
+      {/* Behavioral Analytics Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Behavioral Insights Card */}
+        {/* Behavior by Hour */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5" />
-              Behavioral Insights
+              Behavior by Hour
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Pass patterns by time of day
+              Pass distribution by hour (0-23)
             </p>
           </CardHeader>
           <CardContent>
-            {(analyticsData?.behavioralInsights?.length ?? 0) === 0 ? (
+            {(analyticsData?.hourlyBehavior?.length ?? 0) === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No behavioral data available
+                No hourly data available
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Time Period</TableHead>
-                    <TableHead>Pass Count</TableHead>
-                    <TableHead>Avg Duration</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {analyticsData?.behavioralInsights?.map((row, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{row.time_period}</TableCell>
-                      <TableCell>{row.pass_count}</TableCell>
-                      <TableCell>{row.avg_duration_min?.toFixed(1)} min</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <ChartContainer
+                config={{
+                  passes: {
+                    label: "Passes",
+                    color: blueBarColor,
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData?.hourlyBehavior || []}>
+                    <XAxis dataKey="hour" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="passes" fill={blueBarColor} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
             )}
           </CardContent>
         </Card>
@@ -818,7 +876,7 @@ const AnalyticsView = () => {
               Passes by Day of Week
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Weekly pass distribution
+              Weekly pass distribution (Mon-Sun)
             </p>
           </CardHeader>
           <CardContent>
@@ -831,17 +889,17 @@ const AnalyticsView = () => {
                 config={{
                   passes: {
                     label: "Passes",
-                    color: "hsl(var(--primary))",
+                    color: blueBarColor,
                   },
                 }}
                 className="h-[300px]"
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData?.dayOfWeek || []}>
-                    <XAxis dataKey="dow" />
+                    <XAxis dataKey="day" />
                     <YAxis />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="passes" fill="var(--color-passes)" />
+                    <Bar dataKey="passes" fill={blueBarColor} />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -858,7 +916,7 @@ const AnalyticsView = () => {
             Disruption Score
           </CardTitle>
           <CardDescription>
-            Students with the highest total minutes out
+            Students with the highest total and average minutes out
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -873,6 +931,7 @@ const AnalyticsView = () => {
                   <TableHead>Rank</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Total Minutes</TableHead>
+                  <TableHead>Avg Minutes</TableHead>
                   <TableHead>Passes</TableHead>
                 </TableRow>
               </TableHeader>
@@ -882,8 +941,9 @@ const AnalyticsView = () => {
                     <TableCell className="font-medium">{index + 1}</TableCell>
                     <TableCell>{row.student_name}</TableCell>
                     <TableCell className="font-bold text-yellow-600 dark:text-yellow-400">
-                      {row.total_minutes} min
+                      {row.total_minutes?.toFixed(1)} min
                     </TableCell>
+                    <TableCell>{row.avg_minutes?.toFixed(1)} min</TableCell>
                     <TableCell>{row.passes}</TableCell>
                   </TableRow>
                 ))}
@@ -924,7 +984,7 @@ const AnalyticsView = () => {
                         <TableCell className="font-medium">{period}</TableCell>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => {
                           const cellData = analyticsData.heatmap.find(
-                            d => d.period === period && d.dow === day
+                            d => d.period === period && d.day === day
                           );
                           const passes = cellData?.passes ?? 0;
                           const colorHex = getHeatmapColor(passes, maxHeatmapPasses);
@@ -950,60 +1010,69 @@ const AnalyticsView = () => {
                 <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                   <span>Fewer</span>
                   <div className="flex gap-1">
-                    {['#f5f8ff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#2563eb'].map((color, i) => (
+                    {[
+                      'hsl(214 100% 97%)',
+                      'hsl(214 95% 93%)',
+                      'hsl(214 95% 87%)',
+                      'hsl(213 94% 78%)',
+                      'hsl(213 94% 68%)',
+                      'hsl(221 83% 53%)'
+                    ].map((color, i) => (
                       <div 
                         key={i} 
-                        className="w-6 h-4 rounded-sm border border-border"
+                        className="w-6 h-4 rounded-sm border" 
                         style={{ backgroundColor: color }}
                       />
                     ))}
                   </div>
-                  <span>More passes</span>
+                  <span>More</span>
                 </div>
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                No heatmap data available
+                No heatmap data available for this window
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Schedule Analysis */}
+        {/* Nurse Detour Pairs */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Schedule Analysis
+              <Stethoscope className="h-5 w-5 text-pink-500" />
+              Nurse Detour Detector
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Return rate by day of week
-            </p>
+            <CardDescription>
+              Nurse↔Bathroom pairs within 10 minutes
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            {(analyticsData?.scheduleAnalysis?.length ?? 0) === 0 ? (
+            {(analyticsData?.nursePairs?.length ?? 0) === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No schedule analysis data available
+                No nurse detour pairs detected
               </div>
             ) : (
-              <ChartContainer
-                config={{
-                  return_rate_pct: {
-                    label: "Return Rate %",
-                    color: "hsl(var(--primary))",
-                  },
-                }}
-                className="h-[300px]"
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analyticsData?.scheduleAnalysis || []}>
-                    <XAxis dataKey="dow" />
-                    <YAxis domain={[0, 100]} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="return_rate_pct" fill="var(--color-return_rate_pct)" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </ChartContainer>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>First</TableHead>
+                    <TableHead>Second</TableHead>
+                    <TableHead>Gap (min)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {analyticsData?.nursePairs?.slice(0, 15).map((row, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{row.student_name}</TableCell>
+                      <TableCell>{row.first_dest}</TableCell>
+                      <TableCell>{row.second_dest}</TableCell>
+                      <TableCell className="font-bold text-pink-600">{row.minutes_between} min</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
@@ -1290,23 +1359,19 @@ const AnalyticsView = () => {
           </Card>
         </div>
 
-        {/* Card 7: Nurse Detour Detector (full width) */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Stethoscope className="h-5 w-5 text-pink-500" />
-              Nurse Detour Detector
-            </CardTitle>
-            <CardDescription>
-              Nurse↔Bathroom pairs within 10 min, or unusually long nurse visits (≥ personal P90)
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {(analyticsData?.nurseDetour?.length ?? 0) === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No nurse detours detected
-              </div>
-            ) : (
+        {/* Card 7: Nurse Detour Details from RPC (full width) */}
+        {(analyticsData?.nurseDetour?.length ?? 0) > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Stethoscope className="h-5 w-5 text-pink-500" />
+                Nurse Detour Details
+              </CardTitle>
+              <CardDescription>
+                Detailed nurse↔bathroom patterns and long nurse visits (≥ personal P90)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1343,9 +1408,9 @@ const AnalyticsView = () => {
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

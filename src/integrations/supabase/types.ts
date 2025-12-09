@@ -701,6 +701,14 @@ export type Database = {
           },
         ]
       }
+      hp_behavior_hourly_windows: {
+        Row: {
+          hour_24: number | null
+          passes: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
       hp_by_destination_windows: {
         Row: {
           destination: string | null
@@ -721,11 +729,37 @@ export type Database = {
         }
         Relationships: []
       }
+      hp_dayofweek_windows: {
+        Row: {
+          dow_short: string | null
+          passes: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_disruption_windows: {
+        Row: {
+          minutes_out: number | null
+          passes: number | null
+          student_name: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
       hp_frequent_flyers_windows: {
         Row: {
           minutes_out: number | null
           passes: number | null
           student_name: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_heatmap_windows: {
+        Row: {
+          day: string | null
+          passes: number | null
+          period: string | null
           window: string | null
         }
         Relationships: []
@@ -746,6 +780,17 @@ export type Database = {
         Row: {
           end_ct: string | null
           start_ct: string | null
+        }
+        Relationships: []
+      }
+      hp_nurse_bathroom_pairs: {
+        Row: {
+          curr_time: string | null
+          first_dest: string | null
+          minutes_between: number | null
+          prev_time: string | null
+          second_dest: string | null
+          student_name: string | null
         }
         Relationships: []
       }
