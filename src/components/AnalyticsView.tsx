@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, Clock, Users, TrendingUp, RefreshCw, Zap, Stethoscope, Timer } from "lucide-react";
+import { BarChart3, Clock, Users, TrendingUp, RefreshCw, Stethoscope } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
