@@ -25,7 +25,6 @@ type TimeFrame = "Day" | "Week" | "Month" | "Quarter" | "All";
 
 interface SummaryData {
   passes: number;
-  total_minutes: number;
 }
 
 interface ReturnRateData {
@@ -34,12 +33,16 @@ interface ReturnRateData {
   total: number;
 }
 
+interface TotalMinutesData {
+  total_minutes: number;
+}
+
 interface AvgData {
   avg_minutes: number | null;
 }
 
 interface PeriodData {
-  period_label: string;
+  period: string;
   passes: number;
   total_minutes: number;
   avg_minutes: number | null;
@@ -49,9 +52,9 @@ interface DestinationData {
   destination: string;
   passes: number;
   total_minutes: number;
-  median_minutes: number;
-  q1_minutes: number;
-  q3_minutes: number;
+  avg_minutes: number | null;
+  median_min: number;
+  p90_min: number;
 }
 
 interface FrequentFlyerData {
@@ -65,7 +68,7 @@ interface LongestPassData {
   student_name: string;
   period: string;
   destination: string;
-  duration_minutes: number;
+  minutes: number;
   timeout: string;
   timein: string;
 }
@@ -164,6 +167,7 @@ interface NurseDetourData {
 // Consolidated analytics data interface
 interface AnalyticsData {
   summary: SummaryData;
+  totalMinutes: TotalMinutesData;
   returnRate: ReturnRateData;
   avg: AvgData;
   byPeriod: PeriodData[];
@@ -212,15 +216,141 @@ const AnalyticsView = () => {
     setError(null);
 
     try {
-      // Single API call to get all analytics data
-      const { data, error: analyticsError } = await supabase.rpc('get_full_analytics', {
-        time_frame_arg: timeFrame
-      });
+      const tfLower = timeFrame.toLowerCase();
 
-      if (analyticsError) throw analyticsError;
-      
-      // The data is already in the correct format from our backend function
-      setAnalyticsData(data as unknown as AnalyticsData);
+      // Parallel queries to all views
+      const [
+        summaryRes,
+        totalMinutesRes,
+        returnRateRes,
+        byPeriodRes,
+        byDestinationRes,
+        frequentFlyersRes,
+        longestPassesRes,
+        fullAnalyticsRes
+      ] = await Promise.all([
+        // KPI: Passes
+        supabase
+          .from('hp_summary_windows')
+          .select('passes')
+          .eq('window', tfLower)
+          .maybeSingle(),
+        // KPI: Total Minutes  
+        supabase
+          .from('hp_summary_windows')
+          .select('minutes_out')
+          .eq('window', tfLower)
+          .maybeSingle(),
+        // KPI: Return Rate
+        supabase
+          .from('hp_return_rate_windows')
+          .select('pct_returned, still_out, total')
+          .eq('window', tfLower)
+          .maybeSingle(),
+        // Trips by Period (hide zero rows)
+        supabase
+          .from('hp_by_period_windows')
+          .select('period, passes, minutes_out')
+          .eq('window', tfLower)
+          .gt('passes', 0)
+          .order('passes', { ascending: false }),
+        // Trips by Destination (hide zero rows)
+        supabase
+          .from('hp_by_destination_windows')
+          .select('destination, passes, minutes_out, median_min, p90_min')
+          .eq('window', tfLower)
+          .gt('passes', 0)
+          .order('passes', { ascending: false }),
+        // Frequent Flyers
+        supabase
+          .from('hp_frequent_flyers_windows')
+          .select('student_name, passes, minutes_out')
+          .eq('window', tfLower)
+          .gt('passes', 0)
+          .order('passes', { ascending: false })
+          .limit(15),
+        // Longest Single Trips
+        supabase
+          .from('hp_longest_windows')
+          .select('student_name, period, destination, duration, timeout, timein')
+          .eq('window', tfLower)
+          .order('duration', { ascending: false })
+          .limit(15),
+        // Get remaining analytics from RPC for advanced cards
+        supabase.rpc('get_full_analytics', { time_frame_arg: timeFrame })
+      ]);
+
+      // Build data object
+      const summary: SummaryData = { passes: summaryRes.data?.passes ?? 0 };
+      const totalMinutes: TotalMinutesData = { total_minutes: Number(totalMinutesRes.data?.minutes_out ?? 0) };
+      const returnRate: ReturnRateData = {
+        return_rate_pct: Math.round((returnRateRes.data?.pct_returned ?? 0) * 1000) / 10,
+        still_out: returnRateRes.data?.still_out ?? 0,
+        total: returnRateRes.data?.total ?? 0
+      };
+
+      // Calculate avg minutes from summary data
+      const avgMinutes = summary.passes > 0 
+        ? Math.round((totalMinutes.total_minutes / summary.passes) * 10) / 10 
+        : null;
+
+      const byPeriod: PeriodData[] = (byPeriodRes.data || []).map(row => ({
+        period: row.period,
+        passes: row.passes,
+        total_minutes: Number(row.minutes_out),
+        avg_minutes: row.passes > 0 ? Math.round((Number(row.minutes_out) / row.passes) * 10) / 10 : null
+      }));
+
+      const byDestination: DestinationData[] = (byDestinationRes.data || []).map(row => ({
+        destination: row.destination,
+        passes: row.passes,
+        total_minutes: Number(row.minutes_out),
+        avg_minutes: row.passes > 0 ? Math.round((Number(row.minutes_out) / row.passes) * 10) / 10 : null,
+        median_min: Number(row.median_min ?? 0),
+        p90_min: Number(row.p90_min ?? 0)
+      }));
+
+      const frequentFlyers: FrequentFlyerData[] = (frequentFlyersRes.data || []).map(row => ({
+        student_name: row.student_name,
+        passes: row.passes,
+        total_minutes: Number(row.minutes_out),
+        avg_minutes_per_trip: row.passes > 0 ? Math.round((Number(row.minutes_out) / row.passes) * 10) / 10 : 0
+      }));
+
+      const longestPasses: LongestPassData[] = (longestPassesRes.data || []).map(row => ({
+        student_name: row.student_name,
+        period: row.period,
+        destination: row.destination,
+        minutes: Number(row.duration),
+        timeout: row.timeout,
+        timein: row.timein
+      }));
+
+      // Get additional data from RPC for advanced cards
+      const rpcData = fullAnalyticsRes.data as any;
+
+      setAnalyticsData({
+        summary,
+        totalMinutes,
+        returnRate,
+        avg: { avg_minutes: avgMinutes },
+        byPeriod,
+        byDestination,
+        frequentFlyers,
+        longestPasses,
+        behavioralInsights: rpcData?.behavioralInsights || [],
+        dayOfWeek: rpcData?.dayOfWeek || [],
+        heatmap: rpcData?.heatmap || [],
+        scheduleAnalysis: rpcData?.scheduleAnalysis || [],
+        disruptionScores: rpcData?.disruptionScores || [],
+        buddyLeaves: rpcData?.buddyLeaves || [],
+        bellEdge: rpcData?.bellEdge || [],
+        lunchFriction: rpcData?.lunchFriction || [],
+        streaks: rpcData?.streaks || [],
+        outliers: rpcData?.outliers || [],
+        longTrips: rpcData?.longTrips || [],
+        nurseDetour: rpcData?.nurseDetour || []
+      });
 
     } catch (err) {
       console.error("Analytics data loading error:", err);
@@ -267,10 +397,6 @@ const AnalyticsView = () => {
     return `${rate}%`;
   };
 
-  const formatIQR = (q1: number, q3: number) => {
-    if (q1 === 0 && q3 === 0) return "No data";
-    return `${Math.round(q1)}-${Math.round(q3)} min`;
-  };
 
   // Helper function for heatmap text color based on bucket
   const getHeatmapTextColor = (bucket: number) => {
@@ -343,7 +469,7 @@ const AnalyticsView = () => {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* Passes Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -356,6 +482,30 @@ const AnalyticsView = () => {
           </CardContent>
         </Card>
 
+        {/* Total Minutes Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Minutes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {analyticsData?.totalMinutes?.total_minutes ?? 0} min
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Avg Minutes per Trip Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Avg Minutes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {analyticsData?.avg?.avg_minutes !== null ? `${analyticsData?.avg?.avg_minutes ?? 0} min` : "0 min"}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Return Rate Card */}
         <Card>
           <CardHeader className="pb-2">
@@ -363,30 +513,13 @@ const AnalyticsView = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {analyticsData?.returnRate ? formatReturnRate(analyticsData.returnRate.return_rate_pct) : "No data"}
+              {analyticsData?.returnRate ? formatReturnRate(analyticsData.returnRate.return_rate_pct) : "0%"}
             </div>
             {analyticsData?.returnRate && analyticsData.returnRate.total > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 Still out: {analyticsData.returnRate.still_out} / {analyticsData.returnRate.total}
               </p>
             )}
-            {analyticsData?.returnRate?.total === 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                No data in this window
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Avg Minutes per Trip Card */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Avg Minutes per Trip</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {analyticsData?.avg?.avg_minutes !== null ? `${analyticsData?.avg?.avg_minutes ?? 0} min` : "No data"}
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -419,7 +552,7 @@ const AnalyticsView = () => {
             >
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={analyticsData?.byPeriod || []}>
-                  <XAxis dataKey="period_label" />
+                  <XAxis dataKey="period" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Bar dataKey="passes" fill="var(--color-passes)" />
@@ -443,7 +576,7 @@ const AnalyticsView = () => {
                 <TableBody>
                   {analyticsData?.byPeriod?.map((row, index) => (
                     <TableRow key={index}>
-                      <TableCell className="font-medium">{row.period_label}</TableCell>
+                      <TableCell className="font-medium">{row.period}</TableCell>
                       <TableCell>{row.passes}</TableCell>
                       <TableCell>{row.total_minutes ? `${row.total_minutes.toFixed(1)} min` : 'N/A'}</TableCell>
                       <TableCell>{row.avg_minutes ? `${row.avg_minutes.toFixed(1)} min` : 'N/A'}</TableCell>
@@ -478,21 +611,23 @@ const AnalyticsView = () => {
                     <TableHead>Destination</TableHead>
                     <TableHead>Passes</TableHead>
                     <TableHead>Total Minutes</TableHead>
-                    <TableHead>Median Minutes</TableHead>
-                    <TableHead>Typical Duration (IQR)</TableHead>
+                    <TableHead>Avg Minutes</TableHead>
+                    <TableHead>Median</TableHead>
+                    <TableHead>P90</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {analyticsData?.byDestination?.map((row, index) => (
                     <TableRow 
                       key={index}
-                      className={row.q3_minutes > 12 ? "bg-orange-50 dark:bg-orange-950/20" : ""}
+                      className={row.p90_min > 12 ? "bg-orange-50 dark:bg-orange-950/20" : ""}
                     >
                       <TableCell className="font-medium">{row.destination}</TableCell>
                       <TableCell>{row.passes}</TableCell>
                       <TableCell>{Number(row.total_minutes).toFixed(1)} min</TableCell>
-                      <TableCell>{Number(row.median_minutes).toFixed(1)} min</TableCell>
-                      <TableCell>{formatIQR(row.q1_minutes, row.q3_minutes)}</TableCell>
+                      <TableCell>{row.avg_minutes?.toFixed(1) ?? 'N/A'} min</TableCell>
+                      <TableCell>{row.median_min.toFixed(1)} min</TableCell>
+                      <TableCell>{row.p90_min.toFixed(1)} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -573,9 +708,9 @@ const AnalyticsView = () => {
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.period}</TableCell>
                       <TableCell>{row.destination}</TableCell>
-                      <TableCell>{row.duration_minutes} min</TableCell>
+                      <TableCell>{row.minutes} min</TableCell>
                       <TableCell className="text-sm">{formatDateTime(row.timeout)}</TableCell>
-                      <TableCell className="text-sm">{formatDateTime(row.timein)}</TableCell>
+                      <TableCell className="text-sm">{row.timein ? formatDateTime(row.timein) : 'Still out'}</TableCell>
                     </TableRow>
                   ))}
               </TableBody>
