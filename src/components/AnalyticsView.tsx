@@ -184,16 +184,27 @@ interface AnalyticsData {
   nurseDetour: NurseDetourData[];
 }
 
+// localStorage key for auto-refresh preference
+const AUTO_KEY = 'hp_analytics_auto';
+
 const AnalyticsView = () => {
   const [timeFrame, setTimeFrame] = useState<TimeFrame>("Week");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
-  
-  // Refresh controls
-  const [autoRefresh, setAutoRefresh] = useState(false);
+
+  // Bathroom-only frequent flyers data
+  const [bathroomFlyers, setBathroomFlyers] = useState<FrequentFlyerData[]>([]);
+
+  // Refresh controls - OFF by default, persisted to localStorage
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(AUTO_KEY) === 'true';
+    }
+    return false;
+  });
   const [refreshNonce, setRefreshNonce] = useState('init');
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   // Teaching and Meeting Schedules
   const planningPeriods = ['B', 'E', 'F'];
@@ -218,7 +229,7 @@ const AnalyticsView = () => {
       });
 
       if (analyticsError) throw analyticsError;
-      
+
       // The data is already in the correct format from our backend function
       setAnalyticsData(data as unknown as AnalyticsData);
 
@@ -230,16 +241,99 @@ const AnalyticsView = () => {
     }
   }, [timeFrame]);
 
+  // Load bathroom-only frequent flyers using quotes-safe timeframe
+  const loadBathroomFlyers = useCallback(async () => {
+    try {
+      // Normalize timeframe: quotes-safe, lowercase
+      const normalizedFrame = timeFrame.toLowerCase().replace(/"/g, '');
+
+      // Calculate time boundaries based on timeframe
+      const now = new Date();
+      let startTime: Date;
+
+      switch (normalizedFrame) {
+        case 'day':
+          startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          const dayOfWeek = now.getDay();
+          startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek);
+          break;
+        case 'month':
+          startTime = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'quarter':
+          const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+          startTime = new Date(now.getFullYear(), quarterStart, 1);
+          break;
+        default: // 'all'
+          startTime = new Date(2000, 0, 1);
+      }
+
+      // Query bathroom-only passes grouped by student
+      const { data, error: queryError } = await supabase
+        .from('bathroom_passes')
+        .select('student_name, duration_min')
+        .gte('timeout', startTime.toISOString())
+        .or('destination.ilike.%bathroom%,destination.ilike.%restroom%')
+        .not('student_name', 'is', null);
+
+      if (queryError) throw queryError;
+
+      // Aggregate by student
+      const studentMap = new Map<string, { passes: number; totalMinutes: number }>();
+
+      (data || []).forEach((row: { student_name: string; duration_min: number | null }) => {
+        const existing = studentMap.get(row.student_name) || { passes: 0, totalMinutes: 0 };
+        studentMap.set(row.student_name, {
+          passes: existing.passes + 1,
+          totalMinutes: existing.totalMinutes + (row.duration_min || 0)
+        });
+      });
+
+      // Convert to array and sort
+      const flyers: FrequentFlyerData[] = Array.from(studentMap.entries())
+        .map(([student_name, stats]) => ({
+          student_name,
+          passes: stats.passes,
+          total_minutes: stats.totalMinutes,
+          avg_minutes_per_trip: stats.passes > 0
+            ? Math.round((stats.totalMinutes / stats.passes) * 10) / 10
+            : 0
+        }))
+        .sort((a, b) => b.passes - a.passes || b.total_minutes - a.total_minutes)
+        .slice(0, 15);
+
+      setBathroomFlyers(flyers);
+    } catch (err) {
+      console.error("Bathroom flyers loading error:", err);
+    }
+  }, [timeFrame]);
+
+  // Refetch all data function for auto-refresh
+  const refetchAll = useCallback(() => {
+    loadData();
+    loadBathroomFlyers();
+  }, [loadData, loadBathroomFlyers]);
+
   // Load data when timeFrame or refreshNonce changes
   useEffect(() => {
     loadData();
-  }, [timeFrame, refreshNonce, loadData]);
+    loadBathroomFlyers();
+  }, [timeFrame, refreshNonce, loadData, loadBathroomFlyers]);
 
-  // Handle auto-refresh interval
+  // Persist auto-refresh preference to localStorage
+  useEffect(() => {
+    localStorage.setItem(AUTO_KEY, autoRefresh ? 'true' : 'false');
+  }, [autoRefresh]);
+
+  // Handle auto-refresh interval - only poll when ON and tab is visible
   useEffect(() => {
     if (autoRefresh) {
       intervalRef.current = setInterval(() => {
-        setRefreshNonce(Date.now().toString());
+        if (!document.hidden) {
+          refetchAll();
+        }
       }, 60000); // 60 seconds
     } else {
       if (intervalRef.current) {
@@ -247,13 +341,13 @@ const AnalyticsView = () => {
         intervalRef.current = null;
       }
     }
-    
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
     };
-  }, [autoRefresh]);
+  }, [autoRefresh, refetchAll]);
 
   const handleManualRefresh = () => {
     setRefreshNonce(Date.now().toString());
@@ -395,7 +489,7 @@ const AnalyticsView = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" />
+            <BarChart3 className="h-5 w-5 text-blue-600" />
             Trips by Period
           </CardTitle>
           <p className="text-sm text-muted-foreground">
@@ -403,7 +497,7 @@ const AnalyticsView = () => {
           </p>
         </CardHeader>
         <CardContent>
-          {(analyticsData?.byPeriod?.length ?? 0) === 0 ? (
+          {(analyticsData?.byPeriod?.filter(r => r.passes > 0)?.length ?? 0) === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No period data available
             </div>
@@ -412,24 +506,24 @@ const AnalyticsView = () => {
               config={{
                 passes: {
                   label: "Passes",
-                  color: "hsl(var(--primary))",
+                  color: "#2563eb", // Blue gradient primary
                 },
               }}
               className="h-[300px]"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analyticsData?.byPeriod || []}>
+                <BarChart data={analyticsData?.byPeriod?.filter(r => r.passes > 0) || []}>
                   <XAxis dataKey="period_label" />
                   <YAxis />
                   <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="passes" fill="var(--color-passes)" />
+                  <Bar dataKey="passes" fill="#3b82f6" />
                 </BarChart>
               </ResponsiveContainer>
             </ChartContainer>
           )}
-          
-          {/* Period Table */}
-          {(analyticsData?.byPeriod?.length ?? 0) > 0 && (
+
+          {/* Period Table - hide zero-pass rows */}
+          {(analyticsData?.byPeriod?.filter(r => r.passes > 0)?.length ?? 0) > 0 && (
             <div className="mt-6">
               <Table>
                 <TableHeader>
@@ -441,7 +535,7 @@ const AnalyticsView = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analyticsData?.byPeriod?.map((row, index) => (
+                  {analyticsData?.byPeriod?.filter(row => row.passes > 0).map((row, index) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{row.period_label}</TableCell>
                       <TableCell>{row.passes}</TableCell>
@@ -462,7 +556,7 @@ const AnalyticsView = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5" />
+              <TrendingUp className="h-5 w-5 text-blue-600" />
               Destinations
             </CardTitle>
           </CardHeader>
@@ -483,8 +577,8 @@ const AnalyticsView = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analyticsData?.byDestination?.map((row, index) => (
-                    <TableRow 
+                  {analyticsData?.byDestination?.filter(row => row.passes > 0).map((row, index) => (
+                    <TableRow
                       key={index}
                       className={row.q3_minutes > 12 ? "bg-orange-50 dark:bg-orange-950/20" : ""}
                     >
@@ -501,18 +595,21 @@ const AnalyticsView = () => {
           </CardContent>
         </Card>
 
-        {/* Frequent Flyers Table */}
+        {/* Frequent Flyers — Bathroom Table */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Frequent Flyers
+              <Users className="h-5 w-5 text-blue-600" />
+              Frequent Flyers — Bathroom
             </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Students with most bathroom/restroom trips
+            </p>
           </CardHeader>
           <CardContent>
-            {(analyticsData?.frequentFlyers?.length ?? 0) === 0 ? (
+            {bathroomFlyers.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No passes in this window.
+                No bathroom passes in this window.
               </div>
             ) : (
               <Table>
@@ -521,11 +618,11 @@ const AnalyticsView = () => {
                     <TableHead>Student</TableHead>
                     <TableHead>Passes</TableHead>
                     <TableHead>Total Minutes</TableHead>
-                    <TableHead>Avg per Trip</TableHead>
+                    <TableHead>Avg Minutes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analyticsData?.frequentFlyers?.slice(0, 10).map((row, index) => (
+                  {bathroomFlyers.map((row, index) => (
                     <TableRow key={index}>
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.passes}</TableCell>
@@ -544,8 +641,8 @@ const AnalyticsView = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Longest
+            <Clock className="h-5 w-5 text-blue-600" />
+            Longest Passes
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -590,7 +687,7 @@ const AnalyticsView = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+              <Clock className="h-5 w-5 text-blue-600" />
               Behavioral Insights
             </CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -629,7 +726,7 @@ const AnalyticsView = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
+              <BarChart3 className="h-5 w-5 text-blue-600" />
               Passes by Day of Week
             </CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -637,7 +734,7 @@ const AnalyticsView = () => {
             </p>
           </CardHeader>
           <CardContent>
-            {(analyticsData?.dayOfWeek?.length ?? 0) === 0 ? (
+            {(analyticsData?.dayOfWeek?.filter(d => d.pass_count > 0)?.length ?? 0) === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 No day-of-week data available
               </div>
@@ -646,17 +743,17 @@ const AnalyticsView = () => {
                 config={{
                   pass_count: {
                     label: "Passes",
-                    color: "hsl(var(--primary))",
+                    color: "#2563eb", // Blue gradient
                   },
                 }}
                 className="h-[300px]"
               >
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analyticsData?.dayOfWeek || []}>
+                  <BarChart data={analyticsData?.dayOfWeek?.filter(d => d.pass_count > 0) || []}>
                     <XAxis dataKey="day_of_week" />
                     <YAxis />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="pass_count" fill="var(--color-pass_count)" />
+                    <Bar dataKey="pass_count" fill="#60a5fa" />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -786,7 +883,7 @@ const AnalyticsView = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <Calendar className="h-5 w-5 text-blue-600" />
               Schedule Analysis
             </CardTitle>
             <p className="text-sm text-muted-foreground">
