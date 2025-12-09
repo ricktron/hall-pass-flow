@@ -74,34 +74,31 @@ interface LongestPassData {
 }
 
 interface BehavioralInsightsData {
-  insight_type: string;
+  time_period: string;
   pass_count: number;
-  avg_duration: number;
+  avg_duration_min: number;
 }
 
 interface DayOfWeekData {
-  day_of_week: string;
-  pass_count: number;
+  dow: string;
+  passes: number;
 }
 
 interface HeatmapData {
-  day_of_week: string;
   period: string;
-  pass_count: number;
-  bucket: number;
-  color_hex: string;
+  dow: string;
+  passes: number;
 }
 
 interface ScheduleAnalysisData {
-  schedule_type: string;
-  total_passes: number;
-  instructional_minutes: number;
-  passes_per_100_min: number;
+  dow: string;
+  return_rate_pct: number;
 }
 
 interface DisruptionScoreData {
   student_name: string;
-  disruption_score: number;
+  total_minutes: number;
+  passes: number;
 }
 
 // New card interfaces
@@ -194,22 +191,24 @@ const AnalyticsView = () => {
   const [error, setError] = useState<string | null>(null);
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   
-  // Refresh controls
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  // Refresh controls - persist to localStorage, default to false
+  const [autoRefresh, setAutoRefresh] = useState(() => {
+    return localStorage.getItem('hp_auto_refresh') === 'true';
+  });
   const [refreshNonce, setRefreshNonce] = useState('init');
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Teaching and Meeting Schedules
-  const planningPeriods = ['B', 'E', 'F'];
-  const weeklyMeetingPattern: { [key: string]: string[] } = {
-    'A': ['Monday', 'Tuesday', 'Thursday'],
-    'C': ['Monday', 'Tuesday', 'Thursday'],
-    'D': ['Monday', 'Tuesday', 'Thursday'],
-    'G': ['Monday', 'Wednesday', 'Friday'],
-    'H': ['Monday', 'Wednesday', 'Friday']
-  };
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
+
+  // Helper to format destination names
+  const formatDestination = (dest: string): string => {
+    const lower = dest?.toLowerCase() || '';
+    if (['testing_center', 'testing center', 'testingcenter'].includes(lower)) {
+      return 'Testing Center';
+    }
+    // Title case
+    return dest?.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()) || 'Other';
+  };
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -238,7 +237,7 @@ const AnalyticsView = () => {
         // KPI: Total Minutes  
         supabase
           .from('hp_summary_windows')
-          .select('minutes_out')
+          .select('minutes_out, passes')
           .eq('window', tfLower)
           .maybeSingle(),
         // KPI: Return Rate
@@ -269,11 +268,12 @@ const AnalyticsView = () => {
           .gt('passes', 0)
           .order('passes', { ascending: false })
           .limit(15),
-        // Longest Single Trips
+        // Longest Single Trips - BATHROOM ONLY
         supabase
           .from('hp_longest_windows')
           .select('student_name, period, destination, duration, timeout, timein')
           .eq('window', tfLower)
+          .or('destination.ilike.%bathroom%,destination.ilike.%restroom%')
           .order('duration', { ascending: false })
           .limit(15),
         // Get remaining analytics from RPC for advanced cards
@@ -282,52 +282,85 @@ const AnalyticsView = () => {
 
       // Build data object
       const summary: SummaryData = { passes: summaryRes.data?.passes ?? 0 };
-      const totalMinutes: TotalMinutesData = { total_minutes: Number(totalMinutesRes.data?.minutes_out ?? 0) };
+      const totalMinutesRaw = Number(totalMinutesRes.data?.minutes_out ?? 0);
+      const totalMinutes: TotalMinutesData = { 
+        total_minutes: Math.round(totalMinutesRaw * 10) / 10 
+      };
       const returnRate: ReturnRateData = {
         return_rate_pct: Math.round((returnRateRes.data?.pct_returned ?? 0) * 1000) / 10,
         still_out: returnRateRes.data?.still_out ?? 0,
         total: returnRateRes.data?.total ?? 0
       };
 
-      // Calculate avg minutes from summary data
-      const avgMinutes = summary.passes > 0 
-        ? Math.round((totalMinutes.total_minutes / summary.passes) * 10) / 10 
+      // Calculate avg minutes from summary data - round to 1 decimal
+      const passes = totalMinutesRes.data?.passes ?? 0;
+      const avgMinutes = passes > 0 
+        ? Math.round((totalMinutesRaw / passes) * 10) / 10 
         : null;
 
       const byPeriod: PeriodData[] = (byPeriodRes.data || []).map(row => ({
         period: row.period,
         passes: row.passes,
-        total_minutes: Number(row.minutes_out),
+        total_minutes: Math.round(Number(row.minutes_out) * 10) / 10,
         avg_minutes: row.passes > 0 ? Math.round((Number(row.minutes_out) / row.passes) * 10) / 10 : null
       }));
 
       const byDestination: DestinationData[] = (byDestinationRes.data || []).map(row => ({
-        destination: row.destination,
+        destination: formatDestination(row.destination),
         passes: row.passes,
-        total_minutes: Number(row.minutes_out),
+        total_minutes: Math.round(Number(row.minutes_out) * 10) / 10,
         avg_minutes: row.passes > 0 ? Math.round((Number(row.minutes_out) / row.passes) * 10) / 10 : null,
-        median_min: Number(row.median_min ?? 0),
-        p90_min: Number(row.p90_min ?? 0)
+        median_min: Math.round(Number(row.median_min ?? 0) * 10) / 10,
+        p90_min: Math.round(Number(row.p90_min ?? 0) * 10) / 10
       }));
 
       const frequentFlyers: FrequentFlyerData[] = (frequentFlyersRes.data || []).map(row => ({
         student_name: row.student_name,
         passes: row.passes,
-        total_minutes: Number(row.minutes_out),
+        total_minutes: Math.round(Number(row.minutes_out) * 10) / 10,
         avg_minutes_per_trip: row.passes > 0 ? Math.round((Number(row.minutes_out) / row.passes) * 10) / 10 : 0
       }));
 
       const longestPasses: LongestPassData[] = (longestPassesRes.data || []).map(row => ({
         student_name: row.student_name,
         period: row.period,
-        destination: row.destination,
-        minutes: Number(row.duration),
+        destination: 'Bathroom',
+        minutes: Math.round(Number(row.duration) * 10) / 10,
         timeout: row.timeout,
         timein: row.timein
       }));
 
       // Get additional data from RPC for advanced cards
       const rpcData = fullAnalyticsRes.data as any;
+
+      // Extract data from RPC response
+      const behavioralInsights: BehavioralInsightsData[] = (rpcData?.behavioralInsights || []).map((row: any) => ({
+        time_period: row.time_period || row.insight_type || '',
+        pass_count: row.pass_count || 0,
+        avg_duration_min: Math.round(Number(row.avg_duration_min || row.avg_duration || 0) * 10) / 10
+      }));
+
+      const dayOfWeek: DayOfWeekData[] = (rpcData?.dayOfWeek || []).map((row: any) => ({
+        dow: row.dow || row.day_of_week || '',
+        passes: row.passes || row.pass_count || 0
+      }));
+
+      const heatmap: HeatmapData[] = (rpcData?.heatmap || []).map((row: any) => ({
+        period: row.period || '',
+        dow: row.dow || row.day_of_week || '',
+        passes: row.passes || row.pass_count || 0
+      }));
+
+      const disruptionScores: DisruptionScoreData[] = (rpcData?.disruptionScores || []).map((row: any) => ({
+        student_name: row.student_name || '',
+        total_minutes: row.total_minutes || row.disruption_score || 0,
+        passes: row.passes || 0
+      }));
+
+      const scheduleAnalysis: ScheduleAnalysisData[] = (rpcData?.scheduleAnalysis || []).map((row: any) => ({
+        dow: row.dow || '',
+        return_rate_pct: row.return_rate_pct || 0
+      }));
 
       setAnalyticsData({
         summary,
@@ -338,11 +371,11 @@ const AnalyticsView = () => {
         byDestination,
         frequentFlyers,
         longestPasses,
-        behavioralInsights: rpcData?.behavioralInsights || [],
-        dayOfWeek: rpcData?.dayOfWeek || [],
-        heatmap: rpcData?.heatmap || [],
-        scheduleAnalysis: rpcData?.scheduleAnalysis || [],
-        disruptionScores: rpcData?.disruptionScores || [],
+        behavioralInsights,
+        dayOfWeek,
+        heatmap,
+        scheduleAnalysis,
+        disruptionScores,
         buddyLeaves: rpcData?.buddyLeaves || [],
         bellEdge: rpcData?.bellEdge || [],
         lunchFriction: rpcData?.lunchFriction || [],
@@ -385,6 +418,12 @@ const AnalyticsView = () => {
     };
   }, [autoRefresh]);
 
+  // Persist auto-refresh to localStorage
+  const handleAutoRefreshChange = (checked: boolean) => {
+    setAutoRefresh(checked);
+    localStorage.setItem('hp_auto_refresh', String(checked));
+  };
+
   const handleManualRefresh = () => {
     setRefreshNonce(Date.now().toString());
   };
@@ -397,12 +436,23 @@ const AnalyticsView = () => {
     return `${rate}%`;
   };
 
-
-  // Helper function for heatmap text color based on bucket
-  const getHeatmapTextColor = (bucket: number) => {
-    // Buckets 4 and 5 are dark enough to need white text
-    return bucket >= 4 ? 'text-white' : 'text-foreground';
+  // Helper to get heatmap color based on pass count
+  const getHeatmapColor = (passes: number, maxPasses: number): string => {
+    if (passes === 0) return '#f5f8ff';
+    const ratio = passes / Math.max(maxPasses, 1);
+    const colors = ['#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb'];
+    const index = Math.min(Math.floor(ratio * colors.length), colors.length - 1);
+    return colors[index];
   };
+
+  const getHeatmapTextColor = (passes: number, maxPasses: number) => {
+    const ratio = passes / Math.max(maxPasses, 1);
+    return ratio > 0.6 ? 'text-white' : 'text-foreground';
+  };
+
+  // Calculate max passes for heatmap
+  const maxHeatmapPasses = analyticsData?.heatmap?.reduce((max, item) => 
+    Math.max(max, item.passes || 0), 0) || 1;
 
   return (
     <div className="space-y-6">
@@ -431,7 +481,7 @@ const AnalyticsView = () => {
               <Switch
                 id="auto-refresh"
                 checked={autoRefresh}
-                onCheckedChange={setAutoRefresh}
+                onCheckedChange={handleAutoRefreshChange}
               />
               <Label htmlFor="auto-refresh" className="text-sm">Auto</Label>
             </div>
@@ -489,7 +539,7 @@ const AnalyticsView = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {analyticsData?.totalMinutes?.total_minutes ?? 0} min
+              {analyticsData?.totalMinutes?.total_minutes?.toFixed(1) ?? '0.0'} min
             </div>
           </CardContent>
         </Card>
@@ -501,7 +551,9 @@ const AnalyticsView = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {analyticsData?.avg?.avg_minutes !== null ? `${analyticsData?.avg?.avg_minutes ?? 0} min` : "0 min"}
+              {analyticsData?.avg?.avg_minutes !== null 
+                ? `${analyticsData?.avg?.avg_minutes?.toFixed(1) ?? '0.0'} min` 
+                : "0.0 min"}
             </div>
           </CardContent>
         </Card>
@@ -578,8 +630,8 @@ const AnalyticsView = () => {
                     <TableRow key={index}>
                       <TableCell className="font-medium">{row.period}</TableCell>
                       <TableCell>{row.passes}</TableCell>
-                      <TableCell>{row.total_minutes ? `${row.total_minutes.toFixed(1)} min` : 'N/A'}</TableCell>
-                      <TableCell>{row.avg_minutes ? `${row.avg_minutes.toFixed(1)} min` : 'N/A'}</TableCell>
+                      <TableCell>{row.total_minutes?.toFixed(1)} min</TableCell>
+                      <TableCell>{row.avg_minutes?.toFixed(1) ?? 'N/A'} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -624,10 +676,10 @@ const AnalyticsView = () => {
                     >
                       <TableCell className="font-medium">{row.destination}</TableCell>
                       <TableCell>{row.passes}</TableCell>
-                      <TableCell>{Number(row.total_minutes).toFixed(1)} min</TableCell>
+                      <TableCell>{row.total_minutes?.toFixed(1)} min</TableCell>
                       <TableCell>{row.avg_minutes?.toFixed(1) ?? 'N/A'} min</TableCell>
-                      <TableCell>{row.median_min.toFixed(1)} min</TableCell>
-                      <TableCell>{row.p90_min.toFixed(1)} min</TableCell>
+                      <TableCell>{row.median_min?.toFixed(1)} min</TableCell>
+                      <TableCell>{row.p90_min?.toFixed(1)} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -664,8 +716,8 @@ const AnalyticsView = () => {
                     <TableRow key={index}>
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.passes}</TableCell>
-                      <TableCell>{Number(row.total_minutes).toFixed(1)} min</TableCell>
-                      <TableCell>{row.avg_minutes_per_trip} min</TableCell>
+                      <TableCell>{row.total_minutes?.toFixed(1)} min</TableCell>
+                      <TableCell>{row.avg_minutes_per_trip?.toFixed(1)} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -680,13 +732,13 @@ const AnalyticsView = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Longest
+            Longest Bathroom Trips
           </CardTitle>
         </CardHeader>
         <CardContent>
           {(analyticsData?.longestPasses?.length ?? 0) === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No passes in this window.
+              No bathroom passes in this window.
             </div>
           ) : (
             <Table>
@@ -695,7 +747,6 @@ const AnalyticsView = () => {
                     <TableHead>#</TableHead>
                     <TableHead>Student</TableHead>
                     <TableHead>Period</TableHead>
-                    <TableHead>Destination</TableHead>
                     <TableHead>Duration (min)</TableHead>
                     <TableHead>Out</TableHead>
                     <TableHead>In</TableHead>
@@ -707,8 +758,7 @@ const AnalyticsView = () => {
                       <TableCell className="font-medium">{index + 1}</TableCell>
                       <TableCell className="font-medium">{row.student_name}</TableCell>
                       <TableCell>{row.period}</TableCell>
-                      <TableCell>{row.destination}</TableCell>
-                      <TableCell>{row.minutes} min</TableCell>
+                      <TableCell>{row.minutes?.toFixed(1)} min</TableCell>
                       <TableCell className="text-sm">{formatDateTime(row.timeout)}</TableCell>
                       <TableCell className="text-sm">{row.timein ? formatDateTime(row.timein) : 'Still out'}</TableCell>
                     </TableRow>
@@ -749,9 +799,9 @@ const AnalyticsView = () => {
                 <TableBody>
                   {analyticsData?.behavioralInsights?.map((row, index) => (
                     <TableRow key={index}>
-                      <TableCell className="font-medium">{row.insight_type}</TableCell>
+                      <TableCell className="font-medium">{row.time_period}</TableCell>
                       <TableCell>{row.pass_count}</TableCell>
-                      <TableCell>{row.avg_duration} min</TableCell>
+                      <TableCell>{row.avg_duration_min?.toFixed(1)} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -779,7 +829,7 @@ const AnalyticsView = () => {
             ) : (
               <ChartContainer
                 config={{
-                  pass_count: {
+                  passes: {
                     label: "Passes",
                     color: "hsl(var(--primary))",
                   },
@@ -788,10 +838,10 @@ const AnalyticsView = () => {
               >
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData?.dayOfWeek || []}>
-                    <XAxis dataKey="day_of_week" />
+                    <XAxis dataKey="dow" />
                     <YAxis />
                     <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar dataKey="pass_count" fill="var(--color-pass_count)" />
+                    <Bar dataKey="passes" fill="var(--color-passes)" />
                   </BarChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -808,7 +858,7 @@ const AnalyticsView = () => {
             Disruption Score
           </CardTitle>
           <CardDescription>
-            Students with the highest classroom disruption impact
+            Students with the highest total minutes out
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -822,7 +872,8 @@ const AnalyticsView = () => {
                 <TableRow>
                   <TableHead>Rank</TableHead>
                   <TableHead>Student</TableHead>
-                  <TableHead>Disruption Score</TableHead>
+                  <TableHead>Total Minutes</TableHead>
+                  <TableHead>Passes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -831,8 +882,9 @@ const AnalyticsView = () => {
                     <TableCell className="font-medium">{index + 1}</TableCell>
                     <TableCell>{row.student_name}</TableCell>
                     <TableCell className="font-bold text-yellow-600 dark:text-yellow-400">
-                      {row.disruption_score}
+                      {row.total_minutes} min
                     </TableCell>
+                    <TableCell>{row.passes}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -872,21 +924,21 @@ const AnalyticsView = () => {
                         <TableCell className="font-medium">{period}</TableCell>
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(day => {
                           const cellData = analyticsData.heatmap.find(
-                            d => d.period === period && d.day_of_week === day
+                            d => d.period === period && d.dow === day
                           );
-                          const colorHex = cellData?.color_hex || '#f5f8ff';
-                          const bucket = cellData?.bucket ?? 0;
+                          const passes = cellData?.passes ?? 0;
+                          const colorHex = getHeatmapColor(passes, maxHeatmapPasses);
                           
                           return (
                             <TableCell 
                               key={day} 
                               className={cn(
                                 "text-center font-semibold transition-colors duration-300",
-                                getHeatmapTextColor(bucket)
+                                getHeatmapTextColor(passes, maxHeatmapPasses)
                               )}
                               style={{ backgroundColor: colorHex }}
                             >
-                              {cellData?.pass_count ?? 0}
+                              {passes}
                             </TableCell>
                           );
                         })}
@@ -925,7 +977,7 @@ const AnalyticsView = () => {
               Schedule Analysis
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Comparing pass rates between schedule types
+              Return rate by day of week
             </p>
           </CardHeader>
           <CardContent>
@@ -934,41 +986,34 @@ const AnalyticsView = () => {
                 No schedule analysis data available
               </div>
             ) : (
-              <div className="space-y-4">
-                {analyticsData?.scheduleAnalysis?.map((item, index) => (
-                  <div key={index} className="p-4 rounded-lg bg-muted/50">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium">{item.schedule_type}</h4>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-primary">
-                          {item.passes_per_100_min}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          passes per 100 min
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
-                      <div>
-                        <span className="font-medium">Total Passes:</span> {item.total_passes}
-                      </div>
-                      <div>
-                        <span className="font-medium">Instructional Minutes:</span> {item.instructional_minutes}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ChartContainer
+                config={{
+                  return_rate_pct: {
+                    label: "Return Rate %",
+                    color: "hsl(var(--primary))",
+                  },
+                }}
+                className="h-[300px]"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData?.scheduleAnalysis || []}>
+                    <XAxis dataKey="dow" />
+                    <YAxis domain={[0, 100]} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="return_rate_pct" fill="var(--color-return_rate_pct)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* New Analytics Cards Section */}
+      {/* Advanced Pattern Detection Cards */}
       <div className="space-y-6">
-        <h3 className="text-xl font-semibold text-foreground">Advanced Insights</h3>
+        <h3 className="text-lg font-semibold text-foreground">Advanced Pattern Detection</h3>
         
-        {/* Row 1: Buddy Leaves & Bell-Edge Leavers */}
+        {/* Row 1: Buddy Leaves & Bell-Edge */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Card 1: Buddy Leaves */}
           <Card>
