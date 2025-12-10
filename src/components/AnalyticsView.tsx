@@ -33,12 +33,22 @@ interface NursePairData {
 interface FrequentFlyerRow {
   student_name: string; passes: number; total_minutes: number; avg_minutes: number
 }
+interface StreakRow {
+  student_name: string; period: string; cadence: string; start_date: string; end_date: string; streak_len: number
+}
 
 const AUTO_KEY = "hp_analytics_auto";
+const TF_KEY   = "hp_analytics_tf";
 const BLUE = "hsl(217 91% 60%)"; // #3b82f6
 
 const AnalyticsView = () => {
-  const [timeFrame, setTimeFrame] = useState<TimeFrame>("Week");
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(TF_KEY) as TimeFrame | null;
+      if (saved && ["Day","Week","Month","Quarter","All"].includes(saved)) return saved;
+    }
+    return "Week";
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +63,7 @@ const AnalyticsView = () => {
   const [disruption, setDisruption] = useState<DisruptionScoreData[]>([]);
   const [nursePairs, setNursePairs] = useState<NursePairData[]>([]);
   const [bathroomFlyers, setBathroomFlyers] = useState<FrequentFlyerRow[]>([]);
+  const [streaks, setStreaks] = useState<StreakRow[]>([]);
 
   const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -157,6 +168,15 @@ const AnalyticsView = () => {
       setNursePairs(np.data ?? []);
 
       await loadBathroomFrequentFlyers();
+
+      // Fetch streaks by period
+      const st = await supabase
+        .from("hp_streaks_by_period_windows")
+        .select("student_name, period, cadence, start_date, end_date, streak_len")
+        .order("streak_len", { ascending: false })
+        .limit(20);
+      if (st.error) throw st.error;
+      setStreaks(st.data ?? []);
     } catch (e: any) {
       setError(e.message || "Failed to load analytics data");
     } finally {
@@ -169,6 +189,9 @@ const AnalyticsView = () => {
 
   // persist toggle
   useEffect(() => { localStorage.setItem(AUTO_KEY, autoRefresh ? "true" : "false"); }, [autoRefresh]);
+
+  // persist timeframe selection
+  useEffect(() => { localStorage.setItem(TF_KEY, timeFrame); }, [timeFrame]);
 
   // interval only when ON and tab visible
   useEffect(() => {
@@ -183,6 +206,12 @@ const AnalyticsView = () => {
   }, [autoRefresh]);
 
   const manualRefresh = () => setNonce(String(Date.now()));
+
+  const fmtHour = (h: number) =>
+    h === 0 ? "12a" :
+    h < 12 ? `${h}a` :
+    h === 12 ? "12p" :
+    `${h - 12}p`;
 
   const avgMinutes =
     summary && summary.passes > 0
@@ -431,7 +460,7 @@ const AnalyticsView = () => {
               <ChartContainer config={{ passes: { label: "Passes", color: BLUE } }} className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={hourly}>
-                    <XAxis dataKey="hour_24" /><YAxis />
+                    <XAxis dataKey="hour_24" tickFormatter={(v) => fmtHour(v as number)} /><YAxis />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Bar dataKey="passes" fill={BLUE} />
                   </BarChart>
@@ -535,6 +564,47 @@ const AnalyticsView = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Streaks by Period */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-blue-600" />
+            Streaks by Period (≥3)
+          </CardTitle>
+          <CardDescription>Consecutive class meetings with at least one pass (per period cadence)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {streaks.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No streaks detected yet</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Period</TableHead>
+                  <TableHead>Cadence</TableHead>
+                  <TableHead>Start</TableHead>
+                  <TableHead>End</TableHead>
+                  <TableHead>Length</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {streaks.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{r.student_name}</TableCell>
+                    <TableCell>{r.period}</TableCell>
+                    <TableCell>{r.cadence}</TableCell>
+                    <TableCell>{new Date(r.start_date).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(r.end_date).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-bold">{r.streak_len}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
