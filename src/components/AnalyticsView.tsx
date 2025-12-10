@@ -76,56 +76,18 @@ const AnalyticsView = () => {
 
   const tfKey = timeFrame.toLowerCase();
 
-  function startOfWindow(tf: TimeFrame) {
-    const now = new Date();
-    let start = new Date(2000, 0, 1); // All
-    if (tf === "Day") start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    else if (tf === "Week") {
-      const d = now.getDay(); // 0 Sun..6 Sat
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - d);
-    } else if (tf === "Month") start = new Date(now.getFullYear(), now.getMonth(), 1);
-    else if (tf === "Quarter") {
-      const q = Math.floor(now.getMonth() / 3) * 3;
-      start = new Date(now.getFullYear(), q, 1);
-    }
-    return start.toISOString();
-  }
-
   const loadBathroomFrequentFlyers = useCallback(async () => {
-    // aggregate on client from Hall_Passes, bathroom/restroom only
-    const startISO = startOfWindow(timeFrame);
-    const { data, error } = await supabase
-      .from("Hall_Passes")
-      .select("student_name, duration, destination, timeout")
-      .gte("timeout", startISO);
+    const { data: flyers, error: flyersErr } = await supabase
+      .from("hp_frequent_flyers_bathroom_windows")
+      .select("student_name, passes, total_minutes, avg_minutes")
+      .eq("window", tfKey)
+      .order("passes", { ascending: false })
+      .limit(15);
 
-    if (error) throw error;
+    if (flyersErr) throw flyersErr;
 
-    const rows = (data ?? []).filter(
-      r => typeof r.student_name === "string" &&
-           typeof r.destination === "string" &&
-           /bathroom|restroom/i.test(r.destination || "")
-    );
-
-    const agg = new Map<string, { passes: number; minutes: number }>();
-    for (const r of rows) {
-      const dur = Number(r.duration || 0);
-      const cur = agg.get(r.student_name) || { passes: 0, minutes: 0 };
-      agg.set(r.student_name, { passes: cur.passes + 1, minutes: cur.minutes + dur });
-    }
-
-    const out: FrequentFlyerRow[] = Array.from(agg.entries())
-      .map(([student_name, s]) => ({
-        student_name,
-        passes: s.passes,
-        total_minutes: Math.round(s.minutes * 10) / 10,
-        avg_minutes: s.passes ? Math.round((s.minutes / s.passes) * 10) / 10 : 0
-      }))
-      .sort((a, b) => b.passes - a.passes || b.total_minutes - a.total_minutes)
-      .slice(0, 15);
-
-    setBathroomFlyers(out);
-  }, [timeFrame]);
+    setBathroomFlyers(flyers ?? []);
+  }, [tfKey]);
 
   const load = useCallback(async () => {
     setLoading(true);
