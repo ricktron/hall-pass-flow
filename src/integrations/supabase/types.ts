@@ -701,6 +701,14 @@ export type Database = {
           },
         ]
       }
+      hp_bathroom_flyers_all: {
+        Row: {
+          passes: number | null
+          student_name: string | null
+          total_minutes: number | null
+        }
+        Relationships: []
+      }
       hp_behavior_hourly_windows: {
         Row: {
           hour_24: number | null
@@ -742,6 +750,16 @@ export type Database = {
           minutes_out: number | null
           passes: number | null
           student_name: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_frequent_flyers_bathroom_windows: {
+        Row: {
+          avg_minutes: number | null
+          passes: number | null
+          student_name: string | null
+          total_minutes: number | null
           window: string | null
         }
         Relationships: []
@@ -810,6 +828,18 @@ export type Database = {
         }
         Relationships: []
       }
+      hp_streaks_by_period_windows: {
+        Row: {
+          cadence: string | null
+          end_date: string | null
+          period: string | null
+          start_date: string | null
+          streak_len: number | null
+          student_name: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
       hp_summary_windows: {
         Row: {
           minutes_out: number | null
@@ -854,6 +884,8 @@ export type Database = {
       get_teacher_dashboard_data: { Args: never; Returns: Json }
       get_weekly_top_students: { Args: never; Returns: Json }
       normalize_name: { Args: { txt: string }; Returns: string }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
       to_local_date_toronto: { Args: { ts: string }; Returns: string }
       verify_teacher_pin: { Args: { pin_to_check: string }; Returns: boolean }
     }
