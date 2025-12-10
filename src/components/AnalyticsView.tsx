@@ -32,7 +32,10 @@ interface NursePairData {
   student_name: string; first_dest: string; second_dest: string; minutes_between: number; prev_time: string; curr_time: string
 }
 interface FrequentFlyerRow {
-  student_name: string; passes: number; minutes_out: number
+  student_name: string; passes: number; total_minutes: number; avg_minutes: number
+}
+interface StreakRow {
+  student_name: string; period: string; cadence: string; start_date: string; end_date: string; streak_len: number
 }
 
 const AUTO_KEY = "hp_analytics_auto";
@@ -78,6 +81,7 @@ const AnalyticsView = () => {
   const [disruption, setDisruption] = useState<DisruptionScoreData[]>([]);
   const [nursePairs, setNursePairs] = useState<NursePairData[]>([]);
   const [bathroomFlyers, setBathroomFlyers] = useState<FrequentFlyerRow[]>([]);
+  const [streaks, setStreaks] = useState<StreakRow[]>([]);
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
   const tfKey = timeFrame.toLowerCase();
@@ -128,8 +132,7 @@ const AnalyticsView = () => {
         supabase.from("hp_heatmap_windows").select("period, day, passes").eq("window", tfKey).gt("passes", 0),
         supabase.from("hp_disruption_windows").select("student_name, passes, minutes_out").eq("window", tfKey).gt("passes", 0).order("minutes_out", { ascending: false }).limit(15),
         supabase.from("hp_nurse_bathroom_pairs").select("student_name, first_dest, second_dest, minutes_between, prev_time, curr_time").order("minutes_between", { ascending: true }).limit(25),
-        // Use hp_frequent_flyers_windows (exists in types) instead of bathroom-specific view
-        supabase.from("hp_frequent_flyers_windows").select("student_name, passes, minutes_out").eq("window", tfKey).gt("passes", 0).order("passes", { ascending: false }).limit(15)
+        supabase.from("hp_frequent_flyers_bathroom_windows").select("student_name, passes, total_minutes, avg_minutes").eq("window", tfKey).order("passes", { ascending: false }).limit(15)
       ]);
 
       if (s.error) throw s.error;
@@ -152,6 +155,15 @@ const AnalyticsView = () => {
       setDisruption(dz.data ?? []);
       setNursePairs(np.data ?? []);
       setBathroomFlyers(bf.data ?? []);
+
+      // Fetch streaks by period
+      const { data: st, error: stErr } = await supabase
+        .from('hp_streaks_by_period_windows')
+        .select('student_name, period, cadence, start_date, end_date, streak_len')
+        .order('streak_len', { ascending: false })
+        .limit(20);
+      if (stErr) throw stErr;
+      setStreaks(st ?? []);
     } catch (e: any) {
       setError(e.message || "Failed to load analytics data");
     } finally {
@@ -367,12 +379,12 @@ const AnalyticsView = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-600" />Frequent Flyers</CardTitle>
-            <CardDescription>Students with most trips</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-600" />Frequent Flyers — Bathroom</CardTitle>
+            <CardDescription>Students with most bathroom trips</CardDescription>
           </CardHeader>
           <CardContent>
             {bathroomFlyers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No pass data in this window.</div>
+              <div className="text-center py-8 text-muted-foreground">No bathroom passes in this window</div>
             ) : (
               <Table>
                 <TableHeader>
@@ -388,8 +400,8 @@ const AnalyticsView = () => {
                     <TableRow key={i}>
                       <TableCell className="font-medium">{r.student_name}</TableCell>
                       <TableCell>{r.passes}</TableCell>
-                      <TableCell>{Number(r.minutes_out).toFixed(1)} min</TableCell>
-                      <TableCell>{(r.passes ? (Number(r.minutes_out) / r.passes) : 0).toFixed(1)} min</TableCell>
+                      <TableCell>{Number(r.total_minutes).toFixed(1)} min</TableCell>
+                      <TableCell>{Number(r.avg_minutes).toFixed(1)} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -588,6 +600,47 @@ const AnalyticsView = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Streaks by Period */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-blue-600" />
+            Streaks by Period (≥3)
+          </CardTitle>
+          <CardDescription>Consecutive class meetings with at least one pass (period cadence aware)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {streaks.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No streaks detected yet</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Period</TableHead>
+                  <TableHead>Cadence</TableHead>
+                  <TableHead>Start</TableHead>
+                  <TableHead>End</TableHead>
+                  <TableHead>Length</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {streaks.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{r.student_name}</TableCell>
+                    <TableCell>{r.period}</TableCell>
+                    <TableCell>{r.cadence}</TableCell>
+                    <TableCell>{new Date(r.start_date).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(r.end_date).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-bold">{r.streak_len}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
