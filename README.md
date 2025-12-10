@@ -173,3 +173,22 @@ These patterns:
 - Normalize the `timeFrame` parameter to lowercase
 - Use `LEFT JOIN` to guarantee one row even if the view has no matching data
 - Use `COALESCE` to provide sensible defaults (0) for missing values
+
+## Analytics Views and Performance
+
+### Views
+
+- **hp_base** — Base view over `bathroom_passes` that normalizes column names
+- **hp_frequent_flyers_bathroom_windows** — Windowed bathroom frequent flyers view
+
+### Indexes
+
+The following indexes are maintained on `bathroom_passes` to optimize analytics queries:
+
+| Index Name | Type | Column | Purpose |
+|------------|------|--------|---------|
+| `idx_bathroom_passes_timeout` | B-tree | `timeout` | Time-range filtering |
+| `idx_bathroom_passes_period` | B-tree | `period` | Period-based aggregations |
+| `bathroom_passes_destination_trgm` | GIN (trigram) | `destination` | ILIKE acceleration for destination search |
+
+> **Note:** The `pg_trgm` extension is required for the trigram index. It is enabled automatically by the performance migration.
