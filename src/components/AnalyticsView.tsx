@@ -3,7 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake } from "lucide-react";
+import { BarChart3, BarChart4, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -36,6 +38,15 @@ interface FrequentFlyerRow {
 }
 interface StreakRow {
   student_name: string; period: string; cadence: string; start_date: string; end_date: string; streak_len: number
+}
+interface GradeCompareRow {
+  student_key: string;
+  term: string | null;
+  course: string | null;
+  avg_grade: number | null;
+  passes: number | null;
+  total_minutes: number | null;
+  avg_minutes: number | null;
 }
 
 const AUTO_KEY = "hp_analytics_auto";
@@ -82,6 +93,9 @@ const AnalyticsView = () => {
   const [nursePairs, setNursePairs] = useState<NursePairData[]>([]);
   const [bathroomFlyers, setBathroomFlyers] = useState<FrequentFlyerRow[]>([]);
   const [streaks, setStreaks] = useState<StreakRow[]>([]);
+  const [gradeRows, setGradeRows] = useState<GradeCompareRow[]>([]);
+  const [gradeTerm, setGradeTerm] = useState<string | null>(null);
+  const [gradeScope, setGradeScope] = useState<'bathroom' | 'all'>('bathroom');
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
   const tfKey = timeFrame.toLowerCase();
@@ -164,12 +178,29 @@ const AnalyticsView = () => {
         .limit(20);
       if (stErr) throw stErr;
       setStreaks(st ?? []);
+
+      // Fetch grades vs bathroom passes data
+      let gradeQuery = supabase
+        .from('hp_grade_compare_windows')
+        .select('student_key, term, course, avg_grade, passes, total_minutes, avg_minutes')
+        .eq('window', tfKey)
+        .eq('scope', gradeScope)
+        .order('avg_grade', { ascending: true })
+        .limit(1000);
+
+      if (gradeTerm) {
+        gradeQuery = gradeQuery.eq('term', gradeTerm);
+      }
+
+      const { data: grows, error: gerr } = await gradeQuery;
+      if (gerr) throw gerr;
+      setGradeRows(grows ?? []);
     } catch (e: any) {
       setError(e.message || "Failed to load analytics data");
     } finally {
       setLoading(false);
     }
-  }, [tfKey]);
+  }, [tfKey, gradeScope, gradeTerm]);
 
   // Main load effect - only depends on nonce, timeFrame, freezeData
   useEffect(() => {
@@ -634,6 +665,74 @@ const AnalyticsView = () => {
                     <TableCell>{new Date(r.start_date).toLocaleDateString()}</TableCell>
                     <TableCell>{new Date(r.end_date).toLocaleDateString()}</TableCell>
                     <TableCell className="font-bold">{r.streak_len}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Grades vs Bathroom Passes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart4 className="h-5 w-5 text-blue-600" />
+            Grades vs Bathroom Passes
+          </CardTitle>
+          <CardDescription>Correlate grade averages with pass frequency/duration</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <Label>Scope</Label>
+            <Select value={gradeScope} onValueChange={(v) => setGradeScope(v as 'bathroom' | 'all')}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bathroom">Bathroom</SelectItem>
+                <SelectItem value="all">All passes</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Label className="ml-4">Term</Label>
+            <Input
+              placeholder="e.g., Q2 (leave blank for all)"
+              value={gradeTerm ?? ''}
+              onChange={(e) => setGradeTerm(e.target.value || null)}
+              className="w-[200px]"
+            />
+
+            <Button variant="outline" onClick={() => setNonce(String(Date.now()))}>
+              Refresh
+            </Button>
+          </div>
+
+          {gradeRows.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {gradeTerm ? `No rows for term ${gradeTerm}.` : 'No grades loaded. Import or map grades_normalized.'}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Term</TableHead>
+                  <TableHead>Course</TableHead>
+                  <TableHead className="text-right">Avg Grade</TableHead>
+                  <TableHead className="text-right">Passes</TableHead>
+                  <TableHead className="text-right">Total Minutes</TableHead>
+                  <TableHead className="text-right">Avg Minutes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {gradeRows.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{r.student_key}</TableCell>
+                    <TableCell>{r.term ?? '—'}</TableCell>
+                    <TableCell>{r.course ?? '—'}</TableCell>
+                    <TableCell className="text-right">{r.avg_grade ?? '—'}</TableCell>
+                    <TableCell className="text-right">{r.passes ?? 0}</TableCell>
+                    <TableCell className="text-right">{r.total_minutes ?? 0}</TableCell>
+                    <TableCell className="text-right">{r.avg_minutes ?? 0}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

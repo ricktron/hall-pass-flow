@@ -192,3 +192,54 @@ The following indexes are maintained on `bathroom_passes` to optimize analytics 
 | `bathroom_passes_destination_trgm` | GIN (trigram) | `destination` | ILIKE acceleration for destination search |
 
 > **Note:** The `pg_trgm` extension is required for the trigram index. It is enabled automatically by the performance migration.
+
+## Grades Integration
+
+The analytics dashboard includes a "Grades vs Bathroom Passes" card that correlates student grade averages with their pass frequency and duration. This helps identify students who may be struggling academically and spending excessive time out of class.
+
+### Setting Up Grade Data
+
+**Option A: Import CSV into the scaffold table**
+
+The migration creates a `public.grades_normalized` table with columns:
+- `student_key` (text) - lower-cased student display name or canonical key
+- `term` (text, nullable) - e.g., 'Q2', 'Fall25', etc.
+- `course` (text, nullable) - e.g., 'Math', 'English'
+- `avg_grade` (numeric) - the student's average grade
+
+Import your data via CSV or manual INSERT statements:
+```sql
+INSERT INTO public.grades_normalized (student_key, term, course, avg_grade)
+VALUES
+  ('john doe', 'Q2', 'Math', 85.5),
+  ('jane smith', 'Q2', 'Math', 92.0);
+```
+
+**Option B: Create a view that maps your existing gradebook**
+
+If you already have a grades table, create a view that maps to the expected columns:
+```sql
+CREATE OR REPLACE VIEW public.grades_normalized AS
+SELECT lower(student_name) AS student_key,
+       term,
+       course,
+       avg_score::numeric(5,2) AS avg_grade
+FROM public.your_grades_table;
+```
+
+### How It Works
+
+The analytics dashboard pulls from `hp_grade_compare_windows`, which joins:
+- `hp_student_metrics_windows` - per-student pass metrics (bathroom or all scopes) by time window
+- `grades_normalized` - your grade data
+
+Filters available in the UI:
+- **Scope**: "Bathroom" (only bathroom passes) or "All passes"
+- **Term**: Filter by academic term (leave blank for all terms)
+- **Timeframe**: Uses the same Day/Week/Month/Quarter/All selector as other analytics
+
+### Discovery Helper
+
+Run `scripts/sql/grades_discovery.sql` in the Supabase SQL Editor to:
+1. List candidate grade tables in your schema
+2. See example queries to inspect and map your data
