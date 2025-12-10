@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, Clock, Users, TrendingUp, RefreshCw, Stethoscope } from "lucide-react";
+import { BarChart3, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type TimeFrame = "Day" | "Week" | "Month" | "Quarter" | "All";
 
@@ -31,26 +32,40 @@ interface NursePairData {
   student_name: string; first_dest: string; second_dest: string; minutes_between: number; prev_time: string; curr_time: string
 }
 interface FrequentFlyerRow {
-  student_name: string; passes: number; total_minutes: number; avg_minutes: number
-}
-interface StreakRow {
-  student_name: string; period: string; cadence: string; start_date: string; end_date: string; streak_len: number
+  student_name: string; passes: number; minutes_out: number
 }
 
 const AUTO_KEY = "hp_analytics_auto";
-const TF_KEY   = "hp_analytics_tf";
+const TF_KEY = "hp_analytics_tf";
+const FREEZE_KEY = "hp_analytics_freeze";
 const BLUE = "hsl(217 91% 60%)"; // #3b82f6
 
 const AnalyticsView = () => {
+  // Persisted timeframe
   const [timeFrame, setTimeFrame] = useState<TimeFrame>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(TF_KEY) as TimeFrame | null;
-      if (saved && ["Day","Week","Month","Quarter","All"].includes(saved)) return saved;
+      if (saved && ["Day", "Week", "Month", "Quarter", "All"].includes(saved)) return saved;
     }
     return "Week";
   });
+
+  // Persisted freeze toggle - blocks all auto reloads
+  const [freezeData, setFreezeData] = useState<boolean>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem(FREEZE_KEY) === "true";
+    return false;
+  });
+
+  // Persisted auto-refresh toggle - OFF by default
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
+    if (typeof window !== "undefined") return localStorage.getItem(AUTO_KEY) === "true";
+    return false;
+  });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nonce, setNonce] = useState("init");
+  const intervalRef = useRef<number | null>(null);
 
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [returnRate, setReturnRate] = useState<ReturnRateData | null>(null);
@@ -63,31 +78,37 @@ const AnalyticsView = () => {
   const [disruption, setDisruption] = useState<DisruptionScoreData[]>([]);
   const [nursePairs, setNursePairs] = useState<NursePairData[]>([]);
   const [bathroomFlyers, setBathroomFlyers] = useState<FrequentFlyerRow[]>([]);
-  const [streaks, setStreaks] = useState<StreakRow[]>([]);
-
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(AUTO_KEY) === "true";
-  });
-  const [nonce, setNonce] = useState("init");
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
-
   const tfKey = timeFrame.toLowerCase();
 
-  const loadBathroomFrequentFlyers = useCallback(async () => {
-    const { data: flyers, error: flyersErr } = await supabase
-      .from("hp_frequent_flyers_bathroom_windows")
-      .select("student_name, passes, total_minutes, avg_minutes")
-      .eq("window", tfKey)
-      .order("passes", { ascending: false })
-      .limit(15);
+  // Persist localStorage
+  useEffect(() => { localStorage.setItem(TF_KEY, timeFrame); }, [timeFrame]);
+  useEffect(() => { localStorage.setItem(FREEZE_KEY, String(freezeData)); }, [freezeData]);
+  useEffect(() => { localStorage.setItem(AUTO_KEY, String(autoRefresh)); }, [autoRefresh]);
 
-    if (flyersErr) throw flyersErr;
-
-    setBathroomFlyers(flyers ?? []);
-  }, [tfKey]);
+  // Single interval control effect
+  useEffect(() => {
+    // Always clear any existing timer
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    // Do not poll if frozen or toggle is off
+    if (!autoRefresh || freezeData) return;
+    // Poll only when tab visible; otherwise wait for next tick
+    intervalRef.current = window.setInterval(() => {
+      if (!document.hidden) {
+        setNonce(String(Date.now()));
+      }
+    }, 60000);
+    return () => {
+      if (intervalRef.current !== null) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [autoRefresh, freezeData]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,7 +116,7 @@ const AnalyticsView = () => {
 
     try {
       const [
-        s, rr, p, d, l, h, w, hm, dz, np
+        s, rr, p, d, l, h, w, hm, dz, np, bf
       ] = await Promise.all([
         supabase.from("hp_summary_windows").select("passes, minutes_out").eq("window", tfKey).maybeSingle(),
         supabase.from("hp_return_rate_windows").select("pct_returned, still_out, total").eq("window", tfKey).maybeSingle(),
@@ -106,7 +127,9 @@ const AnalyticsView = () => {
         supabase.from("hp_dayofweek_windows").select("dow_short, passes").eq("window", tfKey),
         supabase.from("hp_heatmap_windows").select("period, day, passes").eq("window", tfKey).gt("passes", 0),
         supabase.from("hp_disruption_windows").select("student_name, passes, minutes_out").eq("window", tfKey).gt("passes", 0).order("minutes_out", { ascending: false }).limit(15),
-        supabase.from("hp_nurse_bathroom_pairs").select("student_name, first_dest, second_dest, minutes_between, prev_time, curr_time").order("minutes_between", { ascending: true }).limit(25)
+        supabase.from("hp_nurse_bathroom_pairs").select("student_name, first_dest, second_dest, minutes_between, prev_time, curr_time").order("minutes_between", { ascending: true }).limit(25),
+        // Use hp_frequent_flyers_windows (exists in types) instead of bathroom-specific view
+        supabase.from("hp_frequent_flyers_windows").select("student_name, passes, minutes_out").eq("window", tfKey).gt("passes", 0).order("passes", { ascending: false }).limit(15)
       ]);
 
       if (s.error) throw s.error;
@@ -123,57 +146,32 @@ const AnalyticsView = () => {
       setLongest(l.data ?? []);
       setHourly(h.data ?? []);
       // order Mon..Sun
-      const order = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
-      setDow((w.data ?? []).sort((a,b)=> order.indexOf(a.dow_short)-order.indexOf(b.dow_short)));
+      const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      setDow((w.data ?? []).sort((a, b) => order.indexOf(a.dow_short) - order.indexOf(b.dow_short)));
       setHeatmap(hm.data ?? []);
       setDisruption(dz.data ?? []);
       setNursePairs(np.data ?? []);
-
-      await loadBathroomFrequentFlyers();
-
-      // Fetch streaks by period
-      const st = await supabase
-        .from("hp_streaks_by_period_windows")
-        .select("student_name, period, cadence, start_date, end_date, streak_len")
-        .order("streak_len", { ascending: false })
-        .limit(20);
-      if (st.error) throw st.error;
-      setStreaks(st.data ?? []);
+      setBathroomFlyers(bf.data ?? []);
     } catch (e: any) {
       setError(e.message || "Failed to load analytics data");
     } finally {
       setLoading(false);
     }
-  }, [tfKey, loadBathroomFrequentFlyers]);
+  }, [tfKey]);
 
-  // load on timeframe or manual refresh
-  useEffect(() => { load(); }, [load, nonce]);
-
-  // persist toggle
-  useEffect(() => { localStorage.setItem(AUTO_KEY, autoRefresh ? "true" : "false"); }, [autoRefresh]);
-
-  // persist timeframe selection
-  useEffect(() => { localStorage.setItem(TF_KEY, timeFrame); }, [timeFrame]);
-
-  // interval only when ON and tab visible
+  // Main load effect - only depends on nonce, timeFrame, freezeData
   useEffect(() => {
-    if (!autoRefresh) {
-      if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-      return;
-    }
-    intervalRef.current = setInterval(() => {
-      if (!document.hidden) setNonce(String(Date.now()));
-    }, 60000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [autoRefresh]);
+    if (freezeData) return; // hard guard: never auto-load when frozen
+    void load();
+  }, [nonce, timeFrame, freezeData, load]);
 
   const manualRefresh = () => setNonce(String(Date.now()));
 
   const fmtHour = (h: number) =>
     h === 0 ? "12a" :
-    h < 12 ? `${h}a` :
-    h === 12 ? "12p" :
-    `${h - 12}p`;
+      h < 12 ? `${h}a` :
+        h === 12 ? "12p" :
+          `${h - 12}p`;
 
   const avgMinutes =
     summary && summary.passes > 0
@@ -183,8 +181,8 @@ const AnalyticsView = () => {
   const heatColor = (passes: number, max: number) => {
     if (passes === 0) return "hsl(214 100% 97%)";
     const stops = [
-      "hsl(214 95% 93%)","hsl(214 95% 87%)","hsl(213 94% 78%)",
-      "hsl(213 94% 68%)","hsl(217 91% 60%)","hsl(221 83% 53%)"
+      "hsl(214 95% 93%)", "hsl(214 95% 87%)", "hsl(213 94% 78%)",
+      "hsl(213 94% 68%)", "hsl(217 91% 60%)", "hsl(221 83% 53%)"
     ];
     const idx = Math.min(Math.floor((passes / Math.max(max, 1)) * stops.length), stops.length - 1);
     return stops[idx];
@@ -199,15 +197,32 @@ const AnalyticsView = () => {
           <p className="text-muted-foreground">Windowed stats for passes and minutes</p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={manualRefresh} className="gap-2">
+            <Button variant="outline" size="sm" onClick={manualRefresh} className="gap-2" disabled={loading}>
               <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> Refresh
             </Button>
+
             <div className="flex items-center gap-2">
               <Switch id="auto-refresh" checked={autoRefresh} onCheckedChange={setAutoRefresh} />
-              <Label htmlFor="auto-refresh" className="text-sm">Auto refresh</Label>
+              <Label htmlFor="auto-refresh" className="text-sm">Auto</Label>
             </div>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    <Switch id="freeze" checked={freezeData} onCheckedChange={setFreezeData} />
+                    <Label htmlFor="freeze" className="text-sm flex items-center gap-1">
+                      <Snowflake className="h-3 w-3" /> Freeze
+                    </Label>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>When ON, nothing reloads automatically. Use Refresh to fetch.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           <div className="flex rounded-lg bg-muted p-1">
@@ -229,6 +244,17 @@ const AnalyticsView = () => {
         <Card className="border-destructive">
           <CardContent className="p-4">
             <p className="text-destructive text-sm">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {freezeData && (
+        <Card className="border-blue-300 bg-blue-50 dark:bg-blue-950/20">
+          <CardContent className="p-3">
+            <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+              <Snowflake className="h-4 w-4" />
+              Data is frozen. Click Refresh to update or turn off Freeze.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -341,12 +367,12 @@ const AnalyticsView = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-600" />Frequent Flyers — Bathroom</CardTitle>
-            <CardDescription>Students with most bathroom/restroom trips</CardDescription>
+            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-blue-600" />Frequent Flyers</CardTitle>
+            <CardDescription>Students with most trips</CardDescription>
           </CardHeader>
           <CardContent>
             {bathroomFlyers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No bathroom passes in this window.</div>
+              <div className="text-center py-8 text-muted-foreground">No pass data in this window.</div>
             ) : (
               <Table>
                 <TableHeader>
@@ -362,8 +388,8 @@ const AnalyticsView = () => {
                     <TableRow key={i}>
                       <TableCell className="font-medium">{r.student_name}</TableCell>
                       <TableCell>{r.passes}</TableCell>
-                      <TableCell>{r.total_minutes.toFixed(1)} min</TableCell>
-                      <TableCell>{r.avg_minutes.toFixed(1)} min</TableCell>
+                      <TableCell>{Number(r.minutes_out).toFixed(1)} min</TableCell>
+                      <TableCell>{(r.passes ? (Number(r.minutes_out) / r.passes) : 0).toFixed(1)} min</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -454,6 +480,42 @@ const AnalyticsView = () => {
         </Card>
       </div>
 
+      {/* Disruption Score */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-orange-500" />Disruption Score</CardTitle>
+          <CardDescription>Top students by total minutes out</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {disruption.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No disruption data available</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Passes</TableHead>
+                  <TableHead>Total Minutes</TableHead>
+                  <TableHead>Avg Minutes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {disruption.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{i + 1}</TableCell>
+                    <TableCell className="font-medium">{r.student_name}</TableCell>
+                    <TableCell>{r.passes}</TableCell>
+                    <TableCell>{Number(r.minutes_out).toFixed(1)} min</TableCell>
+                    <TableCell>{(r.passes ? (Number(r.minutes_out) / r.passes) : 0).toFixed(1)} min</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Heatmap + Nurse pairs */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>
@@ -469,14 +531,14 @@ const AnalyticsView = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-16">Period</TableHead>
-                    {["Mon","Tue","Wed","Thu","Fri"].map(d => (<TableHead key={d} className="text-center">{d}</TableHead>))}
+                    {["Mon", "Tue", "Wed", "Thu", "Fri"].map(d => (<TableHead key={d} className="text-center">{d}</TableHead>))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {["A","B","C","D","E","F","G","H"].map(period => (
+                  {["A", "B", "C", "D", "E", "F", "G", "H"].map(period => (
                     <TableRow key={period}>
                       <TableCell className="font-medium">{period}</TableCell>
-                      {["Mon","Tue","Wed","Thu","Fri"].map(day => {
+                      {["Mon", "Tue", "Wed", "Thu", "Fri"].map(day => {
                         const cell = heatmap.find(x => x.period === period && x.day === day);
                         const p = cell?.passes ?? 0;
                         return (
@@ -526,47 +588,6 @@ const AnalyticsView = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Streaks by Period */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-blue-600" />
-            Streaks by Period (≥3)
-          </CardTitle>
-          <CardDescription>Consecutive class meetings with at least one pass (per period cadence)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {streaks.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No streaks detected yet</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Cadence</TableHead>
-                  <TableHead>Start</TableHead>
-                  <TableHead>End</TableHead>
-                  <TableHead>Length</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {streaks.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium">{r.student_name}</TableCell>
-                    <TableCell>{r.period}</TableCell>
-                    <TableCell>{r.cadence}</TableCell>
-                    <TableCell>{new Date(r.start_date).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(r.end_date).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-bold">{r.streak_len}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 };
