@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, BarChart4, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake } from "lucide-react";
+import { BarChart3, BarChart4, BarChartBig, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake, AlertTriangle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,31 @@ interface GradeCompareRow {
   passes: number | null;
   total_minutes: number | null;
   avg_minutes: number | null;
+}
+interface GradeCorrRow {
+  window: string;
+  scope: 'bathroom' | 'all';
+  term: string | null;
+  n: number | null;
+  corr_grade_vs_passes: number | null;
+  corr_grade_vs_minutes: number | null;
+  slope_grade_vs_passes: number | null;
+  slope_grade_vs_minutes: number | null;
+  r2_grade_vs_passes: number | null;
+  r2_grade_vs_minutes: number | null;
+}
+interface RiskRow {
+  window: string;
+  scope: 'bathroom' | 'all';
+  term: string | null;
+  student_key: string;
+  avg_grade: number | null;
+  passes: number | null;
+  total_minutes: number | null;
+  z_grade: number | null;
+  z_passes: number | null;
+  z_minutes: number | null;
+  risk_score: number | null;
 }
 
 const AUTO_KEY = "hp_analytics_auto";
@@ -96,6 +121,8 @@ const AnalyticsView = () => {
   const [gradeRows, setGradeRows] = useState<GradeCompareRow[]>([]);
   const [gradeTerm, setGradeTerm] = useState<string | null>(null);
   const [gradeScope, setGradeScope] = useState<'bathroom' | 'all'>('bathroom');
+  const [corr, setCorr] = useState<GradeCorrRow | null>(null);
+  const [risks, setRisks] = useState<RiskRow[]>([]);
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
   const tfKey = timeFrame.toLowerCase();
@@ -195,6 +222,35 @@ const AnalyticsView = () => {
       const { data: grows, error: gerr } = await gradeQuery;
       if (gerr) throw gerr;
       setGradeRows(grows ?? []);
+
+      // Fetch grade correlation metrics
+      let corrQuery = supabase
+        .from('hp_grade_corr_windows')
+        .select('window,scope,term,n,corr_grade_vs_passes,corr_grade_vs_minutes,slope_grade_vs_passes,slope_grade_vs_minutes,r2_grade_vs_passes,r2_grade_vs_minutes')
+        .eq('window', tfKey)
+        .eq('scope', gradeScope)
+        .limit(1);
+      if (gradeTerm) {
+        corrQuery = corrQuery.eq('term', gradeTerm);
+      }
+      const { data: corrRows, error: corrErr } = await corrQuery;
+      if (corrErr) throw corrErr;
+      setCorr((corrRows && corrRows.length > 0) ? corrRows[0] : null);
+
+      // Fetch at-risk students (grade outliers)
+      let riskQuery = supabase
+        .from('hp_grade_outliers_windows')
+        .select('window,scope,term,student_key,avg_grade,passes,total_minutes,z_grade,z_passes,z_minutes,risk_score')
+        .eq('window', tfKey)
+        .eq('scope', gradeScope)
+        .order('risk_score', { ascending: false })
+        .limit(15);
+      if (gradeTerm) {
+        riskQuery = riskQuery.eq('term', gradeTerm);
+      }
+      const { data: riskRows, error: riskErr } = await riskQuery;
+      if (riskErr) throw riskErr;
+      setRisks(riskRows ?? []);
     } catch (e: any) {
       setError(e.message || "Failed to load analytics data");
     } finally {
@@ -733,6 +789,70 @@ const AnalyticsView = () => {
                     <TableCell className="text-right">{r.passes ?? 0}</TableCell>
                     <TableCell className="text-right">{r.total_minutes ?? 0}</TableCell>
                     <TableCell className="text-right">{r.avg_minutes ?? 0}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Grade Signals */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BarChartBig className="h-5 w-5 text-blue-600" />
+            Grade Signals
+          </CardTitle>
+          <CardDescription>Pearson r, slopes, and R² (current timeframe/scope/term)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!corr ? (
+            <div className="text-center py-8 text-muted-foreground">No grade metrics for this selection.</div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div><div className="text-sm text-muted-foreground">n</div><div className="text-xl font-semibold">{corr.n ?? '—'}</div></div>
+              <div><div className="text-sm text-muted-foreground">r (grade vs passes)</div><div className="text-xl font-semibold">{corr.corr_grade_vs_passes?.toFixed(3) ?? '—'}</div></div>
+              <div><div className="text-sm text-muted-foreground">r (grade vs minutes)</div><div className="text-xl font-semibold">{corr.corr_grade_vs_minutes?.toFixed(3) ?? '—'}</div></div>
+              <div><div className="text-sm text-muted-foreground">slope grade~passes</div><div className="text-xl font-semibold">{corr.slope_grade_vs_passes?.toFixed(3) ?? '—'}</div></div>
+              <div><div className="text-sm text-muted-foreground">R² grade~passes</div><div className="text-xl font-semibold">{corr.r2_grade_vs_passes?.toFixed(3) ?? '—'}</div></div>
+              <div><div className="text-sm text-muted-foreground">R² grade~minutes</div><div className="text-xl font-semibold">{corr.r2_grade_vs_minutes?.toFixed(3) ?? '—'}</div></div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* At-Risk (grades vs bathroom) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            At-Risk (grades vs bathroom)
+          </CardTitle>
+          <CardDescription>Low grades + high bathroom use (z-score composite)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {risks.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">No outliers for this selection.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead className="text-right">Avg Grade</TableHead>
+                  <TableHead className="text-right">Passes</TableHead>
+                  <TableHead className="text-right">Total Min</TableHead>
+                  <TableHead className="text-right">Risk</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {risks.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{r.student_key}</TableCell>
+                    <TableCell className="text-right">{r.avg_grade ?? '—'}</TableCell>
+                    <TableCell className="text-right">{r.passes ?? 0}</TableCell>
+                    <TableCell className="text-right">{r.total_minutes ?? 0}</TableCell>
+                    <TableCell className="text-right">{r.risk_score?.toFixed(2) ?? '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
