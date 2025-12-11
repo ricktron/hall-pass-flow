@@ -116,6 +116,9 @@ const AnalyticsView = () => {
   const [nonce, setNonce] = useState("init");
   const intervalRef = useRef<number | null>(null);
 
+  // Prevent overlapping fetches
+  const inFlightRef = useRef(false);
+
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [returnRate, setReturnRate] = useState<ReturnRateData | null>(null);
   const [byPeriod, setByPeriod] = useState<PeriodData[]>([]);
@@ -133,6 +136,8 @@ const AnalyticsView = () => {
   const [gradeScope, setGradeScope] = useState<'bathroom' | 'all'>('bathroom');
   const [corr, setCorr] = useState<GradeCorrRow | null>(null);
   const [risks, setRisks] = useState<RiskRow[]>([]);
+  // Filter to show only rows with grades
+  const [onlyWithGrades, setOnlyWithGrades] = useState<boolean>(false);
 
   // Drill-down modal state
   const [drillStudent, setDrillStudent] = useState<string | null>(null);
@@ -223,6 +228,12 @@ const AnalyticsView = () => {
   };
 
   const load = useCallback(async () => {
+    // Do not refresh while frozen
+    if (freezeData) return;
+    // Prevent overlapping fetches
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+
     setLoading(true);
     setError(null);
 
@@ -274,11 +285,15 @@ const AnalyticsView = () => {
       setStreaks(st ?? []);
 
       // Fetch grades vs bathroom passes data using raw query (views not in types)
-      const { data: grows, error: gerr } = await supabase
+      // Build query with optional "has grades only" filter
+      let gradeQuery = supabase
         .from('hp_grade_compare_windows' as any)
         .select('student_key, term, course, avg_grade, passes, total_minutes, avg_minutes')
         .eq('window', tfKey)
-        .eq('scope', gradeScope)
+        .eq('scope', gradeScope);
+      if (gradeTerm) gradeQuery = gradeQuery.eq('term', gradeTerm);
+      if (onlyWithGrades) gradeQuery = gradeQuery.not('avg_grade', 'is', null);
+      const { data: grows, error: gerr } = await gradeQuery
         .order('avg_grade', { ascending: true })
         .limit(1000);
       if (gerr) throw gerr;
@@ -308,8 +323,9 @@ const AnalyticsView = () => {
       setError(e.message || "Failed to load analytics data");
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
-  }, [tfKey, gradeScope, gradeTerm]);
+  }, [tfKey, gradeScope, gradeTerm, freezeData, onlyWithGrades]);
 
   // Main load effect - only depends on nonce, timeFrame, freezeData
   useEffect(() => {
@@ -317,7 +333,10 @@ const AnalyticsView = () => {
     void load();
   }, [nonce, timeFrame, freezeData, load]);
 
-  const manualRefresh = () => setNonce(String(Date.now()));
+  // Manual refresh respects freeze - no refresh when frozen
+  const manualRefresh = () => {
+    if (!freezeData) void load();
+  };
 
   const fmtHour = (h: number) =>
     h === 0 ? "12a" :
@@ -810,9 +829,15 @@ const AnalyticsView = () => {
               className="w-[200px]"
             />
 
-            <Button variant="outline" onClick={() => setNonce(String(Date.now()))}>
+            <Button variant="outline" onClick={manualRefresh}>
               Refresh
             </Button>
+
+            {/* Filter: only show rows with grades */}
+            <div className="flex items-center gap-2 ml-4">
+              <Label htmlFor="hp-only-with-grades" className="text-sm">Has grades only</Label>
+              <Switch id="hp-only-with-grades" checked={onlyWithGrades} onCheckedChange={setOnlyWithGrades} />
+            </div>
           </div>
 
           {gradeRows.length === 0 ? (
