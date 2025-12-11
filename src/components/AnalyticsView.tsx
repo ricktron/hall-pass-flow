@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, BarChart4, BarChartBig, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake, AlertTriangle } from "lucide-react";
+import { BarChart3, BarChart4, BarChartBig, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake, AlertTriangle, Eye, Download, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ import {
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 type TimeFrame = "Day" | "Week" | "Month" | "Quarter" | "All";
 
@@ -50,7 +51,7 @@ interface GradeCompareRow {
 }
 interface GradeCorrRow {
   window: string;
-  scope: 'bathroom' | 'all';
+  scope: string;
   term: string | null;
   n: number | null;
   corr_grade_vs_passes: number | null;
@@ -62,7 +63,7 @@ interface GradeCorrRow {
 }
 interface RiskRow {
   window: string;
-  scope: 'bathroom' | 'all';
+  scope: string;
   term: string | null;
   student_key: string;
   avg_grade: number | null;
@@ -72,6 +73,15 @@ interface RiskRow {
   z_passes: number | null;
   z_minutes: number | null;
   risk_score: number | null;
+}
+interface DrillRow {
+  student_key: string;
+  timeout: string;
+  timein: string | null;
+  duration: number | string | null;
+  destination: string | null;
+  period: string | null;
+  classroom: string | null;
 }
 
 const AUTO_KEY = "hp_analytics_auto";
@@ -124,6 +134,12 @@ const AnalyticsView = () => {
   const [corr, setCorr] = useState<GradeCorrRow | null>(null);
   const [risks, setRisks] = useState<RiskRow[]>([]);
 
+  // Drill-down modal state
+  const [drillStudent, setDrillStudent] = useState<string | null>(null);
+  const [drillRows, setDrillRows] = useState<DrillRow[]>([]);
+  const [drillLoading, setDrillLoading] = useState(false);
+  const [showDrill, setShowDrill] = useState(false);
+
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
   const tfKey = timeFrame.toLowerCase();
 
@@ -154,6 +170,57 @@ const AnalyticsView = () => {
       }
     };
   }, [autoRefresh, freezeData]);
+
+  // Open student drill-down modal
+  const openStudentDrill = async (studentKey: string) => {
+    const key = studentKey.toLowerCase();
+    setDrillStudent(key);
+    setShowDrill(true);
+    setDrillLoading(true);
+    setDrillRows([]);
+
+    try {
+      const { data, error: drillError } = await supabase
+        .from('hp_bathroom_trips_current_quarter' as any)
+        .select('timeout,timein,duration,destination,period,classroom,student_key')
+        .eq('student_key', key)
+        .order('timeout', { ascending: false })
+        .limit(200);
+
+      if (drillError) {
+        setError(`Failed to load trips: ${drillError.message}`);
+      } else {
+        setDrillRows((data as unknown as DrillRow[]) ?? []);
+      }
+    } catch (e: any) {
+      setError(e.message || "Failed to load trips");
+    } finally {
+      setDrillLoading(false);
+    }
+  };
+
+  // Export CSV
+  const exportDrillCSV = () => {
+    if (drillRows.length === 0) return;
+    const headers = ['Date', 'Time Out', 'Time In', 'Duration (min)', 'Destination', 'Period', 'Classroom'];
+    const rows = drillRows.map(r => [
+      r.timeout ? new Date(r.timeout).toLocaleDateString() : '',
+      r.timeout ? new Date(r.timeout).toLocaleTimeString() : '',
+      r.timein ? new Date(r.timein).toLocaleTimeString() : '',
+      r.duration ?? '',
+      r.destination ?? '',
+      r.period ?? '',
+      r.classroom ?? ''
+    ]);
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bathroom_trips_${drillStudent}_current_quarter.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -206,51 +273,37 @@ const AnalyticsView = () => {
       if (stErr) throw stErr;
       setStreaks(st ?? []);
 
-      // Fetch grades vs bathroom passes data
-      let gradeQuery = supabase
-        .from('hp_grade_compare_windows')
+      // Fetch grades vs bathroom passes data using raw query (views not in types)
+      const { data: grows, error: gerr } = await supabase
+        .from('hp_grade_compare_windows' as any)
         .select('student_key, term, course, avg_grade, passes, total_minutes, avg_minutes')
         .eq('window', tfKey)
         .eq('scope', gradeScope)
         .order('avg_grade', { ascending: true })
         .limit(1000);
-
-      if (gradeTerm) {
-        gradeQuery = gradeQuery.eq('term', gradeTerm);
-      }
-
-      const { data: grows, error: gerr } = await gradeQuery;
       if (gerr) throw gerr;
-      setGradeRows(grows ?? []);
+      setGradeRows((grows as unknown as GradeCompareRow[]) ?? []);
 
       // Fetch grade correlation metrics
-      let corrQuery = supabase
-        .from('hp_grade_corr_windows')
+      const { data: corrRows, error: corrErr } = await supabase
+        .from('hp_grade_corr_windows' as any)
         .select('window,scope,term,n,corr_grade_vs_passes,corr_grade_vs_minutes,slope_grade_vs_passes,slope_grade_vs_minutes,r2_grade_vs_passes,r2_grade_vs_minutes')
         .eq('window', tfKey)
         .eq('scope', gradeScope)
         .limit(1);
-      if (gradeTerm) {
-        corrQuery = corrQuery.eq('term', gradeTerm);
-      }
-      const { data: corrRows, error: corrErr } = await corrQuery;
       if (corrErr) throw corrErr;
-      setCorr((corrRows && corrRows.length > 0) ? corrRows[0] : null);
+      setCorr((corrRows && corrRows.length > 0) ? (corrRows[0] as unknown as GradeCorrRow) : null);
 
       // Fetch at-risk students (grade outliers)
-      let riskQuery = supabase
-        .from('hp_grade_outliers_windows')
+      const { data: riskRows, error: riskErr } = await supabase
+        .from('hp_grade_outliers_windows' as any)
         .select('window,scope,term,student_key,avg_grade,passes,total_minutes,z_grade,z_passes,z_minutes,risk_score')
         .eq('window', tfKey)
         .eq('scope', gradeScope)
         .order('risk_score', { ascending: false })
         .limit(15);
-      if (gradeTerm) {
-        riskQuery = riskQuery.eq('term', gradeTerm);
-      }
-      const { data: riskRows, error: riskErr } = await riskQuery;
       if (riskErr) throw riskErr;
-      setRisks(riskRows ?? []);
+      setRisks((riskRows as unknown as RiskRow[]) ?? []);
     } catch (e: any) {
       setError(e.message || "Failed to load analytics data");
     } finally {
@@ -777,6 +830,7 @@ const AnalyticsView = () => {
                   <TableHead className="text-right">Passes</TableHead>
                   <TableHead className="text-right">Total Minutes</TableHead>
                   <TableHead className="text-right">Avg Minutes</TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -789,6 +843,16 @@ const AnalyticsView = () => {
                     <TableCell className="text-right">{r.passes ?? 0}</TableCell>
                     <TableCell className="text-right">{r.total_minutes ?? 0}</TableCell>
                     <TableCell className="text-right">{r.avg_minutes ?? 0}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openStudentDrill(r.student_key)}
+                        className="gap-1 text-blue-600 hover:text-blue-700"
+                      >
+                        <Eye className="h-4 w-4" /> View trips
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -843,6 +907,7 @@ const AnalyticsView = () => {
                   <TableHead className="text-right">Passes</TableHead>
                   <TableHead className="text-right">Total Min</TableHead>
                   <TableHead className="text-right">Risk</TableHead>
+                  <TableHead className="w-24">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -853,6 +918,16 @@ const AnalyticsView = () => {
                     <TableCell className="text-right">{r.passes ?? 0}</TableCell>
                     <TableCell className="text-right">{r.total_minutes ?? 0}</TableCell>
                     <TableCell className="text-right">{r.risk_score?.toFixed(2) ?? '—'}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openStudentDrill(r.student_key)}
+                        className="gap-1 text-blue-600 hover:text-blue-700"
+                      >
+                        <Eye className="h-4 w-4" /> View trips
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -860,6 +935,78 @@ const AnalyticsView = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Student Drill-Down Modal */}
+      <Dialog open={showDrill} onOpenChange={setShowDrill}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-xl">Bathroom Trips — Current Quarter</DialogTitle>
+                <DialogDescription className="text-sm">
+                  America/Chicago window. Only bathroom/restroom/rr destinations.
+                </DialogDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportDrillCSV}
+                  disabled={drillRows.length === 0}
+                  className="gap-1"
+                >
+                  <Download className="h-4 w-4" /> Export CSV
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowDrill(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            {drillStudent && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Student: <span className="font-medium">{drillStudent}</span>
+              </p>
+            )}
+          </DialogHeader>
+
+          <div className="flex-1 overflow-auto mt-4">
+            {drillLoading ? (
+              <div className="text-center py-12 text-muted-foreground">Loading trips...</div>
+            ) : drillRows.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No bathroom trips this quarter for this student.
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Time Out</TableHead>
+                    <TableHead>Time In</TableHead>
+                    <TableHead>Duration (min)</TableHead>
+                    <TableHead>Destination</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Classroom</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {drillRows.map((r, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{r.timeout ? new Date(r.timeout).toLocaleDateString() : '—'}</TableCell>
+                      <TableCell>{r.timeout ? new Date(r.timeout).toLocaleTimeString() : '—'}</TableCell>
+                      <TableCell>{r.timein ? new Date(r.timein).toLocaleTimeString() : '—'}</TableCell>
+                      <TableCell>{r.duration != null ? Number(r.duration).toFixed(1) : '—'}</TableCell>
+                      <TableCell>{r.destination ?? '—'}</TableCell>
+                      <TableCell>{r.period ?? '—'}</TableCell>
+                      <TableCell>{r.classroom ?? '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

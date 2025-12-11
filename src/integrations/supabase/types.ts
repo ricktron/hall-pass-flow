@@ -220,6 +220,27 @@ export type Database = {
         }
         Relationships: []
       }
+      grades_normalized: {
+        Row: {
+          avg_grade: number
+          course: string | null
+          student_key: string
+          term: string | null
+        }
+        Insert: {
+          avg_grade: number
+          course?: string | null
+          student_key: string
+          term?: string | null
+        }
+        Update: {
+          avg_grade?: number
+          course?: string | null
+          student_key?: string
+          term?: string | null
+        }
+        Relationships: []
+      }
       hall_pass_corrections: {
         Row: {
           corrected_at: string | null
@@ -709,6 +730,26 @@ export type Database = {
         }
         Relationships: []
       }
+      hp_bathroom_trips_current_quarter: {
+        Row: {
+          classroom: string | null
+          destination: string | null
+          duration: number | null
+          period: string | null
+          student_key: string | null
+          timein: string | null
+          timeout: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_bathroom_passes_classroom"
+            columns: ["classroom"]
+            isOneToOne: false
+            referencedRelation: "classrooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hp_behavior_hourly_windows: {
         Row: {
           hour_24: number | null
@@ -770,6 +811,51 @@ export type Database = {
           passes: number | null
           student_name: string | null
           window: string | null
+        }
+        Relationships: []
+      }
+      hp_grade_compare_windows: {
+        Row: {
+          avg_grade: number | null
+          avg_minutes: number | null
+          course: string | null
+          passes: number | null
+          scope: string | null
+          student_key: string | null
+          term: string | null
+          total_minutes: number | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_grade_corr_windows: {
+        Row: {
+          corr_grade_vs_minutes: number | null
+          corr_grade_vs_passes: number | null
+          n: number | null
+          r2_grade_vs_minutes: number | null
+          r2_grade_vs_passes: number | null
+          scope: string | null
+          slope_grade_vs_minutes: number | null
+          slope_grade_vs_passes: number | null
+          term: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_grade_outliers_windows: {
+        Row: {
+          avg_grade: number | null
+          passes: number | null
+          risk_score: number | null
+          scope: string | null
+          student_key: string | null
+          term: string | null
+          total_minutes: number | null
+          window: string | null
+          z_grade: number | null
+          z_minutes: number | null
+          z_passes: number | null
         }
         Relationships: []
       }
@@ -836,6 +922,17 @@ export type Database = {
           start_date: string | null
           streak_len: number | null
           student_name: string | null
+          window: string | null
+        }
+        Relationships: []
+      }
+      hp_student_metrics_windows: {
+        Row: {
+          avg_minutes: number | null
+          passes: number | null
+          scope: string | null
+          student_key: string | null
+          total_minutes: number | null
           window: string | null
         }
         Relationships: []
