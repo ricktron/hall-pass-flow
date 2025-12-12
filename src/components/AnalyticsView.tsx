@@ -89,6 +89,13 @@ const TF_KEY = "hp_analytics_tf";
 const FREEZE_KEY = "hp_analytics_freeze";
 const BLUE = "hsl(217 91% 60%)"; // #3b82f6
 
+// Helper: strictly parse boolean from localStorage (never use Boolean() which treats "false" as true)
+const parseBoolLS = (key: string, defaultVal: boolean): boolean => {
+  if (typeof window === "undefined") return defaultVal;
+  const v = localStorage.getItem(key);
+  return v === "true" ? true : v === "false" ? false : defaultVal;
+};
+
 const AnalyticsView = () => {
   // Persisted timeframe
   const [timeFrame, setTimeFrame] = useState<TimeFrame>(() => {
@@ -99,17 +106,11 @@ const AnalyticsView = () => {
     return "Week";
   });
 
-  // Persisted freeze toggle - blocks all auto reloads
-  const [freezeData, setFreezeData] = useState<boolean>(() => {
-    if (typeof window !== "undefined") return localStorage.getItem(FREEZE_KEY) === "true";
-    return false;
-  });
+  // Persisted freeze toggle - blocks all auto reloads (default OFF)
+  const [freezeData, setFreezeData] = useState<boolean>(() => parseBoolLS(FREEZE_KEY, false));
 
   // Persisted auto-refresh toggle - OFF by default
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
-    if (typeof window !== "undefined") return localStorage.getItem(AUTO_KEY) === "true";
-    return false;
-  });
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => parseBoolLS(AUTO_KEY, false));
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +119,12 @@ const AnalyticsView = () => {
 
   // Prevent overlapping fetches
   const inFlightRef = useRef(false);
+
+  // Refs to access latest toggle values inside interval callback
+  const autoRefreshRef = useRef(autoRefresh);
+  const freezeDataRef = useRef(freezeData);
+  useEffect(() => { autoRefreshRef.current = autoRefresh; }, [autoRefresh]);
+  useEffect(() => { freezeDataRef.current = freezeData; }, [freezeData]);
 
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [returnRate, setReturnRate] = useState<ReturnRateData | null>(null);
@@ -153,28 +160,36 @@ const AnalyticsView = () => {
   useEffect(() => { localStorage.setItem(FREEZE_KEY, String(freezeData)); }, [freezeData]);
   useEffect(() => { localStorage.setItem(AUTO_KEY, String(autoRefresh)); }, [autoRefresh]);
 
-  // Single interval control effect
+  // Single interval control effect — ONLY ONE interval ever exists.
+  // The callback checks ALL conditions before firing, using refs for latest values.
   useEffect(() => {
-    // Always clear any existing timer
+    // Always clear any existing timer first
     if (intervalRef.current !== null) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    // Do not poll if frozen or toggle is off
-    if (!autoRefresh || freezeData) return;
-    // Poll only when tab visible; otherwise wait for next tick
+
+    // Create one interval that checks conditions every tick (60s)
     intervalRef.current = window.setInterval(() => {
-      if (!document.hidden) {
+      // Check ALL conditions before triggering a reload
+      if (
+        autoRefreshRef.current === true &&
+        freezeDataRef.current === false &&
+        document.hidden === false &&
+        inFlightRef.current === false
+      ) {
         setNonce(String(Date.now()));
       }
     }, 60000);
+
+    // Cleanup always runs
     return () => {
       if (intervalRef.current !== null) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
     };
-  }, [autoRefresh, freezeData]);
+  }, []); // Empty deps: one interval for component lifetime
 
   // Open student drill-down modal
   const openStudentDrill = async (studentKey: string) => {
