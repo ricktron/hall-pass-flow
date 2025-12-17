@@ -1,7 +1,8 @@
-
+import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { PERIOD_OPTIONS, DESTINATION_OPTIONS } from "@/constants/formOptions";
+import { PERIOD_OPTIONS } from "@/constants/formOptions";
+import { fetchDestinations, type Destination } from "@/lib/destinationsRepository";
 
 interface PeriodDestinationSelectsProps {
   selectedPeriod: string;
@@ -18,6 +19,18 @@ const PeriodDestinationSelects = ({
   onDestinationChange,
   onKeyDown
 }: PeriodDestinationSelectsProps) => {
+  const [destinations, setDestinations] = useState<Destination[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchDestinations().then((data) => {
+      if (!cancelled) {
+        setDestinations(data);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <>
       <div className="space-y-2">
@@ -43,7 +56,7 @@ const PeriodDestinationSelects = ({
             <SelectValue placeholder="Select destination" />
           </SelectTrigger>
           <SelectContent>
-            {DESTINATION_OPTIONS.map((destination) => (
+            {destinations.map((destination) => (
               <SelectItem key={destination.value} value={destination.value}>
                 {destination.label}
               </SelectItem>

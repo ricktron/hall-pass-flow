@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Users, BarChart3, UserCheck, UserCog } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ArrowLeft, Users, BarChart3, UserCheck, UserCog, LogOut, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import AnalyticsView from "./AnalyticsView";
@@ -9,6 +12,7 @@ import NameCorrections from "./NameCorrections";
 import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchTodaySignouts, recordDaySignout, type DaySignout } from "@/lib/earlyDismissalRepository";
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
@@ -64,6 +68,13 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [err, setErr] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'overview' | 'analytics' | 'corrections'>('overview');
   const [weeklyTopStudents, setWeeklyTopStudents] = useState<Array<{ studentName: string; totalMinutes: number; tripCount: number }>>([]);
+  
+  // Early dismissal state
+  const [todaySignouts, setTodaySignouts] = useState<DaySignout[]>([]);
+  const [signoutDialogOpen, setSignoutDialogOpen] = useState(false);
+  const [signoutStudentName, setSignoutStudentName] = useState("");
+  const [signoutReason, setSignoutReason] = useState("");
+  const [signoutSubmitting, setSignoutSubmitting] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
     if (DEBUG) console.log('[TeacherView] fetch reason:', reason);
@@ -97,6 +108,10 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
           tripCount: row.passes
         })));
       }
+      
+      // Load today's early dismissal signouts
+      const signouts = await fetchTodaySignouts(CLASSROOM_ID);
+      setTodaySignouts(signouts);
       
       setLoading(false);
     } catch (error) {
@@ -184,6 +199,59 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const handleCloseCurrentlyOut = () => {
     // This could be used to hide the currently out display if needed
     // For now, we'll keep it always visible in the teacher view
+  };
+
+  const handleRecordEarlyDismissal = async () => {
+    if (!signoutStudentName.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Missing student name",
+        description: "Please enter a student name.",
+      });
+      return;
+    }
+
+    setSignoutSubmitting(true);
+    try {
+      const result = await recordDaySignout(
+        CLASSROOM_ID,
+        signoutStudentName.trim(),
+        signoutReason.trim() || undefined,
+        "Mr. Garnett"
+      );
+
+      if (!result.success) {
+        toast({
+          variant: "destructive",
+          title: "Failed to record",
+          description: result.error || "Unknown error",
+        });
+        setSignoutSubmitting(false);
+        return;
+      }
+
+      toast({
+        title: "Early dismissal recorded",
+        description: `${result.student_name} has been signed out for the day.`,
+      });
+
+      // Reset form and close dialog
+      setSignoutStudentName("");
+      setSignoutReason("");
+      setSignoutDialogOpen(false);
+
+      // Refresh the signouts list
+      const signouts = await fetchTodaySignouts(CLASSROOM_ID);
+      setTodaySignouts(signouts);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "An unexpected error occurred",
+      });
+    } finally {
+      setSignoutSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -336,6 +404,101 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 </CardContent>
               </Card>
             )}
+
+            {/* Early Dismissals Today */}
+            <Card className="shadow-lg">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <LogOut className="w-5 h-5 text-amber-600" />
+                    Signed Out Today
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Early dismissals ({todaySignouts.length} student{todaySignouts.length !== 1 ? 's' : ''})
+                  </p>
+                </div>
+                <Dialog open={signoutDialogOpen} onOpenChange={setSignoutDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="flex items-center gap-1">
+                      <Plus className="w-4 h-4" />
+                      Record
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                      <DialogTitle>Record Early Dismissal</DialogTitle>
+                      <DialogDescription>
+                        Sign a student out for the day. This does not affect Currently Out or analytics.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="signout-name">Student Name</Label>
+                        <Input
+                          id="signout-name"
+                          value={signoutStudentName}
+                          onChange={(e) => setSignoutStudentName(e.target.value)}
+                          placeholder="First Last"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="signout-reason">Reason (optional)</Label>
+                        <Input
+                          id="signout-reason"
+                          value={signoutReason}
+                          onChange={(e) => setSignoutReason(e.target.value)}
+                          placeholder="e.g., Doctor's appointment"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setSignoutDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleRecordEarlyDismissal}
+                        disabled={signoutSubmitting || !signoutStudentName.trim()}
+                      >
+                        {signoutSubmitting ? "Recording..." : "Record Signout"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {todaySignouts.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">
+                    No early dismissals recorded today.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {todaySignouts.map((signout) => (
+                      <div key={signout.id} className="flex justify-between items-center p-2 rounded bg-amber-50 border border-amber-100">
+                        <div>
+                          <span className="font-medium">{signout.student_name}</span>
+                          {signout.reason && (
+                            <span className="text-sm text-gray-600 ml-2">— {signout.reason}</span>
+                          )}
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {new Date(signout.created_at).toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
