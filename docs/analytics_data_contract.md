@@ -124,8 +124,60 @@ Check the browser console for:
 - `[SUPABASE] AnalyticsView.load() STARTING | timeFrame: ...` - Actual window being queried
 - `[analyticsRepository] fetchX error: ...` - Query-level errors
 
+## Manual Verification Checklist
+
+Before deploying analytics changes, verify in the browser:
+
+### Prerequisites
+- A classroom with historical pass data (at least a few passes across different time ranges)
+
+### Steps
+
+1. **Navigate to Teacher Dashboard > Analytics**
+   - Verify the page loads without errors
+   - KPI cards (Passes, Total Minutes, Avg Minutes, Return Rate) should show non-zero values for a classroom with data
+
+2. **Test Time Window Buttons**
+   - Click each window button: Day, Week, Month, Quarter, All
+   - **Expected**: Numbers should change between windows (unless all data is in one day)
+   - **Critical**: "All" should show the largest totals (or equal to Quarter if all data is recent)
+   - **Bug indicator**: If "All" shows the same as "Quarter" but there's older data, window mapping is broken
+
+3. **Test Freeze + Initial Load**
+   - Enable "Freeze" toggle
+   - Refresh the browser page (Cmd+R / F5)
+   - **Expected**: Data still loads once on page mount (freeze only blocks auto-refresh)
+   - **Bug indicator**: If page shows empty/loading forever, freeze is blocking initial load
+
+4. **Test Freeze + Manual Refresh**
+   - With "Freeze" enabled, click the "Refresh" button
+   - **Expected**: Data updates immediately (manual refresh bypasses freeze)
+   - **Bug indicator**: If nothing happens, force parameter is not being passed
+
+5. **Test Auto-Refresh**
+   - Enable "Auto" toggle, disable "Freeze"
+   - Wait 60+ seconds
+   - **Expected**: Data refreshes automatically (check loading spinner)
+
+6. **Test Empty State**
+   - Select "Day" on a classroom with no passes today
+   - **Expected**: Amber "No activity in this timeframe" notice appears
+   - **Not expected**: Red error card
+
+7. **Test Error State**
+   - Temporarily disconnect network, click Refresh
+   - **Expected**: Red error card with error message and Retry button
+
+### View-Specific Checks
+
+- **Trips by Period**: Bar chart shows period distribution
+- **Destinations**: Table shows destination breakdown with median/p90 stats
+- **Frequent Flyers**: Students sorted by pass count
+- **Heatmap**: Only shows data for Week/Month/Quarter/All (Day returns empty, which is expected)
+
 ## Changelog
 
+- **v2.1 (2024-12)**: Added manual verification checklist
 - **v2 (2024-12)**: Fixed "All" window mapping, added repository layer, improved freeze semantics
 - **v1 (2024-11)**: Initial windowed views implementation
 
