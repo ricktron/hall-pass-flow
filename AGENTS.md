@@ -320,3 +320,36 @@ Change discipline:
   - `typecheck` script to `package.json`
   - a formatter (Prettier or Biome)
   - a minimal CI workflow (lint + typecheck + build)
+
+
+## Hall Pass KB schema artifacts
+
+Location: `docs/kb/hallpass/`
+
+Purpose: These files are the canonical schema source of truth for AI-assisted SQL, migrations, analytics queries, and refactors.
+
+Files:
+- `hallpass_data_dictionary_v*.md`
+- `hallpass_data_dictionary_v*.json`
+- `hallpass_tables_catalog_v*.csv`
+- `hallpass_columns_catalog_v*.csv`
+- `hallpass_constraints_catalog_v*.csv`
+- `hallpass_policies_catalog_v*.csv`
+- `hallpass_views_catalog_v*.csv`
+- `00_index.md`
+
+When to update:
+- Any time `public` schema changes in Supabase (new migration, column/table changes, view changes, trigger/function changes used by hall pass logic, RLS policy changes).
+- Any time analytics views change (especially `hp_*` views).
+
+How to update:
+1. Generate a fresh schema snapshot (do not commit it):
+   - `pg_dump --schema=public --schema-only "$DB_URL" > schema.sql`
+2. Regenerate the KB artifacts (tables, columns, constraints, policies, views, and the dictionary) from the latest schema.
+3. Save outputs into `docs/kb/hallpass/` using the next version number (`v2`, `v3`, etc).
+4. Update `docs/kb/hallpass/00_index.md` to point to the latest versions.
+
+Agent rules:
+- When generating SQL or migrations, only reference tables and columns that exist in the latest `*_catalog_v*.csv` files.
+- If a required field is missing or ambiguous, propose a schema migration instead of guessing.
+- Never commit data exports (for example `data.sql`, `schema.sql`, `*.tgz`, `*.zip`) that include student data.

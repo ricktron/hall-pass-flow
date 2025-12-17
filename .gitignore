@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase export artifacts (do not commit)
+schema.sql
+data.sql
+*.tgz
+*.dump
+*_export.*
