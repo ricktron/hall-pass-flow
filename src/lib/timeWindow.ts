@@ -17,12 +17,15 @@ export const TIME_WINDOW_LABELS: TimeWindowLabel[] = ["Day", "Week", "Month", "Q
 
 /**
  * Normalize a timeframe string input to a valid TimeWindow.
- * Never falls back incorrectly - returns "week" as safe default for unrecognized input.
+ * Returns "all" as safe default for unrecognized or invalid input.
  */
-export function normalizeTimeWindow(input: string | null | undefined): TimeWindow {
-  if (!input) return "week";
+export function normalizeTimeWindow(input: unknown): TimeWindow {
+  if (input == null || typeof input !== "string") return "all";
   
   const normalized = input.toLowerCase().trim();
+  
+  // Empty string after trim
+  if (!normalized) return "all";
   
   // Exact match check
   if (TIME_WINDOWS.includes(normalized as TimeWindow)) {
@@ -55,9 +58,9 @@ export function normalizeTimeWindow(input: string | null | undefined): TimeWindo
     default:
       // Log warning in dev for debugging
       if (import.meta.env.DEV) {
-        console.warn(`[timeWindow] Unrecognized window input "${input}", defaulting to "week"`);
+        console.warn(`[timeWindow] Unrecognized window input "${input}", defaulting to "all"`);
       }
-      return "week";
+      return "all";
   }
 }
 

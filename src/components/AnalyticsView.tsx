@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { BarChart3, BarChart4, BarChartBig, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake, AlertTriangle, Eye, Download, X, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -16,81 +15,38 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { 
-  type TimeWindow as TimeWindowKey,
   type TimeWindowLabel,
   TIME_WINDOW_LABELS,
   normalizeTimeWindow,
   fromLabel,
   assertWindowNotMismapped
 } from "@/lib/timeWindow";
+import {
+  type SummaryData,
+  type ReturnRateData,
+  type PeriodData,
+  type DestinationData,
+  type LongestPassData,
+  type HourlyBehaviorData,
+  type DayOfWeekData,
+  type HeatmapData,
+  type DisruptionScoreData,
+  type NursePairData,
+  type FrequentFlyerData as FrequentFlyerRow,
+  type StreakData as StreakRow,
+  type GradeCompareData as GradeCompareRow,
+  type GradeCorrData as GradeCorrRow,
+  type RiskData as RiskRow,
+  type DrillData as DrillRow,
+  fetchAllCoreAnalytics,
+  fetchGradeAnalytics,
+  fetchStudentDrill,
+} from "@/lib/analyticsRepository";
 
 type TimeFrame = TimeWindowLabel;
 
-interface SummaryData { passes: number; minutes_out?: number }
-interface ReturnRateData { return_rate_pct: number; still_out: number; total: number }
-interface PeriodData { period: string; passes: number; minutes_out: number }
-interface DestinationData {
-  destination: string; passes: number; minutes_out: number; median_min: number; p90_min: number
-}
-interface LongestPassData {
-  student_name: string; period: string; destination: string; duration: number; timeout: string; timein: string | null
-}
-interface HourlyBehaviorData { hour_24: number; passes: number }
-interface DayOfWeekData { dow_short: string; passes: number }
-interface HeatmapData { period: string; day: string; passes: number }
-interface DisruptionScoreData { student_name: string; passes: number; minutes_out: number }
-interface NursePairData {
-  student_name: string; first_dest: string; second_dest: string; minutes_between: number; prev_time: string; curr_time: string
-}
-interface FrequentFlyerRow {
-  student_name: string; passes: number; total_minutes: number; avg_minutes: number
-}
-interface StreakRow {
-  student_name: string; period: string; cadence: string; start_date: string; end_date: string; streak_len: number
-}
-interface GradeCompareRow {
-  student_key: string;
-  term: string | null;
-  course: string | null;
-  avg_grade: number | null;
-  passes: number | null;
-  total_minutes: number | null;
-  avg_minutes: number | null;
-}
-interface GradeCorrRow {
-  window: string;
-  scope: string;
-  term: string | null;
-  n: number | null;
-  corr_grade_vs_passes: number | null;
-  corr_grade_vs_minutes: number | null;
-  slope_grade_vs_passes: number | null;
-  slope_grade_vs_minutes: number | null;
-  r2_grade_vs_passes: number | null;
-  r2_grade_vs_minutes: number | null;
-}
-interface RiskRow {
-  window: string;
-  scope: string;
-  term: string | null;
-  student_key: string;
-  avg_grade: number | null;
-  passes: number | null;
-  total_minutes: number | null;
-  z_grade: number | null;
-  z_passes: number | null;
-  z_minutes: number | null;
-  risk_score: number | null;
-}
-interface DrillRow {
-  student_key: string;
-  timeout: string;
-  timein: string | null;
-  duration: number | string | null;
-  destination: string | null;
-  period: string | null;
-  classroom: string | null;
-}
+// UI-specific type for return rate display (computed from repository data)
+interface ReturnRateDisplay { return_rate_pct: number; still_out: number; total: number }
 
 const AUTO_KEY = "hp_analytics_auto";
 const TF_KEY = "hp_analytics_tf";
@@ -154,9 +110,9 @@ const AnalyticsView = () => {
   // Prevent overlapping fetches
   const inFlightRef = useRef(false);
 
-  // Data state
+  // Data state (types imported from analyticsRepository)
   const [summary, setSummary] = useState<SummaryData | null>(null);
-  const [returnRate, setReturnRate] = useState<ReturnRateData | null>(null);
+  const [returnRate, setReturnRate] = useState<ReturnRateDisplay | null>(null);
   const [byPeriod, setByPeriod] = useState<PeriodData[]>([]);
   const [byDestination, setByDestination] = useState<DestinationData[]>([]);
   const [longest, setLongest] = useState<LongestPassData[]>([]);
@@ -239,7 +195,7 @@ const AnalyticsView = () => {
     };
   }, []); // Empty deps: one interval for component lifetime
 
-  // Open student drill-down modal
+  // Open student drill-down modal (uses repository)
   const openStudentDrill = async (studentKey: string) => {
     const key = studentKey.toLowerCase();
     setDrillStudent(key);
@@ -248,20 +204,15 @@ const AnalyticsView = () => {
     setDrillRows([]);
 
     try {
-      const { data, error: drillError } = await supabase
-        .from('hp_bathroom_trips_current_quarter' as any)
-        .select('timeout,timein,duration,destination,period,classroom,student_key')
-        .eq('student_key', key)
-        .order('timeout', { ascending: false })
-        .limit(200);
-
-      if (drillError) {
-        setError(`Failed to load trips: ${drillError.message}`);
+      const result = await fetchStudentDrill(key);
+      if (result.error) {
+        setError(`Failed to load trips: ${result.error}`);
       } else {
-        setDrillRows((data as unknown as DrillRow[]) ?? []);
+        setDrillRows(result.data ?? []);
       }
-    } catch (e: any) {
-      setError(e.message || "Failed to load trips");
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to load trips";
+      setError(message);
     } finally {
       setDrillLoading(false);
     }
@@ -324,107 +275,63 @@ const AnalyticsView = () => {
     // Dev assertion: ensure "All" is not incorrectly mapped
     assertWindowNotMismapped(currentLabel, currentTfKey);
 
-    // Diagnostic: log Supabase call initiation
+    // Diagnostic: log fetch initiation
     if (DEBUG_DIAG) {
-      console.log('[SUPABASE] AnalyticsView.load() STARTING | timeFrame:', currentTfKey, '| scope:', currentGradeScope, '| term:', currentGradeTerm, '| ts:', new Date().toISOString());
+      console.log('[analyticsRepository] load() STARTING | timeFrame:', currentTfKey, '| scope:', currentGradeScope, '| term:', currentGradeTerm, '| ts:', new Date().toISOString());
     }
 
     setLoading(true);
     setError(null);
 
     try {
-      const [
-        s, rr, p, d, l, h, w, hm, dz, np, bf
-      ] = await Promise.all([
-        supabase.from("hp_summary_windows").select("passes, minutes_out").eq("window", currentTfKey).maybeSingle(),
-        supabase.from("hp_return_rate_windows").select("pct_returned, still_out, total").eq("window", currentTfKey).maybeSingle(),
-        supabase.from("hp_by_period_windows").select("period, passes, minutes_out").eq("window", currentTfKey).gt("passes", 0).order("passes", { ascending: false }),
-        supabase.from("hp_by_destination_windows").select("destination, passes, minutes_out, median_min, p90_min").eq("window", currentTfKey).gt("passes", 0).order("passes", { ascending: false }),
-        supabase.from("hp_longest_windows").select("student_name, period, destination, duration, timeout, timein").eq("window", currentTfKey).or("destination.ilike.%bathroom%,destination.ilike.%restroom%").order("duration", { ascending: false }).limit(15),
-        supabase.from("hp_behavior_hourly_windows").select("hour_24, passes").eq("window", currentTfKey).order("hour_24", { ascending: true }),
-        supabase.from("hp_dayofweek_windows").select("dow_short, passes").eq("window", currentTfKey),
-        supabase.from("hp_heatmap_windows").select("period, day, passes").eq("window", currentTfKey).gt("passes", 0),
-        supabase.from("hp_disruption_windows").select("student_name, passes, minutes_out").eq("window", currentTfKey).gt("passes", 0).order("minutes_out", { ascending: false }).limit(15),
-        supabase.from("hp_nurse_bathroom_pairs").select("student_name, first_dest, second_dest, minutes_between, prev_time, curr_time").order("minutes_between", { ascending: true }).limit(25),
-        supabase.from("hp_frequent_flyers_bathroom_windows").select("student_name, passes, total_minutes, avg_minutes").eq("window", currentTfKey).order("passes", { ascending: false }).limit(15)
+      // Fetch core analytics and grade analytics in parallel via repository
+      const [coreResult, gradeResult] = await Promise.all([
+        fetchAllCoreAnalytics(currentTfKey),
+        fetchGradeAnalytics(currentTfKey, currentGradeScope, currentGradeTerm, currentOnlyWithGrades),
       ]);
 
-      if (s.error) throw s.error;
-      if (rr.error) throw rr.error;
+      // Check for critical errors
+      const allErrors = [...coreResult.errors, ...gradeResult.errors];
+      if (allErrors.length > 0) {
+        if (DEBUG_DIAG) console.warn('[analyticsRepository] Some queries failed:', allErrors);
+        // Only show error if all critical data failed
+        if (!coreResult.summary && !coreResult.returnRate) {
+          throw new Error(allErrors.join("; "));
+        }
+      }
 
-      setSummary({ passes: s.data?.passes ?? 0, minutes_out: Number(s.data?.minutes_out ?? 0) });
-      setReturnRate({
-        return_rate_pct: Math.round(((rr.data?.pct_returned ?? 0) * 1000)) / 10,
-        still_out: rr.data?.still_out ?? 0,
-        total: rr.data?.total ?? 0
-      });
-      setByPeriod(p.data ?? []);
-      setByDestination(d.data ?? []);
-      setLongest(l.data ?? []);
-      setHourly(h.data ?? []);
-      // order Mon..Sun
-      const order = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-      setDow((w.data ?? []).sort((a, b) => order.indexOf(a.dow_short) - order.indexOf(b.dow_short)));
-      setHeatmap(hm.data ?? []);
-      setDisruption(dz.data ?? []);
-      setNursePairs(np.data ?? []);
-      setBathroomFlyers(bf.data ?? []);
+      // Set core analytics data
+      setSummary(coreResult.summary);
+      setReturnRate(coreResult.returnRate ? {
+        return_rate_pct: Math.round((coreResult.returnRate.pct_returned ?? 0) * 1000) / 10,
+        still_out: coreResult.returnRate.still_out ?? 0,
+        total: coreResult.returnRate.total ?? 0,
+      } : null);
+      setByPeriod(coreResult.byPeriod);
+      setByDestination(coreResult.byDestination);
+      setLongest(coreResult.longest);
+      setHourly(coreResult.hourly);
+      setDow(coreResult.dow); // Already sorted by repository
+      setHeatmap(coreResult.heatmap);
+      setDisruption(coreResult.disruption);
+      setNursePairs(coreResult.nursePairs);
+      setBathroomFlyers(coreResult.bathroomFlyers);
+      setStreaks(coreResult.streaks);
 
-      // Fetch streaks by period
-      const { data: st, error: stErr } = await supabase
-        .from('hp_streaks_by_period_windows')
-        .select('student_name, period, cadence, start_date, end_date, streak_len')
-        .order('streak_len', { ascending: false })
-        .limit(20);
-      if (stErr) throw stErr;
-      setStreaks(st ?? []);
+      // Set grade analytics data
+      setGradeRows(gradeResult.gradeRows);
+      setCorr(gradeResult.corr);
+      setRisks(gradeResult.risks);
 
-      // Fetch grades vs bathroom passes data
-      // When "Has grades only" is ON, use hp_grade_compare_with_grades view
-      // When OFF, use hp_grade_compare_windows view
-      const gradeViewName = currentOnlyWithGrades
-        ? 'hp_grade_compare_with_grades'
-        : 'hp_grade_compare_windows';
-      let gradeQuery = supabase
-        .from(gradeViewName as any)
-        .select('student_key, term, course, avg_grade, passes, total_minutes, avg_minutes')
-        .eq('window', currentTfKey)
-        .eq('scope', currentGradeScope);
-      if (currentGradeTerm) gradeQuery = gradeQuery.eq('term', currentGradeTerm);
-      const { data: grows, error: gerr } = await gradeQuery
-        .order('avg_grade', { ascending: true })
-        .limit(1000);
-      if (gerr) throw gerr;
-      setGradeRows((grows as unknown as GradeCompareRow[]) ?? []);
-
-      // Fetch grade correlation metrics
-      const { data: corrRows, error: corrErr } = await supabase
-        .from('hp_grade_corr_windows' as any)
-        .select('window,scope,term,n,corr_grade_vs_passes,corr_grade_vs_minutes,slope_grade_vs_passes,slope_grade_vs_minutes,r2_grade_vs_passes,r2_grade_vs_minutes')
-        .eq('window', currentTfKey)
-        .eq('scope', currentGradeScope)
-        .limit(1);
-      if (corrErr) throw corrErr;
-      setCorr((corrRows && corrRows.length > 0) ? (corrRows[0] as unknown as GradeCorrRow) : null);
-
-      // Fetch at-risk students (grade outliers)
-      const { data: riskRows, error: riskErr } = await supabase
-        .from('hp_grade_outliers_windows' as any)
-        .select('window,scope,term,student_key,avg_grade,passes,total_minutes,z_grade,z_passes,z_minutes,risk_score')
-        .eq('window', currentTfKey)
-        .eq('scope', currentGradeScope)
-        .order('risk_score', { ascending: false })
-        .limit(15);
-      if (riskErr) throw riskErr;
-      setRisks((riskRows as unknown as RiskRow[]) ?? []);
-    } catch (e: any) {
-      setError(e.message || "Failed to load analytics data");
-      if (DEBUG_DIAG) console.log('[SUPABASE] AnalyticsView.load() ERROR:', e.message);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Failed to load analytics data";
+      setError(message);
+      if (DEBUG_DIAG) console.log('[analyticsRepository] load() ERROR:', message);
     } finally {
       setLoading(false);
       inFlightRef.current = false;
       hasLoadedOnce.current = true; // Mark that we've loaded at least once
-      if (DEBUG_DIAG) console.log('[SUPABASE] AnalyticsView.load() COMPLETE | ts:', new Date().toISOString());
+      if (DEBUG_DIAG) console.log('[analyticsRepository] load() COMPLETE | ts:', new Date().toISOString());
     }
   }, []); // Empty deps: load is stable, reads current values from refs
 

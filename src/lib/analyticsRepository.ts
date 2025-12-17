@@ -162,7 +162,7 @@ export interface AnalyticsQueryResult<T> {
  * View: hp_summary_windows
  */
 export async function fetchSummary(
-  windowInput: string
+  windowInput: unknown
 ): Promise<AnalyticsQueryResult<SummaryData>> {
   const window = normalizeTimeWindow(windowInput);
   assertWindowNotMismapped(windowInput, window);
@@ -192,7 +192,7 @@ export async function fetchSummary(
  * View: hp_return_rate_windows
  */
 export async function fetchReturnRate(
-  windowInput: string
+  windowInput: unknown
 ): Promise<AnalyticsQueryResult<ReturnRateData>> {
   const window = normalizeTimeWindow(windowInput);
   assertWindowNotMismapped(windowInput, window);
@@ -223,7 +223,7 @@ export async function fetchReturnRate(
  * View: hp_by_period_windows
  */
 export async function fetchByPeriod(
-  windowInput: string
+  windowInput: unknown
 ): Promise<AnalyticsQueryResult<PeriodData[]>> {
   const window = normalizeTimeWindow(windowInput);
   assertWindowNotMismapped(windowInput, window);
@@ -248,7 +248,7 @@ export async function fetchByPeriod(
  * View: hp_by_destination_windows
  */
 export async function fetchByDestination(
-  windowInput: string
+  windowInput: unknown
 ): Promise<AnalyticsQueryResult<DestinationData[]>> {
   const window = normalizeTimeWindow(windowInput);
   assertWindowNotMismapped(windowInput, window);
@@ -273,7 +273,7 @@ export async function fetchByDestination(
  * View: hp_longest_windows
  */
 export async function fetchLongestTrips(
-  windowInput: string,
+  windowInput: unknown,
   limit = 15
 ): Promise<AnalyticsQueryResult<LongestPassData[]>> {
   const window = normalizeTimeWindow(windowInput);
@@ -300,7 +300,7 @@ export async function fetchLongestTrips(
  * View: hp_behavior_hourly_windows
  */
 export async function fetchHourlyBehavior(
-  windowInput: string
+  windowInput: unknown
 ): Promise<AnalyticsQueryResult<HourlyBehaviorData[]>> {
   const window = normalizeTimeWindow(windowInput);
   assertWindowNotMismapped(windowInput, window);
@@ -324,7 +324,7 @@ export async function fetchHourlyBehavior(
  * View: hp_dayofweek_windows
  */
 export async function fetchDayOfWeek(
-  windowInput: string
+  windowInput: unknown
 ): Promise<AnalyticsQueryResult<DayOfWeekData[]>> {
   const window = normalizeTimeWindow(windowInput);
   assertWindowNotMismapped(windowInput, window);
@@ -353,7 +353,7 @@ export async function fetchDayOfWeek(
  * View: hp_heatmap_windows
  */
 export async function fetchHeatmap(
-  windowInput: string
+  windowInput: unknown
 ): Promise<AnalyticsQueryResult<HeatmapData[]>> {
   const window = normalizeTimeWindow(windowInput);
   assertWindowNotMismapped(windowInput, window);
@@ -377,7 +377,7 @@ export async function fetchHeatmap(
  * View: hp_disruption_windows
  */
 export async function fetchDisruption(
-  windowInput: string,
+  windowInput: unknown,
   limit = 15
 ): Promise<AnalyticsQueryResult<DisruptionScoreData[]>> {
   const window = normalizeTimeWindow(windowInput);
@@ -425,7 +425,7 @@ export async function fetchNursePairs(
  * View: hp_frequent_flyers_bathroom_windows
  */
 export async function fetchBathroomFlyers(
-  windowInput: string,
+  windowInput: unknown,
   limit = 15
 ): Promise<AnalyticsQueryResult<FrequentFlyerData[]>> {
   const window = normalizeTimeWindow(windowInput);
@@ -472,7 +472,7 @@ export async function fetchStreaks(
  * View: hp_grade_compare_windows or hp_grade_compare_with_grades
  */
 export async function fetchGradeComparison(
-  windowInput: string,
+  windowInput: unknown,
   scope: "bathroom" | "all",
   term: string | null,
   onlyWithGrades: boolean,
@@ -512,7 +512,7 @@ export async function fetchGradeComparison(
  * View: hp_grade_corr_windows
  */
 export async function fetchGradeCorrelation(
-  windowInput: string,
+  windowInput: unknown,
   scope: "bathroom" | "all"
 ): Promise<AnalyticsQueryResult<GradeCorrData | null>> {
   const window = normalizeTimeWindow(windowInput);
@@ -541,7 +541,7 @@ export async function fetchGradeCorrelation(
  * View: hp_grade_outliers_windows
  */
 export async function fetchRiskStudents(
-  windowInput: string,
+  windowInput: unknown,
   scope: "bathroom" | "all",
   limit = 15
 ): Promise<AnalyticsQueryResult<RiskData[]>> {
@@ -616,7 +616,7 @@ export interface AnalyticsBulkResult {
  * Returns partial results even if some queries fail.
  */
 export async function fetchAllCoreAnalytics(
-  windowInput: string
+  windowInput: unknown
 ): Promise<AnalyticsBulkResult> {
   const errors: string[] = [];
 
@@ -690,7 +690,7 @@ export interface AnalyticsGradeResult {
  * Fetch grade-related analytics data in parallel.
  */
 export async function fetchGradeAnalytics(
-  windowInput: string,
+  windowInput: unknown,
   scope: "bathroom" | "all",
   term: string | null,
   onlyWithGrades: boolean

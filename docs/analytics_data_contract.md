@@ -76,8 +76,12 @@ The frontend uses these window values:
 ```typescript
 export type TimeWindow = "day" | "week" | "month" | "quarter" | "all";
 
-// Normalize any input to a valid TimeWindow
-export function normalizeTimeWindow(input: string): TimeWindow;
+// Constant list of valid windows for runtime checks
+export const TIME_WINDOWS: TimeWindow[] = ["day", "week", "month", "quarter", "all"];
+
+// Normalize any input (unknown type) to a valid TimeWindow
+// Returns "all" if input is invalid, null, or unrecognized
+export function normalizeTimeWindow(input: unknown): TimeWindow;
 
 // Dev assertion to catch incorrect "all" -> "quarter" mappings
 export function assertWindowNotMismapped(inputLabel: string, resolvedWindow: TimeWindow): void;
@@ -177,6 +181,7 @@ Before deploying analytics changes, verify in the browser:
 
 ## Changelog
 
+- **v2.2 (2024-12)**: Stabilized time window handling; `normalizeTimeWindow()` now accepts `unknown` and defaults to "all" for invalid inputs; `AnalyticsView` fully migrated to use `analyticsRepository` layer
 - **v2.1 (2024-12)**: Added manual verification checklist
 - **v2 (2024-12)**: Fixed "All" window mapping, added repository layer, improved freeze semantics
 - **v1 (2024-11)**: Initial windowed views implementation
