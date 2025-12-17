@@ -42,31 +42,21 @@ export const addArrivalRecord = async (data: {
 
 export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
   try {
-    // First, check if the student already has an open trip
+    // First, check if the student already has an active pass
     const { data: existingRecords, error: checkError } = await (supabase as any)
-      .from('Hall_Passes_api')
-      .select('id, studentName')
-      .eq('studentName', record.studentName)
-      .filter('timeIn', 'is', null);
+      .from('bathroom_passes')
+      .select('id, student_name')
+      .eq('student_name', record.studentName)
+      .is('timein', null);
 
     if (checkError) {
       console.error("Error checking existing records:", checkError);
       throw checkError;
     }
 
-    // If there's an existing open trip, close it first
+    // If there's an existing active pass, block the new submission
     if (existingRecords && existingRecords.length > 0) {
-      const openRecord = existingRecords[0];
-
-      const { error: updateError } = await (supabase as any)
-        .from('bathroom_passes')
-        .update({ timein: new Date().toISOString() })
-        .eq('id', openRecord.id);
-
-      if (updateError) {
-        console.error("Error closing existing record:", updateError);
-        throw updateError;
-      }
+      throw new Error('You already have an active pass');
     }
 
     // Now create the new record

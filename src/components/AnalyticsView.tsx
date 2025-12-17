@@ -120,11 +120,20 @@ const AnalyticsView = () => {
   // Prevent overlapping fetches
   const inFlightRef = useRef(false);
 
-  // Refs to access latest toggle values inside interval callback
+  // Refs to access latest toggle/state values inside callbacks (prevents stale closures)
   const autoRefreshRef = useRef(autoRefresh);
   const freezeDataRef = useRef(freezeData);
+  const timeFrameRef = useRef(timeFrame);
+  const gradeScopeRef = useRef(gradeScope);
+  const gradeTermRef = useRef(gradeTerm);
+  const onlyWithGradesRef = useRef(onlyWithGrades);
+
   useEffect(() => { autoRefreshRef.current = autoRefresh; }, [autoRefresh]);
   useEffect(() => { freezeDataRef.current = freezeData; }, [freezeData]);
+  useEffect(() => { timeFrameRef.current = timeFrame; }, [timeFrame]);
+  useEffect(() => { gradeScopeRef.current = gradeScope; }, [gradeScope]);
+  useEffect(() => { gradeTermRef.current = gradeTerm; }, [gradeTerm]);
+  useEffect(() => { onlyWithGradesRef.current = onlyWithGrades; }, [onlyWithGrades]);
 
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [returnRate, setReturnRate] = useState<ReturnRateData | null>(null);
@@ -153,7 +162,6 @@ const AnalyticsView = () => {
   const [showDrill, setShowDrill] = useState(false);
 
   const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
-  const tfKey = timeFrame.toLowerCase();
 
   // Persist localStorage
   useEffect(() => { localStorage.setItem(TF_KEY, timeFrame); }, [timeFrame]);
@@ -242,12 +250,20 @@ const AnalyticsView = () => {
     URL.revokeObjectURL(url);
   };
 
+  // Load function reads from refs to avoid stale closures
+  // This function is stable (no deps) - always reads latest values via refs
   const load = useCallback(async () => {
-    // Do not refresh while frozen
-    if (freezeData) return;
+    // Hard guard: do not refresh while frozen (read from ref for latest value)
+    if (freezeDataRef.current) return;
     // Prevent overlapping fetches
     if (inFlightRef.current) return;
     inFlightRef.current = true;
+
+    // Read current values from refs at call time
+    const currentTfKey = timeFrameRef.current.toLowerCase();
+    const currentGradeScope = gradeScopeRef.current;
+    const currentGradeTerm = gradeTermRef.current;
+    const currentOnlyWithGrades = onlyWithGradesRef.current;
 
     setLoading(true);
     setError(null);
@@ -256,17 +272,17 @@ const AnalyticsView = () => {
       const [
         s, rr, p, d, l, h, w, hm, dz, np, bf
       ] = await Promise.all([
-        supabase.from("hp_summary_windows").select("passes, minutes_out").eq("window", tfKey).maybeSingle(),
-        supabase.from("hp_return_rate_windows").select("pct_returned, still_out, total").eq("window", tfKey).maybeSingle(),
-        supabase.from("hp_by_period_windows").select("period, passes, minutes_out").eq("window", tfKey).gt("passes", 0).order("passes", { ascending: false }),
-        supabase.from("hp_by_destination_windows").select("destination, passes, minutes_out, median_min, p90_min").eq("window", tfKey).gt("passes", 0).order("passes", { ascending: false }),
-        supabase.from("hp_longest_windows").select("student_name, period, destination, duration, timeout, timein").eq("window", tfKey).or("destination.ilike.%bathroom%,destination.ilike.%restroom%").order("duration", { ascending: false }).limit(15),
-        supabase.from("hp_behavior_hourly_windows").select("hour_24, passes").eq("window", tfKey).order("hour_24", { ascending: true }),
-        supabase.from("hp_dayofweek_windows").select("dow_short, passes").eq("window", tfKey),
-        supabase.from("hp_heatmap_windows").select("period, day, passes").eq("window", tfKey).gt("passes", 0),
-        supabase.from("hp_disruption_windows").select("student_name, passes, minutes_out").eq("window", tfKey).gt("passes", 0).order("minutes_out", { ascending: false }).limit(15),
+        supabase.from("hp_summary_windows").select("passes, minutes_out").eq("window", currentTfKey).maybeSingle(),
+        supabase.from("hp_return_rate_windows").select("pct_returned, still_out, total").eq("window", currentTfKey).maybeSingle(),
+        supabase.from("hp_by_period_windows").select("period, passes, minutes_out").eq("window", currentTfKey).gt("passes", 0).order("passes", { ascending: false }),
+        supabase.from("hp_by_destination_windows").select("destination, passes, minutes_out, median_min, p90_min").eq("window", currentTfKey).gt("passes", 0).order("passes", { ascending: false }),
+        supabase.from("hp_longest_windows").select("student_name, period, destination, duration, timeout, timein").eq("window", currentTfKey).or("destination.ilike.%bathroom%,destination.ilike.%restroom%").order("duration", { ascending: false }).limit(15),
+        supabase.from("hp_behavior_hourly_windows").select("hour_24, passes").eq("window", currentTfKey).order("hour_24", { ascending: true }),
+        supabase.from("hp_dayofweek_windows").select("dow_short, passes").eq("window", currentTfKey),
+        supabase.from("hp_heatmap_windows").select("period, day, passes").eq("window", currentTfKey).gt("passes", 0),
+        supabase.from("hp_disruption_windows").select("student_name, passes, minutes_out").eq("window", currentTfKey).gt("passes", 0).order("minutes_out", { ascending: false }).limit(15),
         supabase.from("hp_nurse_bathroom_pairs").select("student_name, first_dest, second_dest, minutes_between, prev_time, curr_time").order("minutes_between", { ascending: true }).limit(25),
-        supabase.from("hp_frequent_flyers_bathroom_windows").select("student_name, passes, total_minutes, avg_minutes").eq("window", tfKey).order("passes", { ascending: false }).limit(15)
+        supabase.from("hp_frequent_flyers_bathroom_windows").select("student_name, passes, total_minutes, avg_minutes").eq("window", currentTfKey).order("passes", { ascending: false }).limit(15)
       ]);
 
       if (s.error) throw s.error;
@@ -299,15 +315,18 @@ const AnalyticsView = () => {
       if (stErr) throw stErr;
       setStreaks(st ?? []);
 
-      // Fetch grades vs bathroom passes data using raw query (views not in types)
-      // Build query with optional "has grades only" filter
+      // Fetch grades vs bathroom passes data
+      // When "Has grades only" is ON, use hp_grade_compare_with_grades view
+      // When OFF, use hp_grade_compare_windows view
+      const gradeViewName = currentOnlyWithGrades
+        ? 'hp_grade_compare_with_grades'
+        : 'hp_grade_compare_windows';
       let gradeQuery = supabase
-        .from('hp_grade_compare_windows' as any)
+        .from(gradeViewName as any)
         .select('student_key, term, course, avg_grade, passes, total_minutes, avg_minutes')
-        .eq('window', tfKey)
-        .eq('scope', gradeScope);
-      if (gradeTerm) gradeQuery = gradeQuery.eq('term', gradeTerm);
-      if (onlyWithGrades) gradeQuery = gradeQuery.not('avg_grade', 'is', null);
+        .eq('window', currentTfKey)
+        .eq('scope', currentGradeScope);
+      if (currentGradeTerm) gradeQuery = gradeQuery.eq('term', currentGradeTerm);
       const { data: grows, error: gerr } = await gradeQuery
         .order('avg_grade', { ascending: true })
         .limit(1000);
@@ -318,8 +337,8 @@ const AnalyticsView = () => {
       const { data: corrRows, error: corrErr } = await supabase
         .from('hp_grade_corr_windows' as any)
         .select('window,scope,term,n,corr_grade_vs_passes,corr_grade_vs_minutes,slope_grade_vs_passes,slope_grade_vs_minutes,r2_grade_vs_passes,r2_grade_vs_minutes')
-        .eq('window', tfKey)
-        .eq('scope', gradeScope)
+        .eq('window', currentTfKey)
+        .eq('scope', currentGradeScope)
         .limit(1);
       if (corrErr) throw corrErr;
       setCorr((corrRows && corrRows.length > 0) ? (corrRows[0] as unknown as GradeCorrRow) : null);
@@ -328,8 +347,8 @@ const AnalyticsView = () => {
       const { data: riskRows, error: riskErr } = await supabase
         .from('hp_grade_outliers_windows' as any)
         .select('window,scope,term,student_key,avg_grade,passes,total_minutes,z_grade,z_passes,z_minutes,risk_score')
-        .eq('window', tfKey)
-        .eq('scope', gradeScope)
+        .eq('window', currentTfKey)
+        .eq('scope', currentGradeScope)
         .order('risk_score', { ascending: false })
         .limit(15);
       if (riskErr) throw riskErr;
@@ -340,17 +359,26 @@ const AnalyticsView = () => {
       setLoading(false);
       inFlightRef.current = false;
     }
-  }, [tfKey, gradeScope, gradeTerm, freezeData, onlyWithGrades]);
+  }, []); // Empty deps: load is stable, reads current values from refs
 
-  // Main load effect - only depends on nonce, timeFrame, freezeData
+  // Main load effect - triggers on nonce (interval) or timeFrame change
+  // Uses refs for freeze check to avoid stale closures and unnecessary re-runs
   useEffect(() => {
-    if (freezeData) return; // hard guard: never auto-load when frozen
+    if (freezeDataRef.current) return; // hard guard: never auto-load when frozen
     void load();
-  }, [nonce, timeFrame, freezeData, load]);
+  }, [nonce, timeFrame, load]);
+
+  // Effect for user-initiated parameter changes (gradeScope, gradeTerm, onlyWithGrades)
+  // Separate from main load effect to allow independent control
+  useEffect(() => {
+    if (freezeDataRef.current) return; // respect freeze
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gradeScope, gradeTerm, onlyWithGrades]);
 
   // Manual refresh respects freeze - no refresh when frozen
   const manualRefresh = () => {
-    if (!freezeData) void load();
+    if (!freezeDataRef.current) void load();
   };
 
   const fmtHour = (h: number) =>

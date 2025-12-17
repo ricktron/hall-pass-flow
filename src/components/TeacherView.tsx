@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Users, BarChart3, UserCheck } from "lucide-react";
+import { ArrowLeft, Users, BarChart3, UserCheck, UserCog } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import AnalyticsView from "./AnalyticsView";
+import NameCorrections from "./NameCorrections";
 import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,7 +48,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'overview' | 'analytics'>('overview');
+  const [activeView, setActiveView] = useState<'overview' | 'analytics' | 'corrections'>('overview');
   const [weeklyTopStudents, setWeeklyTopStudents] = useState<Array<{ studentName: string; totalMinutes: number; tripCount: number }>>([]);
 
   const loadDashboardData = async () => {
@@ -65,10 +66,20 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
       setDashboardData(data as unknown as DashboardData);
       
-      // Load weekly top students
-      const { data: weeklyData, error: weeklyError } = await supabase.rpc('get_weekly_top_students');
+      // Load weekly top students (bathroom-only) from hp_frequent_flyers_bathroom_windows view
+      const { data: weeklyData, error: weeklyError } = await supabase
+        .from('hp_frequent_flyers_bathroom_windows')
+        .select('student_name, passes, total_minutes, avg_minutes')
+        .eq('window', 'week')
+        .order('passes', { ascending: false })
+        .limit(5);
       if (!weeklyError && weeklyData) {
-        setWeeklyTopStudents(weeklyData as Array<{ studentName: string; totalMinutes: number; tripCount: number }>);
+        // Map view columns to the expected interface
+        setWeeklyTopStudents(weeklyData.map(row => ({
+          studentName: row.student_name,
+          totalMinutes: Math.round(Number(row.total_minutes)),
+          tripCount: row.passes
+        })));
       }
       
       setLoading(false);
@@ -226,6 +237,14 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
               <BarChart3 className="w-4 h-4" />
               Analytics
             </Button>
+            <Button
+              variant={activeView === 'corrections' ? 'default' : 'outline'}
+              onClick={() => setActiveView('corrections')}
+              className="flex items-center gap-2"
+            >
+              <UserCog className="w-4 h-4" />
+              Name Corrections
+            </Button>
           </div>
         </div>
 
@@ -276,11 +295,12 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
               />
             )}
 
-            {/* This Week's Top Students */}
+            {/* This Week's Top Students (Bathroom Only) */}
             {weeklyTopStudents.length > 0 && (
               <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle>This Week's Most Active Students</CardTitle>
+                  <p className="text-sm text-muted-foreground">Bathroom trips only</p>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
@@ -299,6 +319,10 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
         {activeView === 'analytics' && (
           <AnalyticsView />
+        )}
+
+        {activeView === 'corrections' && (
+          <NameCorrections />
         )}
       </div>
     </div>
