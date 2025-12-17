@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -92,6 +92,13 @@ const BLUE = "hsl(217 91% 60%)"; // #3b82f6
 // Dev-only debug flag: set to true to log fetch triggers
 const DEBUG = false;
 
+// Diagnostic flag for investigating reload-while-frozen issue
+// Set to true ONLY for debugging mount/unmount/render behavior
+const DEBUG_DIAG = false;
+
+// Diagnostic render counter (persists across re-renders, not remounts)
+let diagRenderCount = 0;
+
 // Helper: strictly parse boolean from localStorage (never use Boolean() which treats "false" as true)
 const parseBoolLS = (key: string, defaultVal: boolean): boolean => {
   if (typeof window === "undefined") return defaultVal;
@@ -100,6 +107,22 @@ const parseBoolLS = (key: string, defaultVal: boolean): boolean => {
 };
 
 const AnalyticsView = () => {
+  // Diagnostic: track mount/unmount/render
+  const diagRenderRef = React.useRef(0);
+  React.useEffect(() => {
+    if (!DEBUG_DIAG) return;
+    diagRenderCount++;
+    diagRenderRef.current++;
+    console.log('[MOUNT] AnalyticsView | global render count:', diagRenderCount, '| instance render:', diagRenderRef.current);
+    return () => console.log('[UNMOUNT] AnalyticsView | global render count:', diagRenderCount, '| instance render:', diagRenderRef.current);
+  }, []);
+
+  // Diagnostic: log every render with key state
+  if (DEBUG_DIAG) {
+    diagRenderRef.current++;
+    // Note: This logs on every render, not just mount
+  }
+
   // Persisted timeframe
   const [timeFrame, setTimeFrame] = useState<TimeFrame>(() => {
     if (typeof window !== "undefined") {
@@ -260,9 +283,15 @@ const AnalyticsView = () => {
   // This function is stable (no deps) - always reads latest values via refs
   const load = useCallback(async () => {
     // Hard guard: do not refresh while frozen (read from ref for latest value)
-    if (freezeDataRef.current) return;
+    if (freezeDataRef.current) {
+      if (DEBUG_DIAG) console.log('[DIAG] AnalyticsView.load() BLOCKED by freeze | freezeRef:', freezeDataRef.current);
+      return;
+    }
     // Prevent overlapping fetches
-    if (inFlightRef.current) return;
+    if (inFlightRef.current) {
+      if (DEBUG_DIAG) console.log('[DIAG] AnalyticsView.load() BLOCKED by inFlight');
+      return;
+    }
     inFlightRef.current = true;
 
     // Read current values from refs at call time
@@ -270,6 +299,11 @@ const AnalyticsView = () => {
     const currentGradeScope = gradeScopeRef.current;
     const currentGradeTerm = gradeTermRef.current;
     const currentOnlyWithGrades = onlyWithGradesRef.current;
+
+    // Diagnostic: log Supabase call initiation
+    if (DEBUG_DIAG) {
+      console.log('[SUPABASE] AnalyticsView.load() STARTING | timeFrame:', currentTfKey, '| scope:', currentGradeScope, '| term:', currentGradeTerm, '| ts:', new Date().toISOString());
+    }
 
     setLoading(true);
     setError(null);
@@ -361,9 +395,11 @@ const AnalyticsView = () => {
       setRisks((riskRows as unknown as RiskRow[]) ?? []);
     } catch (e: any) {
       setError(e.message || "Failed to load analytics data");
+      if (DEBUG_DIAG) console.log('[SUPABASE] AnalyticsView.load() ERROR:', e.message);
     } finally {
       setLoading(false);
       inFlightRef.current = false;
+      if (DEBUG_DIAG) console.log('[SUPABASE] AnalyticsView.load() COMPLETE | ts:', new Date().toISOString());
     }
   }, []); // Empty deps: load is stable, reads current values from refs
 
@@ -421,6 +457,11 @@ const AnalyticsView = () => {
     return stops[idx];
   };
   const maxHeat = heatmap.reduce((m, r) => Math.max(m, r.passes || 0), 0);
+
+  // Diagnostic: render counter log (only when DEBUG_DIAG is true)
+  if (DEBUG_DIAG) {
+    console.log('[RENDER] AnalyticsView', diagRenderRef.current, { freeze: freezeData, auto: autoRefresh, timeFrame, loading, nonce });
+  }
 
   return (
     <div className="space-y-6">

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Users, BarChart3, UserCheck, UserCog } from "lucide-react";
@@ -14,6 +14,10 @@ const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
 // Dev-only debug flag: set to true to log fetch triggers
 const DEBUG = false;
+
+// Diagnostic flag for investigating reload-while-frozen issue
+// Set to true ONLY for debugging mount/unmount/render behavior
+const DEBUG_DIAG = false;
 
 interface TeacherViewProps {
   onBack: () => void;
@@ -46,6 +50,13 @@ interface DashboardData {
 }
 
 const TeacherView = ({ onBack }: TeacherViewProps) => {
+  // Diagnostic: track mount/unmount
+  React.useEffect(() => {
+    if (!DEBUG_DIAG) return;
+    console.log('[MOUNT] TeacherView');
+    return () => console.log('[UNMOUNT] TeacherView');
+  }, []);
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -56,6 +67,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
   const loadDashboardData = async (reason: string = 'unknown') => {
     if (DEBUG) console.log('[TeacherView] fetch reason:', reason);
+    if (DEBUG_DIAG) console.log('[SUPABASE] TeacherView.loadDashboardData() | reason:', reason, '| ts:', new Date().toISOString());
     setLoading(true);
     setErr(null);
 
@@ -94,12 +106,18 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   };
 
   useEffect(() => {
+    // Skip polling when not on overview tab to prevent background fetches
+    // from triggering loading states / re-renders on Analytics or Corrections
+    if (activeView !== 'overview') return;
+
     loadDashboardData('mount');
     // Use dynamic refresh interval from server, fallback to 60s
     const refreshInterval = dashboardData?.refreshInterval || 60000;
-    const interval = setInterval(() => loadDashboardData('interval'), refreshInterval);
+    const interval = setInterval(() => {
+      loadDashboardData('interval');
+    }, refreshInterval);
     return () => clearInterval(interval);
-  }, [dashboardData?.refreshInterval]);
+  }, [activeView, dashboardData?.refreshInterval]);
 
   const handleBackClick = () => {
     onBack();

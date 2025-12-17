@@ -9,6 +9,9 @@ import PinEntryDialog from "@/components/PinEntryDialog";
 import { getCurrentlyOutRecords, HallPassRecord } from "@/lib/supabaseDataManager";
 import { CLASSROOM_ID } from "@/config/classroom";
 
+// Diagnostic flag for investigating reload-while-frozen issue
+const DEBUG_DIAG = false;
+
 const Index = () => {
   const [currentView, setCurrentView] = useState<'select' | 'student' | 'teacher' | 'multiple'>('select');
   const [currentlyOutRecords, setCurrentlyOutRecords] = useState<HallPassRecord[]>([]);
@@ -16,6 +19,7 @@ const Index = () => {
   const [isTeacherAuthenticated, setIsTeacherAuthenticated] = useState(false);
 
   const loadCurrentlyOut = async () => {
+    if (DEBUG_DIAG) console.log('[SUPABASE] Index.loadCurrentlyOut() | ts:', new Date().toISOString());
     const records = await getCurrentlyOutRecords();
     setCurrentlyOutRecords(records);
   };
