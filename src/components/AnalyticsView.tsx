@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { BarChart3, BarChart4, BarChartBig, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake, AlertTriangle, Eye, Download, X } from "lucide-react";
+import { BarChart3, BarChart4, BarChartBig, Clock, Users, TrendingUp, RefreshCw, Stethoscope, Snowflake, AlertTriangle, Eye, Download, X, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +15,16 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { 
+  type TimeWindow as TimeWindowKey,
+  type TimeWindowLabel,
+  TIME_WINDOW_LABELS,
+  normalizeTimeWindow,
+  fromLabel,
+  assertWindowNotMismapped
+} from "@/lib/timeWindow";
 
-type TimeFrame = "Day" | "Week" | "Month" | "Quarter" | "All";
+type TimeFrame = TimeWindowLabel;
 
 interface SummaryData { passes: number; minutes_out?: number }
 interface ReturnRateData { return_rate_pct: number; still_out: number; total: number }
@@ -175,6 +183,9 @@ const AnalyticsView = () => {
   const gradeScopeRef = useRef(gradeScope);
   const gradeTermRef = useRef(gradeTerm);
   const onlyWithGradesRef = useRef(onlyWithGrades);
+  
+  // Track if we've done an initial load - freeze should NOT block this
+  const hasLoadedOnce = useRef(false);
 
   useEffect(() => { autoRefreshRef.current = autoRefresh; }, [autoRefresh]);
   useEffect(() => { freezeDataRef.current = freezeData; }, [freezeData]);
@@ -189,7 +200,7 @@ const AnalyticsView = () => {
   const [drillLoading, setDrillLoading] = useState(false);
   const [showDrill, setShowDrill] = useState(false);
 
-  const timeFrameOptions: TimeFrame[] = ["Day", "Week", "Month", "Quarter", "All"];
+  const timeFrameOptions: TimeFrame[] = TIME_WINDOW_LABELS;
 
   // Persist localStorage
   useEffect(() => { localStorage.setItem(TF_KEY, timeFrame); }, [timeFrame]);
@@ -281,12 +292,21 @@ const AnalyticsView = () => {
 
   // Load function reads from refs to avoid stale closures
   // This function is stable (no deps) - always reads latest values via refs
-  const load = useCallback(async () => {
-    // Hard guard: do not refresh while frozen (read from ref for latest value)
-    if (freezeDataRef.current) {
+  // 
+  // force=true: bypass freeze check (used for initial load and manual refresh)
+  // force=false: respects freeze (used for auto-refresh intervals)
+  const load = useCallback(async (force = false) => {
+    // Check freeze - but ALWAYS allow:
+    // 1. Initial load (hasLoadedOnce.current === false)
+    // 2. Forced loads (manual refresh button)
+    const isInitialLoad = !hasLoadedOnce.current;
+    const shouldBlockForFreeze = freezeDataRef.current && !force && !isInitialLoad;
+    
+    if (shouldBlockForFreeze) {
       if (DEBUG_DIAG) console.log('[DIAG] AnalyticsView.load() BLOCKED by freeze | freezeRef:', freezeDataRef.current);
       return;
     }
+    
     // Prevent overlapping fetches
     if (inFlightRef.current) {
       if (DEBUG_DIAG) console.log('[DIAG] AnalyticsView.load() BLOCKED by inFlight');
@@ -295,10 +315,14 @@ const AnalyticsView = () => {
     inFlightRef.current = true;
 
     // Read current values from refs at call time
-    const currentTfKey = timeFrameRef.current.toLowerCase();
+    const currentLabel = timeFrameRef.current;
+    const currentTfKey = normalizeTimeWindow(fromLabel(currentLabel));
     const currentGradeScope = gradeScopeRef.current;
     const currentGradeTerm = gradeTermRef.current;
     const currentOnlyWithGrades = onlyWithGradesRef.current;
+    
+    // Dev assertion: ensure "All" is not incorrectly mapped
+    assertWindowNotMismapped(currentLabel, currentTfKey);
 
     // Diagnostic: log Supabase call initiation
     if (DEBUG_DIAG) {
@@ -399,41 +423,43 @@ const AnalyticsView = () => {
     } finally {
       setLoading(false);
       inFlightRef.current = false;
+      hasLoadedOnce.current = true; // Mark that we've loaded at least once
       if (DEBUG_DIAG) console.log('[SUPABASE] AnalyticsView.load() COMPLETE | ts:', new Date().toISOString());
     }
   }, []); // Empty deps: load is stable, reads current values from refs
 
   // Main load effect - triggers on nonce (interval) or timeFrame change
-  // Uses refs for freeze check to avoid stale closures and unnecessary re-runs
+  // Initial mount always loads; subsequent loads respect freeze
   useEffect(() => {
-    if (freezeDataRef.current) {
-      if (DEBUG) console.log('[AnalyticsView] fetch BLOCKED (frozen) | trigger: nonce/timeFrame | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
+    const isInitialLoad = !hasLoadedOnce.current;
+    const reason = nonce === 'init' ? 'mount' : 'nonce/timeFrame-change';
+    
+    // Initial load always happens; interval/timeFrame changes respect freeze
+    if (!isInitialLoad && freezeDataRef.current) {
+      if (DEBUG) console.log('[AnalyticsView] fetch BLOCKED (frozen) | trigger:', reason, '| timeFrame:', timeFrameRef.current);
       return;
     }
-    if (DEBUG) console.log('[AnalyticsView] fetch reason:', nonce === 'init' ? 'mount' : 'nonce/timeFrame-change', '| timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
+    
+    if (DEBUG) console.log('[AnalyticsView] fetch reason:', reason, '| timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current);
     void load();
   }, [nonce, timeFrame, load]);
 
   // Effect for user-initiated parameter changes (gradeScope, gradeTerm, onlyWithGrades)
-  // Separate from main load effect to allow independent control
+  // These are user actions, so they should work even when frozen (like manual refresh)
   useEffect(() => {
-    if (freezeDataRef.current) {
-      if (DEBUG) console.log('[AnalyticsView] fetch BLOCKED (frozen) | trigger: param-change | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
-      return;
-    }
-    if (DEBUG) console.log('[AnalyticsView] fetch reason: param-change | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
-    void load();
+    // Skip on initial mount (main effect handles that)
+    if (!hasLoadedOnce.current) return;
+    
+    if (DEBUG) console.log('[AnalyticsView] fetch reason: param-change (force) | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current);
+    void load(true); // User-initiated param change = force load
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gradeScope, gradeTerm, onlyWithGrades]);
 
-  // Manual refresh respects freeze - no refresh when frozen
+  // Manual refresh ALWAYS works, even when frozen
+  // This allows users to get fresh data while keeping auto-refresh disabled
   const manualRefresh = () => {
-    if (freezeDataRef.current) {
-      if (DEBUG) console.log('[AnalyticsView] fetch BLOCKED (frozen) | trigger: manual | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
-      return;
-    }
-    if (DEBUG) console.log('[AnalyticsView] fetch reason: manual | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
-    void load();
+    if (DEBUG) console.log('[AnalyticsView] fetch reason: manual (force=true) | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
+    void load(true); // force=true bypasses freeze
   };
 
   const fmtHour = (h: number) =>
@@ -446,6 +472,15 @@ const AnalyticsView = () => {
     summary && summary.passes > 0
       ? Math.round(((summary.minutes_out ?? 0) / summary.passes) * 10) / 10
       : 0;
+
+  // Determine if we have truly no data for this timeframe
+  // (vs just loaded zeros). Check multiple signals.
+  const hasNoData = 
+    !loading && 
+    hasLoadedOnce.current && 
+    summary?.passes === 0 && 
+    byPeriod.length === 0 && 
+    byDestination.length === 0;
 
   const heatColor = (passes: number, max: number) => {
     if (passes === 0) return "hsl(214 100% 97%)";
@@ -493,7 +528,7 @@ const AnalyticsView = () => {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>When ON, nothing reloads automatically. Use Refresh to fetch.</p>
+                  <p>Disables auto-refresh. Refresh button still works.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -515,9 +550,19 @@ const AnalyticsView = () => {
       </div>
 
       {error && (
-        <Card className="border-destructive">
-          <CardContent className="p-4">
-            <p className="text-destructive text-sm">{error}</p>
+        <Card className="border-destructive bg-destructive/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-destructive text-base flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Analytics Failed to Load
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <p className="text-destructive/80 text-sm">{error}</p>
+            <p className="text-muted-foreground text-xs mt-2">See browser console for details.</p>
+            <Button variant="outline" size="sm" onClick={manualRefresh} className="mt-3 gap-2">
+              <RefreshCw className="h-4 w-4" /> Retry
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -527,7 +572,25 @@ const AnalyticsView = () => {
           <CardContent className="p-3">
             <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
               <Snowflake className="h-4 w-4" />
-              Data is frozen. Click Refresh to update or turn off Freeze.
+              Auto-refresh paused. Click Refresh to update, or turn off Freeze.
+              {!hasLoadedOnce.current && summary === null && (
+                <span className="ml-2 font-medium">No cached snapshot yet — loading...</span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No data notice */}
+      {hasNoData && !error && (
+        <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="p-4">
+            <p className="text-amber-700 dark:text-amber-300 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              <span>
+                <strong>No activity in this timeframe.</strong>{" "}
+                Try selecting a different range (e.g., "All" for all historical data).
+              </span>
             </p>
           </CardContent>
         </Card>
