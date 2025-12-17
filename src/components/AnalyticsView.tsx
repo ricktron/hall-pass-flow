@@ -89,6 +89,9 @@ const TF_KEY = "hp_analytics_tf";
 const FREEZE_KEY = "hp_analytics_freeze";
 const BLUE = "hsl(217 91% 60%)"; // #3b82f6
 
+// Dev-only debug flag: set to true to log fetch triggers
+const DEBUG = false;
+
 // Helper: strictly parse boolean from localStorage (never use Boolean() which treats "false" as true)
 const parseBoolLS = (key: string, defaultVal: boolean): boolean => {
   if (typeof window === "undefined") return defaultVal;
@@ -120,21 +123,7 @@ const AnalyticsView = () => {
   // Prevent overlapping fetches
   const inFlightRef = useRef(false);
 
-  // Refs to access latest toggle/state values inside callbacks (prevents stale closures)
-  const autoRefreshRef = useRef(autoRefresh);
-  const freezeDataRef = useRef(freezeData);
-  const timeFrameRef = useRef(timeFrame);
-  const gradeScopeRef = useRef(gradeScope);
-  const gradeTermRef = useRef(gradeTerm);
-  const onlyWithGradesRef = useRef(onlyWithGrades);
-
-  useEffect(() => { autoRefreshRef.current = autoRefresh; }, [autoRefresh]);
-  useEffect(() => { freezeDataRef.current = freezeData; }, [freezeData]);
-  useEffect(() => { timeFrameRef.current = timeFrame; }, [timeFrame]);
-  useEffect(() => { gradeScopeRef.current = gradeScope; }, [gradeScope]);
-  useEffect(() => { gradeTermRef.current = gradeTerm; }, [gradeTerm]);
-  useEffect(() => { onlyWithGradesRef.current = onlyWithGrades; }, [onlyWithGrades]);
-
+  // Data state
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [returnRate, setReturnRate] = useState<ReturnRateData | null>(null);
   const [byPeriod, setByPeriod] = useState<PeriodData[]>([]);
@@ -154,6 +143,22 @@ const AnalyticsView = () => {
   const [risks, setRisks] = useState<RiskRow[]>([]);
   // Filter to show only rows with grades
   const [onlyWithGrades, setOnlyWithGrades] = useState<boolean>(false);
+
+  // Refs to access latest toggle/state values inside callbacks (prevents stale closures)
+  // NOTE: Refs must be declared AFTER the state they reference
+  const autoRefreshRef = useRef(autoRefresh);
+  const freezeDataRef = useRef(freezeData);
+  const timeFrameRef = useRef(timeFrame);
+  const gradeScopeRef = useRef(gradeScope);
+  const gradeTermRef = useRef(gradeTerm);
+  const onlyWithGradesRef = useRef(onlyWithGrades);
+
+  useEffect(() => { autoRefreshRef.current = autoRefresh; }, [autoRefresh]);
+  useEffect(() => { freezeDataRef.current = freezeData; }, [freezeData]);
+  useEffect(() => { timeFrameRef.current = timeFrame; }, [timeFrame]);
+  useEffect(() => { gradeScopeRef.current = gradeScope; }, [gradeScope]);
+  useEffect(() => { gradeTermRef.current = gradeTerm; }, [gradeTerm]);
+  useEffect(() => { onlyWithGradesRef.current = onlyWithGrades; }, [onlyWithGrades]);
 
   // Drill-down modal state
   const [drillStudent, setDrillStudent] = useState<string | null>(null);
@@ -186,6 +191,7 @@ const AnalyticsView = () => {
         document.hidden === false &&
         inFlightRef.current === false
       ) {
+        if (DEBUG) console.log('[AnalyticsView] fetch reason: interval | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
         setNonce(String(Date.now()));
       }
     }, 60000);
@@ -364,21 +370,34 @@ const AnalyticsView = () => {
   // Main load effect - triggers on nonce (interval) or timeFrame change
   // Uses refs for freeze check to avoid stale closures and unnecessary re-runs
   useEffect(() => {
-    if (freezeDataRef.current) return; // hard guard: never auto-load when frozen
+    if (freezeDataRef.current) {
+      if (DEBUG) console.log('[AnalyticsView] fetch BLOCKED (frozen) | trigger: nonce/timeFrame | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
+      return;
+    }
+    if (DEBUG) console.log('[AnalyticsView] fetch reason:', nonce === 'init' ? 'mount' : 'nonce/timeFrame-change', '| timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
     void load();
   }, [nonce, timeFrame, load]);
 
   // Effect for user-initiated parameter changes (gradeScope, gradeTerm, onlyWithGrades)
   // Separate from main load effect to allow independent control
   useEffect(() => {
-    if (freezeDataRef.current) return; // respect freeze
+    if (freezeDataRef.current) {
+      if (DEBUG) console.log('[AnalyticsView] fetch BLOCKED (frozen) | trigger: param-change | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
+      return;
+    }
+    if (DEBUG) console.log('[AnalyticsView] fetch reason: param-change | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gradeScope, gradeTerm, onlyWithGrades]);
 
   // Manual refresh respects freeze - no refresh when frozen
   const manualRefresh = () => {
-    if (!freezeDataRef.current) void load();
+    if (freezeDataRef.current) {
+      if (DEBUG) console.log('[AnalyticsView] fetch BLOCKED (frozen) | trigger: manual | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
+      return;
+    }
+    if (DEBUG) console.log('[AnalyticsView] fetch reason: manual | timeFrame:', timeFrameRef.current, '| freeze:', freezeDataRef.current, '| auto:', autoRefreshRef.current);
+    void load();
   };
 
   const fmtHour = (h: number) =>

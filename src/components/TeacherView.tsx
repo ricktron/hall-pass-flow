@@ -12,6 +12,9 @@ import { supabase } from "@/integrations/supabase/client";
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
+// Dev-only debug flag: set to true to log fetch triggers
+const DEBUG = false;
+
 interface TeacherViewProps {
   onBack: () => void;
 }
@@ -51,7 +54,8 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [activeView, setActiveView] = useState<'overview' | 'analytics' | 'corrections'>('overview');
   const [weeklyTopStudents, setWeeklyTopStudents] = useState<Array<{ studentName: string; totalMinutes: number; tripCount: number }>>([]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (reason: string = 'unknown') => {
+    if (DEBUG) console.log('[TeacherView] fetch reason:', reason);
     setLoading(true);
     setErr(null);
 
@@ -90,10 +94,10 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   };
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData('mount');
     // Use dynamic refresh interval from server, fallback to 60s
     const refreshInterval = dashboardData?.refreshInterval || 60000;
-    const interval = setInterval(loadDashboardData, refreshInterval);
+    const interval = setInterval(() => loadDashboardData('interval'), refreshInterval);
     return () => clearInterval(interval);
   }, [dashboardData?.refreshInterval]);
 
@@ -149,7 +153,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
         title: "Student Returned",
         description: `${studentName} has been marked as returned.`,
       });
-      loadDashboardData();
+      loadDashboardData('student-return');
     } catch (error) {
       toast({ 
         variant: 'destructive', 
