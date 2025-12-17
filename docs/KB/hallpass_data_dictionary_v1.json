@@ -1,0 +1,1751 @@
+{
+  "generated_at": "2025-12-17T15:27:00",
+  "schema": "public",
+  "summary": {
+    "tables": 19,
+    "views": 27,
+    "indexes": 13,
+    "policies": 35,
+    "rls_enabled_tables": 16,
+    "enums": 3,
+    "triggers": 2,
+    "functions": 10
+  },
+  "enums": {
+    "location_type": [
+      "classroom",
+      "restroom",
+      "library",
+      "office",
+      "other",
+      "athletics",
+      "hallway",
+      "chapel",
+      "theater"
+    ],
+    "pass_status": [
+      "ACTIVE",
+      "RETURNED",
+      "LATE"
+    ],
+    "user_role": [
+      "student",
+      "teacher",
+      "admin"
+    ]
+  },
+  "tables": {
+    "Classroom_Arrivals": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "generated": null
+        },
+        {
+          "column": "created_at",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "student_name",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "period",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "time_in",
+          "data_type": "timestamp with time zone",
+          "nullable": true,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "arrival_reason",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "bathroom_passes": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "generated": null
+        },
+        {
+          "column": "raw_student_name",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "student_id",
+          "data_type": "uuid",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "period",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "timeout",
+          "data_type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "timein",
+          "data_type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "destination",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "notes",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "was_auto_closed",
+          "data_type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "generated": null
+        },
+        {
+          "column": "manual_adjust_min",
+          "data_type": "numeric",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "manual_adjust_reason",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "created_at",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "updated_at",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "period_norm",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": "upper(TRIM(BOTH FROM period))"
+        },
+        {
+          "column": "date_local",
+          "data_type": "date",
+          "nullable": true,
+          "default": null,
+          "generated": "public.to_local_date_toronto(timeout)"
+        },
+        {
+          "column": "duration_min",
+          "data_type": "numeric",
+          "nullable": false,
+          "default": null,
+          "generated": "CASE\n    WHEN ((timein IS NOT NULL) AND (timeout IS NOT NULL)) THEN (EXTRACT(epoch FROM (timein - timeout)) / 60.0)\n    ELSE NULL::numeric\nEND"
+        },
+        {
+          "column": "pass_status",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": "CASE\n    WHEN ((timein IS NULL) AND (timeout IS NOT NULL)) THEN 'out'::text\n    WHEN (timein IS NOT NULL) THEN 'returned'::text\n    ELSE 'draft'::text\nEND"
+        },
+        {
+          "column": "overrode_period",
+          "data_type": "boolean",
+          "nullable": false,
+          "default": "false",
+          "generated": null
+        },
+        {
+          "column": "override_reason",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "student_name",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "classroom",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "name": "fk_bathroom_passes_classroom",
+          "columns": [
+            "classroom"
+          ],
+          "ref_table": "classrooms",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": null,
+          "on_update": null
+        }
+      ],
+      "unique_constraints": [],
+      "indexes": [
+        {
+          "index": "bathroom_passes_destination_trgm",
+          "unique": false,
+          "method": "gin",
+          "columns_expr": "destination public.gin_trgm_ops",
+          "where": null
+        },
+        {
+          "index": "bathroom_passes_timeout_period_idx",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "timeout, period",
+          "where": null
+        },
+        {
+          "index": "idx_bathroom_passes_classroom",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "classroom",
+          "where": null
+        },
+        {
+          "index": "idx_bathroom_passes_period",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "period",
+          "where": null
+        },
+        {
+          "index": "idx_bathroom_passes_timeout",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "timeout",
+          "where": null
+        },
+        {
+          "index": "idx_passes_date_local",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "date_local",
+          "where": null
+        },
+        {
+          "index": "idx_passes_period_norm",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "period_norm",
+          "where": null
+        },
+        {
+          "index": "idx_passes_status",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "pass_status",
+          "where": null
+        },
+        {
+          "index": "idx_passes_student_id",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "student_id",
+          "where": null
+        },
+        {
+          "index": "one_open_pass_per_raw_name",
+          "unique": true,
+          "method": "btree",
+          "columns_expr": "raw_student_name",
+          "where": "((student_id IS NULL) AND (raw_student_name IS NOT NULL) AND (timein IS NULL))"
+        },
+        {
+          "index": "one_open_pass_per_student",
+          "unique": true,
+          "method": "btree",
+          "columns_expr": "student_id",
+          "where": "((student_id IS NOT NULL) AND (timein IS NULL))"
+        }
+      ],
+      "rls_enabled": true
+    },
+    "Hall_Passes_deleted_backup": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "uuid",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "studentName",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "studentId",
+          "data_type": "uuid",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "period",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "destination",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "timeOut",
+          "data_type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "timeIn",
+          "data_type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "notes",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "classroom",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": null,
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "academic_terms": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "name",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "start_date",
+          "data_type": "date",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "end_date",
+          "data_type": "date",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "classroom_arrivals": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "generated": null
+        },
+        {
+          "column": "created_at",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "student_name",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "period",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "time_in",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "arrival_reason",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "classrooms": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "teacher_email",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [
+        {
+          "name": "classrooms_teacher_email_key",
+          "columns": [
+            "teacher_email"
+          ]
+        }
+      ],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "courses": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "course_code",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "course_name",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "destinations": {
+      "columns": [
+        {
+          "column": "name",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "active",
+          "data_type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "generated": null
+        },
+        {
+          "column": "sort",
+          "data_type": "integer",
+          "nullable": false,
+          "default": "100",
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "name"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": false
+    },
+    "grades_normalized": {
+      "columns": [
+        {
+          "column": "student_key",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "term",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "course",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "avg_grade",
+          "data_type": "numeric(5,2)",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": null,
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [
+        {
+          "index": "grades_norm_student_idx",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "student_key",
+          "where": null
+        },
+        {
+          "index": "grades_norm_term_idx",
+          "unique": false,
+          "method": "btree",
+          "columns_expr": "term",
+          "where": null
+        }
+      ],
+      "rls_enabled": false
+    },
+    "hall_pass_corrections": {
+      "columns": [
+        {
+          "column": "pass_id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "corrected_duration",
+          "data_type": "integer",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "corrected_by",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "corrected_reason",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "corrected_at",
+          "data_type": "timestamp with time zone",
+          "nullable": true,
+          "default": "now()",
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "pass_id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "hall_pass_destinations": {
+      "columns": [
+        {
+          "column": "key",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "label",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "active",
+          "data_type": "boolean",
+          "nullable": false,
+          "default": "true",
+          "generated": null
+        },
+        {
+          "column": "synonyms",
+          "data_type": "text[]",
+          "nullable": false,
+          "default": "'{}'::text[]",
+          "generated": null
+        },
+        {
+          "column": "created_at",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "updated_at",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "key"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": false
+    },
+    "hall_passes": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "student_id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "issued_by",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "origin_id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "destination_id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "time_out",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "time_in",
+          "data_type": "timestamp with time zone",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "status",
+          "data_type": "public.pass_status",
+          "nullable": false,
+          "default": "'ACTIVE'::public.pass_status",
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "name": "hall_passes_destination_id_fkey",
+          "columns": [
+            "destination_id"
+          ],
+          "ref_table": "locations",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": null,
+          "on_update": null
+        },
+        {
+          "name": "hall_passes_issued_by_fkey",
+          "columns": [
+            "issued_by"
+          ],
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE",
+          "on_update": null
+        },
+        {
+          "name": "hall_passes_origin_id_fkey",
+          "columns": [
+            "origin_id"
+          ],
+          "ref_table": "locations",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": null,
+          "on_update": null
+        },
+        {
+          "name": "hall_passes_student_id_fkey",
+          "columns": [
+            "student_id"
+          ],
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE",
+          "on_update": null
+        }
+      ],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "locations": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "name",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "type",
+          "data_type": "public.location_type",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "user_id",
+          "data_type": "uuid",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "name": "locations_user_id_fkey",
+          "columns": [
+            "user_id"
+          ],
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": null,
+          "on_update": null
+        }
+      ],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "period_meta": {
+      "columns": [
+        {
+          "column": "period",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "start_local",
+          "data_type": "time without time zone",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "end_local",
+          "data_type": "time without time zone",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "is_after_lunch",
+          "data_type": "boolean",
+          "nullable": true,
+          "default": "false",
+          "generated": null
+        },
+        {
+          "column": "is_last_period",
+          "data_type": "boolean",
+          "nullable": true,
+          "default": "false",
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "period"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "rosters": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "student_id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "course_id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "academic_term_id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "period_code",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "name": "rosters_academic_term_id_fkey",
+          "columns": [
+            "academic_term_id"
+          ],
+          "ref_table": "academic_terms",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE",
+          "on_update": null
+        },
+        {
+          "name": "rosters_course_id_fkey",
+          "columns": [
+            "course_id"
+          ],
+          "ref_table": "courses",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE",
+          "on_update": null
+        },
+        {
+          "name": "rosters_student_id_fkey",
+          "columns": [
+            "student_id"
+          ],
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE",
+          "on_update": null
+        }
+      ],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "settings": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "bigint",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "setting_name",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "value",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "description",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [
+        {
+          "name": "settings_setting_name_key",
+          "columns": [
+            "setting_name"
+          ]
+        }
+      ],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "student_name_synonyms": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "generated": null
+        },
+        {
+          "column": "created_at",
+          "data_type": "timestamp with time zone",
+          "nullable": false,
+          "default": "now()",
+          "generated": null
+        },
+        {
+          "column": "raw_input",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "student_id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [
+        {
+          "name": "student_name_synonyms_raw_input_key",
+          "columns": [
+            "raw_input"
+          ]
+        }
+      ],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "students": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "sis_id",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "grade_level",
+          "data_type": "integer",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [
+        {
+          "name": "students_id_fkey",
+          "columns": [
+            "id"
+          ],
+          "ref_table": "users",
+          "ref_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE",
+          "on_update": null
+        }
+      ],
+      "unique_constraints": [],
+      "indexes": [],
+      "rls_enabled": true
+    },
+    "users": {
+      "columns": [
+        {
+          "column": "id",
+          "data_type": "uuid",
+          "nullable": false,
+          "default": "gen_random_uuid()",
+          "generated": null
+        },
+        {
+          "column": "first_name",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "last_name",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "email",
+          "data_type": "text",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "role",
+          "data_type": "public.user_role",
+          "nullable": false,
+          "default": null,
+          "generated": null
+        },
+        {
+          "column": "nickname",
+          "data_type": "text",
+          "nullable": true,
+          "default": null,
+          "generated": null
+        }
+      ],
+      "primary_key": [
+        "id"
+      ],
+      "foreign_keys": [],
+      "unique_constraints": [
+        {
+          "name": "users_email_key",
+          "columns": [
+            "email"
+          ]
+        }
+      ],
+      "indexes": [],
+      "rls_enabled": true
+    }
+  },
+  "views": {
+    "Hall_Passes": {
+      "security_invoker_true": true,
+      "definition": "SELECT bp.id,\n    bp.student_name AS \"studentName\",\n    bp.student_id AS \"studentId\",\n    bp.period,\n    bp.destination,\n    bp.timeout AS \"timeOut\",\n    bp.timein AS \"timeIn\",\n    bp.notes,\n    bp.classroom\n   FROM public.bathroom_passes bp"
+    },
+    "Hall_Passes_api": {
+      "security_invoker_true": true,
+      "definition": "SELECT bp.id,\n    bp.timeout AS \"timeOut\",\n    bp.timein AS \"timeIn\",\n    bp.duration_min AS duration,\n        CASE\n            WHEN (bp.timein IS NULL) THEN true\n            ELSE false\n        END AS \"needsReview\",\n    bp.student_id AS \"studentId\",\n    bp.student_name AS \"studentName\",\n    bp.period,\n    bp.destination,\n    split_part(bp.student_name, ' '::text, 1) AS \"firstName\",\n    split_part(bp.student_name, ' '::text, 2) AS \"lastName\",\n    bp.raw_student_name AS \"typedName\"\n   FROM public.bathroom_passes bp"
+    },
+    "hp_base": {
+      "security_invoker_true": true,
+      "definition": "SELECT bathroom_passes.id,\n    bathroom_passes.student_name,\n    bathroom_passes.period,\n    bathroom_passes.timeout,\n    bathroom_passes.timein,\n    bathroom_passes.duration_min AS duration,\n    to_char(bathroom_passes.timeout, 'Day'::text) AS \"dayOfWeek\",\n    bathroom_passes.destination,\n    bathroom_passes.overrode_period AS \"earlyDismissal\",\n    bathroom_passes.classroom\n   FROM public.bathroom_passes"
+    },
+    "hp_bathroom_flyers_all": {
+      "security_invoker_true": false,
+      "definition": "SELECT b.student_name,\n    count(*) AS passes,\n    sum(\n        CASE\n            WHEN (b.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - b.timeout)) / 60.0)\n            ELSE (EXTRACT(epoch FROM (b.timein - b.timeout)) / 60.0)\n        END) AS total_minutes\n   FROM public.hp_base b\n  WHERE ((b.destination ~~* '%bath%'::text) OR (b.destination ~~* '%restroom%'::text) OR (b.destination ~~* '%rr%'::text))\n  GROUP BY b.student_name"
+    },
+    "hp_bathroom_trips_current_quarter": {
+      "security_invoker_true": false,
+      "definition": "WITH bounds AS (\n         SELECT date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) AS s,\n            (date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval) AS e\n        )\n SELECT lower(b.student_name) AS student_key,\n    b.timeout,\n    b.timein,\n    b.duration,\n    b.destination,\n    b.period,\n    b.classroom\n   FROM public.hp_base b,\n    bounds\n  WHERE ((b.timeout IS NOT NULL) AND (b.timeout >= bounds.s) AND (b.timeout < bounds.e) AND (b.destination ~~* ANY (ARRAY['%bath%'::text, '%restroom%'::text, '%rr%'::text])))"
+    },
+    "hp_behavior_hourly_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local\n           FROM public.hp_base\n        ), win AS (\n         SELECT w_1.\"window\",\n            w_1.start_ct,\n            w_1.end_ct\n           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,( SELECT COALESCE(min(b_1.t_local), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))) AS \"coalesce\"\n                           FROM b b_1),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(\"window\", start_ct, end_ct)\n        )\n SELECT w.\"window\",\n    (EXTRACT(hour FROM b.t_local))::integer AS hour_24,\n    count(*) AS passes\n   FROM (win w\n     LEFT JOIN b ON (((b.t_local >= w.start_ct) AND (b.t_local < w.end_ct))))\n  GROUP BY w.\"window\", (EXTRACT(hour FROM b.t_local))\n  ORDER BY w.\"window\", ((EXTRACT(hour FROM b.t_local))::integer)"
+    },
+    "hp_by_destination_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,\n                CASE\n                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)\n                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)\n                END AS duration_min\n           FROM public.hp_base\n        ), win AS (\n         SELECT w_1.\"window\",\n            w_1.start_ct,\n            w_1.end_ct\n           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min\n                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(\"window\", start_ct, end_ct)\n        )\n SELECT w.\"window\",\n    COALESCE(x.destination, 'Other'::text) AS destination,\n    count(*) AS passes,\n    (COALESCE(sum(x.duration_min), (0)::numeric))::integer AS minutes_out,\n    (percentile_cont((0.5)::double precision) WITHIN GROUP (ORDER BY ((x.duration_min)::double precision)))::numeric(10,1) AS median_min,\n    (percentile_cont((0.9)::double precision) WITHIN GROUP (ORDER BY ((x.duration_min)::double precision)))::numeric(10,1) AS p90_min\n   FROM (win w\n     JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))\n  GROUP BY w.\"window\", COALESCE(x.destination, 'Other'::text)\n  ORDER BY w.\"window\", (count(*)) DESC"
+    },
+    "hp_by_period_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,\n                CASE\n                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)\n                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)\n                END AS duration_min\n           FROM public.hp_base\n        ), win AS (\n         SELECT w_1.\"window\",\n            w_1.start_ct,\n            w_1.end_ct\n           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min\n                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(\"window\", start_ct, end_ct)\n        )\n SELECT w.\"window\",\n    x.period,\n    count(*) AS passes,\n    (COALESCE(sum(x.duration_min), (0)::numeric))::integer AS minutes_out\n   FROM (win w\n     JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))\n  GROUP BY w.\"window\", x.period\n  ORDER BY w.\"window\", (count(*)) DESC"
+    },
+    "hp_dayofweek_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local\n           FROM public.hp_base\n        ), win AS (\n         SELECT w_1.\"window\",\n            w_1.start_ct,\n            w_1.end_ct\n           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,( SELECT COALESCE(min(b_1.t_local), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))) AS \"coalesce\"\n                           FROM b b_1),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(\"window\", start_ct, end_ct)\n        )\n SELECT w.\"window\",\n    to_char(b.t_local, 'Dy'::text) AS dow_short,\n    count(*) AS passes\n   FROM (win w\n     LEFT JOIN b ON (((b.t_local >= w.start_ct) AND (b.t_local < w.end_ct))))\n  GROUP BY w.\"window\", (to_char(b.t_local, 'Dy'::text))\n  ORDER BY w.\"window\", (to_char(b.t_local, 'Dy'::text))"
+    },
+    "hp_disruption_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,\n                CASE\n                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)\n                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)\n                END AS duration_min\n           FROM public.hp_base\n        ), win AS (\n         SELECT w_1.\"window\",\n            w_1.start_ct,\n            w_1.end_ct\n           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,( SELECT COALESCE(min(b_1.t_local), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))) AS \"coalesce\"\n                           FROM b b_1),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(\"window\", start_ct, end_ct)\n        )\n SELECT w.\"window\",\n    b.student_name,\n    count(*) AS passes,\n    round(COALESCE(sum(b.duration_min), (0)::numeric), 1) AS minutes_out\n   FROM (win w\n     JOIN b ON (((b.t_local >= w.start_ct) AND (b.t_local < w.end_ct))))\n  GROUP BY w.\"window\", b.student_name\n  ORDER BY w.\"window\", (round(COALESCE(sum(b.duration_min), (0)::numeric), 1)) DESC, (count(*)) DESC"
+    },
+    "hp_frequent_flyers_bathroom_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH now_local AS (\n         SELECT (now() AT TIME ZONE 'America/Chicago'::text) AS t\n        ), win AS (\n         SELECT 'day'::text AS \"window\",\n            date_trunc('day'::text, now_local.t) AS s,\n            (date_trunc('day'::text, now_local.t) + '1 day'::interval) AS e\n           FROM now_local\n        UNION ALL\n         SELECT 'week'::text,\n            date_trunc('week'::text, now_local.t) AS date_trunc,\n            (date_trunc('week'::text, now_local.t) + '7 days'::interval)\n           FROM now_local\n        UNION ALL\n         SELECT 'month'::text,\n            date_trunc('month'::text, now_local.t) AS date_trunc,\n            (date_trunc('month'::text, now_local.t) + '1 mon'::interval)\n           FROM now_local\n        UNION ALL\n         SELECT 'quarter'::text,\n            date_trunc('quarter'::text, now_local.t) AS date_trunc,\n            (date_trunc('quarter'::text, now_local.t) + '3 mons'::interval)\n           FROM now_local\n        ), all_bounds AS (\n         SELECT 'all'::text AS \"window\",\n            COALESCE(( SELECT min(hp_base.timeout) AS min\n                   FROM public.hp_base), (( SELECT now_local.t\n                   FROM now_local))::timestamp with time zone) AS s,\n            ( SELECT now_local.t\n                   FROM now_local) AS e\n        )\n SELECT w.\"window\",\n    b.student_name,\n    (count(*))::integer AS passes,\n    (COALESCE(sum(b.duration), (0)::numeric))::numeric(10,1) AS total_minutes,\n    (COALESCE(avg(b.duration), (0)::numeric))::numeric(10,1) AS avg_minutes\n   FROM (( SELECT win.\"window\",\n            win.s,\n            win.e\n           FROM win\n        UNION ALL\n         SELECT all_bounds.\"window\",\n            all_bounds.s,\n            all_bounds.e\n           FROM all_bounds) w\n     JOIN public.hp_base b ON (((b.timeout >= w.s) AND (b.timeout < w.e))))\n  WHERE (b.destination ~~* ANY (ARRAY['%bath%'::text, '%restroom%'::text, '%rr%'::text]))\n  GROUP BY w.\"window\", b.student_name"
+    },
+    "hp_frequent_flyers_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,\n                CASE\n                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)\n                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)\n                END AS duration_min\n           FROM public.hp_base\n        ), win AS (\n         SELECT w_1.\"window\",\n            w_1.start_ct,\n            w_1.end_ct\n           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min\n                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(\"window\", start_ct, end_ct)\n        )\n SELECT w.\"window\",\n    x.student_name,\n    count(*) AS passes,\n    (COALESCE(sum(x.duration_min), (0)::numeric))::integer AS minutes_out\n   FROM (win w\n     JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))\n  GROUP BY w.\"window\", x.student_name\n  ORDER BY w.\"window\", (count(*)) DESC, ((COALESCE(sum(x.duration_min), (0)::numeric))::integer) DESC"
+    },
+    "hp_student_metrics_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH now_local AS (\n         SELECT (now() AT TIME ZONE 'America/Chicago'::text) AS t\n        ), win AS (\n         SELECT 'day'::text AS \"window\",\n            date_trunc('day'::text, now_local.t) AS s,\n            (date_trunc('day'::text, now_local.t) + '1 day'::interval) AS e\n           FROM now_local\n        UNION ALL\n         SELECT 'week'::text,\n            date_trunc('week'::text, now_local.t) AS date_trunc,\n            (date_trunc('week'::text, now_local.t) + '7 days'::interval)\n           FROM now_local\n        UNION ALL\n         SELECT 'month'::text,\n            date_trunc('month'::text, now_local.t) AS date_trunc,\n            (date_trunc('month'::text, now_local.t) + '1 mon'::interval)\n           FROM now_local\n        UNION ALL\n         SELECT 'quarter'::text,\n            date_trunc('quarter'::text, now_local.t) AS date_trunc,\n            (date_trunc('quarter'::text, now_local.t) + '3 mons'::interval)\n           FROM now_local\n        ), all_bounds AS (\n         SELECT 'all'::text AS \"window\",\n            COALESCE(( SELECT min(hp_base.timeout) AS min\n                   FROM public.hp_base), (( SELECT now_local.t\n                   FROM now_local))::timestamp with time zone) AS s,\n            ( SELECT now_local.t\n                   FROM now_local) AS e\n        ), windows AS (\n         SELECT win.\"window\",\n            win.s,\n            win.e\n           FROM win\n        UNION ALL\n         SELECT all_bounds.\"window\",\n            all_bounds.s,\n            all_bounds.e\n           FROM all_bounds\n        ), base AS (\n         SELECT b.id,\n            b.student_name,\n            b.period,\n            b.timeout,\n            b.timein,\n            b.duration,\n            b.\"dayOfWeek\",\n            b.destination,\n            b.\"earlyDismissal\",\n            b.classroom,\n            lower(b.student_name) AS student_key\n           FROM public.hp_base b\n        ), scoped AS (\n         SELECT w.\"window\",\n            'bathroom'::text AS scope,\n            b.student_key,\n            (count(*))::integer AS passes,\n            (COALESCE(sum(b.duration), (0)::numeric))::numeric(10,1) AS total_minutes,\n            (COALESCE(avg(b.duration), (0)::numeric))::numeric(10,1) AS avg_minutes\n           FROM (windows w\n             JOIN base b ON (((b.timeout >= w.s) AND (b.timeout < w.e))))\n          WHERE (b.destination ~~* ANY (ARRAY['%bath%'::text, '%restroom%'::text, '%rr%'::text]))\n          GROUP BY w.\"window\", b.student_key\n        UNION ALL\n         SELECT w.\"window\",\n            'all'::text AS scope,\n            b.student_key,\n            (count(*))::integer AS passes,\n            (COALESCE(sum(b.duration), (0)::numeric))::numeric(10,1) AS total_minutes,\n            (COALESCE(avg(b.duration), (0)::numeric))::numeric(10,1) AS avg_minutes\n           FROM (windows w\n             JOIN base b ON (((b.timeout >= w.s) AND (b.timeout < w.e))))\n          GROUP BY w.\"window\", b.student_key\n        )\n SELECT scoped.\"window\",\n    scoped.scope,\n    scoped.student_key,\n    scoped.passes,\n    scoped.total_minutes,\n    scoped.avg_minutes\n   FROM scoped"
+    },
+    "hp_grade_compare_windows": {
+      "security_invoker_true": false,
+      "definition": "SELECT m.\"window\",\n    m.scope,\n    m.student_key,\n    g.term,\n    g.course,\n    g.avg_grade,\n    m.passes,\n    m.total_minutes,\n    m.avg_minutes\n   FROM (public.hp_student_metrics_windows m\n     LEFT JOIN public.grades_normalized g ON ((g.student_key = m.student_key)))"
+    },
+    "hp_grade_compare_with_grades": {
+      "security_invoker_true": false,
+      "definition": "SELECT hp_grade_compare_windows.\"window\",\n    hp_grade_compare_windows.scope,\n    hp_grade_compare_windows.student_key,\n    hp_grade_compare_windows.term,\n    hp_grade_compare_windows.course,\n    hp_grade_compare_windows.avg_grade,\n    hp_grade_compare_windows.passes,\n    hp_grade_compare_windows.total_minutes,\n    hp_grade_compare_windows.avg_minutes\n   FROM public.hp_grade_compare_windows\n  WHERE (hp_grade_compare_windows.avg_grade IS NOT NULL)"
+    },
+    "hp_grade_corr_windows": {
+      "security_invoker_true": false,
+      "definition": "SELECT c.\"window\",\n    c.scope,\n    c.term,\n    (count(*))::integer AS n,\n    corr((c.avg_grade)::double precision, (c.passes)::double precision) AS corr_grade_vs_passes,\n    corr((c.avg_grade)::double precision, (c.total_minutes)::double precision) AS corr_grade_vs_minutes,\n    regr_slope((c.avg_grade)::double precision, (c.passes)::double precision) AS slope_grade_vs_passes,\n    regr_r2((c.avg_grade)::double precision, (c.passes)::double precision) AS r2_grade_vs_passes,\n    regr_slope((c.avg_grade)::double precision, (c.total_minutes)::double precision) AS slope_grade_vs_minutes,\n    regr_r2((c.avg_grade)::double precision, (c.total_minutes)::double precision) AS r2_grade_vs_minutes\n   FROM public.hp_grade_compare_windows c\n  WHERE (c.avg_grade IS NOT NULL)\n  GROUP BY c.\"window\", c.scope, c.term"
+    },
+    "hp_grade_outliers_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH base AS (\n         SELECT c.\"window\",\n            c.scope,\n            c.term,\n            c.student_key,\n            (c.avg_grade)::double precision AS avg_grade,\n            (COALESCE(c.passes, 0))::double precision AS passes,\n            (COALESCE(c.total_minutes, (0)::numeric))::double precision AS total_minutes\n           FROM public.hp_grade_compare_windows c\n          WHERE (c.avg_grade IS NOT NULL)\n        ), z AS (\n         SELECT b.\"window\",\n            b.scope,\n            b.term,\n            b.student_key,\n            b.avg_grade,\n            b.passes,\n            b.total_minutes,\n            avg(b.avg_grade) OVER (PARTITION BY b.\"window\", b.scope, b.term) AS g_mu,\n            stddev_pop(b.avg_grade) OVER (PARTITION BY b.\"window\", b.scope, b.term) AS g_sigma,\n            avg(b.passes) OVER (PARTITION BY b.\"window\", b.scope, b.term) AS p_mu,\n            stddev_pop(b.passes) OVER (PARTITION BY b.\"window\", b.scope, b.term) AS p_sigma,\n            avg(b.total_minutes) OVER (PARTITION BY b.\"window\", b.scope, b.term) AS m_mu,\n            stddev_pop(b.total_minutes) OVER (PARTITION BY b.\"window\", b.scope, b.term) AS m_sigma\n           FROM base b\n        ), scored AS (\n         SELECT z.\"window\",\n            z.scope,\n            z.term,\n            z.student_key,\n            z.avg_grade,\n            z.passes,\n            z.total_minutes,\n                CASE\n                    WHEN (z.g_sigma > (0)::double precision) THEN ((z.avg_grade - z.g_mu) / z.g_sigma)\n                    ELSE (0)::double precision\n                END AS z_grade,\n                CASE\n                    WHEN (z.p_sigma > (0)::double precision) THEN ((z.passes - z.p_mu) / z.p_sigma)\n                    ELSE (0)::double precision\n                END AS z_passes,\n                CASE\n                    WHEN (z.m_sigma > (0)::double precision) THEN ((z.total_minutes - z.m_mu) / z.m_sigma)\n                    ELSE (0)::double precision\n                END AS z_minutes\n           FROM z\n        )\n SELECT scored.\"window\",\n    scored.scope,\n    scored.term,\n    scored.student_key,\n    scored.avg_grade,\n    scored.passes,\n    scored.total_minutes,\n    scored.z_grade,\n    scored.z_passes,\n    scored.z_minutes,\n    ((- scored.z_grade) + GREATEST(scored.z_passes, scored.z_minutes)) AS risk_score\n   FROM scored"
+    },
+    "hp_heatmap_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local\n           FROM public.hp_base\n        ), win AS (\n         SELECT w_1.\"window\",\n            w_1.start_ct,\n            w_1.end_ct\n           FROM ( VALUES ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,( SELECT COALESCE(min(b_1.t_local), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))) AS \"coalesce\"\n                           FROM b b_1),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(\"window\", start_ct, end_ct)\n        )\n SELECT w.\"window\",\n    b.period,\n    to_char(b.t_local, 'Dy'::text) AS day,\n    count(*) AS passes\n   FROM (win w\n     JOIN b ON (((b.t_local >= w.start_ct) AND (b.t_local < w.end_ct))))\n  GROUP BY w.\"window\", b.period, (to_char(b.t_local, 'Dy'::text))\n  ORDER BY w.\"window\", b.period, (to_char(b.t_local, 'Dy'::text))"
+    },
+    "hp_longest_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,\n                CASE\n                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)\n                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)\n                END AS duration_min\n           FROM public.hp_base\n        ), win AS (\n         SELECT w_1.\"window\",\n            w_1.start_ct,\n            w_1.end_ct\n           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min\n                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(\"window\", start_ct, end_ct)\n        )\n SELECT w.\"window\",\n    x.student_name,\n    x.period,\n    x.destination,\n    x.duration_min AS duration,\n    x.timeout,\n    x.timein\n   FROM (win w\n     JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))\n  ORDER BY w.\"window\", x.duration_min DESC, x.timeout DESC"
+    },
+    "hp_month_window": {
+      "security_invoker_true": true,
+      "definition": "SELECT date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) AS start_ct,\n    (date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval) AS end_ct"
+    },
+    "hp_nurse_bathroom_pairs": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.destination,\n            hp_base.timeout,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,\n            lag(hp_base.destination) OVER (PARTITION BY hp_base.student_name ORDER BY hp_base.timeout) AS prev_dest,\n            lag(hp_base.timeout) OVER (PARTITION BY hp_base.student_name ORDER BY hp_base.timeout) AS prev_time\n           FROM public.hp_base\n        )\n SELECT b.student_name,\n    b.prev_dest AS first_dest,\n    b.destination AS second_dest,\n    b.prev_time,\n    b.timeout AS curr_time,\n    (EXTRACT(epoch FROM (b.timeout - b.prev_time)) / 60.0) AS minutes_between\n   FROM b\n  WHERE ((b.prev_dest IS NOT NULL) AND (((lower(b.prev_dest) ~~ 'nurse%'::text) AND (lower(b.destination) ~~ 'bath%'::text)) OR ((lower(b.prev_dest) ~~ 'bath%'::text) AND (lower(b.destination) ~~ 'nurse%'::text))) AND ((EXTRACT(epoch FROM (b.timeout - b.prev_time)) >= (0)::numeric) AND (EXTRACT(epoch FROM (b.timeout - b.prev_time)) <= (600)::numeric)))"
+    },
+    "hp_quarter_window": {
+      "security_invoker_true": true,
+      "definition": "SELECT date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) AS start_ct,\n    (date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval) AS end_ct"
+    },
+    "hp_return_rate_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH b AS (\n         SELECT hp_base.student_name,\n            hp_base.period,\n            hp_base.destination,\n            hp_base.timeout,\n            hp_base.timein,\n            timezone('America/Chicago'::text, hp_base.timeout) AS t_local\n           FROM public.hp_base\n        ), win AS (\n         SELECT w.\"window\",\n            w.start_ct,\n            w.end_ct\n           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min\n                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w(\"window\", start_ct, end_ct)\n        ), agg AS (\n         SELECT w.\"window\",\n            count(*) FILTER (WHERE (x.t_local IS NOT NULL)) AS total,\n            count(*) FILTER (WHERE ((x.t_local IS NOT NULL) AND (x.timein IS NULL))) AS still_out\n           FROM (win w\n             LEFT JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))\n          GROUP BY w.\"window\"\n        )\n SELECT agg.\"window\",\n    agg.total,\n    agg.still_out,\n        CASE\n            WHEN (agg.total > 0) THEN round((((agg.total - agg.still_out))::numeric / (agg.total)::numeric), 4)\n            ELSE (0)::numeric\n        END AS pct_returned\n   FROM agg\n  ORDER BY agg.\"window\""
+    },
+    "hp_streaks_by_period_windows": {
+      "security_invoker_true": false,
+      "definition": "WITH meetings AS (\n         SELECT b.student_name,\n            b.period,\n            (timezone('America/Chicago'::text, b.timeout))::date AS d_local,\n            (EXTRACT(dow FROM timezone('America/Chicago'::text, b.timeout)))::integer AS dow\n           FROM public.hp_base b\n          WHERE (b.timeout IS NOT NULL)\n        ), cadence_raw AS (\n         SELECT meetings.period,\n            sum(((meetings.dow = ANY (ARRAY[1, 3, 5])))::integer) AS cnt_mwf,\n            sum(((meetings.dow = ANY (ARRAY[1, 2, 4])))::integer) AS cnt_mtth,\n            sum(((meetings.dow <> ALL (ARRAY[1, 2, 4, 3, 5])))::integer) AS cnt_other\n           FROM meetings\n          GROUP BY meetings.period\n        ), cadence AS (\n         SELECT cadence_raw.period,\n                CASE\n                    WHEN (cadence_raw.cnt_mwf > cadence_raw.cnt_mtth) THEN 'M/W/F'::text\n                    WHEN (cadence_raw.cnt_mtth > cadence_raw.cnt_mwf) THEN 'M/T/Th'::text\n                    ELSE 'Mixed'::text\n                END AS cadence\n           FROM cadence_raw\n        ), filtered AS (\n         SELECT m.student_name,\n            m.period,\n            m.d_local,\n            m.dow,\n            c.cadence,\n            (date_trunc('week'::text, (m.d_local)::timestamp with time zone))::date AS wk\n           FROM (meetings m\n             JOIN cadence c USING (period))\n          WHERE (((c.cadence = 'M/W/F'::text) AND (m.dow = ANY (ARRAY[1, 3, 5]))) OR ((c.cadence = 'M/T/Th'::text) AND (m.dow = ANY (ARRAY[1, 2, 4]))) OR (c.cadence = 'Mixed'::text))\n        ), indexed AS (\n         SELECT f.student_name,\n            f.period,\n            f.d_local,\n            f.dow,\n            f.cadence,\n            f.wk,\n            (floor((EXTRACT(epoch FROM (f.wk)::timestamp without time zone) / 604800.0)))::integer AS week_idx,\n                CASE\n                    WHEN (f.cadence = 'M/W/F'::text) THEN (((floor((EXTRACT(epoch FROM (f.wk)::timestamp without time zone) / 604800.0)))::integer * 3) +\n                    CASE\n                        WHEN (f.dow = 1) THEN 0\n                        WHEN (f.dow = 3) THEN 1\n                        WHEN (f.dow = 5) THEN 2\n                        ELSE 0\n                    END)\n                    WHEN (f.cadence = 'M/T/Th'::text) THEN (((floor((EXTRACT(epoch FROM (f.wk)::timestamp without time zone) / 604800.0)))::integer * 3) +\n                    CASE\n                        WHEN (f.dow = 1) THEN 0\n                        WHEN (f.dow = 2) THEN 1\n                        WHEN (f.dow = 4) THEN 2\n                        ELSE 0\n                    END)\n                    ELSE (((floor((EXTRACT(epoch FROM (f.wk)::timestamp without time zone) / 604800.0)))::integer * 5) + f.dow)\n                END AS meeting_index\n           FROM filtered f\n        ), runs AS (\n         SELECT indexed.student_name,\n            indexed.period,\n            indexed.cadence,\n            indexed.d_local,\n            indexed.meeting_index,\n            (indexed.meeting_index - row_number() OVER (PARTITION BY indexed.student_name, indexed.period ORDER BY indexed.meeting_index)) AS grp\n           FROM indexed\n        ), streaks AS (\n         SELECT runs.student_name,\n            runs.period,\n            runs.cadence,\n            min(runs.d_local) AS start_date,\n            max(runs.d_local) AS end_date,\n            count(*) AS streak_len\n           FROM runs\n          GROUP BY runs.student_name, runs.period, runs.cadence, runs.grp\n        )\n SELECT 'all'::text AS \"window\",\n    streaks.student_name,\n    streaks.period,\n    streaks.cadence,\n    streaks.start_date,\n    streaks.end_date,\n    streaks.streak_len\n   FROM streaks\n  WHERE (streaks.streak_len >= 3)"
+    },
+    "hp_summary_windows": {
+      "security_invoker_true": true,
+      "definition": "SELECT 'day'::text AS \"window\",\n    count(*) AS passes,\n    sum(hp_base.duration) AS minutes_out\n   FROM public.hp_base\n  WHERE (hp_base.timeout >= date_trunc('day'::text, now()))\n  GROUP BY 'day'::text\nUNION ALL\n SELECT 'week'::text AS \"window\",\n    count(*) AS passes,\n    sum(hp_base.duration) AS minutes_out\n   FROM public.hp_base\n  WHERE (hp_base.timeout >= date_trunc('week'::text, now()))\n  GROUP BY 'week'::text\nUNION ALL\n SELECT 'month'::text AS \"window\",\n    count(*) AS passes,\n    sum(hp_base.duration) AS minutes_out\n   FROM public.hp_base\n  WHERE (hp_base.timeout >= date_trunc('month'::text, now()))\n  GROUP BY 'month'::text\nUNION ALL\n SELECT 'quarter'::text AS \"window\",\n    count(*) AS passes,\n    sum(hp_base.duration) AS minutes_out\n   FROM public.hp_base\n  WHERE (hp_base.timeout >= date_trunc('quarter'::text, now()))\n  GROUP BY 'quarter'::text\nUNION ALL\n SELECT 'all'::text AS \"window\",\n    count(*) AS passes,\n    sum(hp_base.duration) AS minutes_out\n   FROM public.hp_base\n  GROUP BY 'all'::text"
+    },
+    "hp_week_window": {
+      "security_invoker_true": true,
+      "definition": "SELECT date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) AS start_ct,\n    (date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval) AS end_ct"
+    },
+    "hp_windows": {
+      "security_invoker_true": true,
+      "definition": "WITH now_ct AS (\n         SELECT (now() AT TIME ZONE 'America/Chicago'::text) AS t\n        )\n SELECT 'day'::text AS \"window\",\n    date_trunc('day'::text, now_ct.t) AS start_ct,\n    (date_trunc('day'::text, now_ct.t) + '1 day'::interval) AS end_ct\n   FROM now_ct\nUNION ALL\n SELECT 'week'::text AS \"window\",\n    date_trunc('week'::text, now_ct.t) AS start_ct,\n    (date_trunc('week'::text, now_ct.t) + '7 days'::interval) AS end_ct\n   FROM now_ct\nUNION ALL\n SELECT 'month'::text AS \"window\",\n    date_trunc('month'::text, now_ct.t) AS start_ct,\n    (date_trunc('month'::text, now_ct.t) + '1 mon'::interval) AS end_ct\n   FROM now_ct\nUNION ALL\n SELECT 'quarter'::text AS \"window\",\n    date_trunc('quarter'::text, now_ct.t) AS start_ct,\n    (date_trunc('quarter'::text, now_ct.t) + '3 mons'::interval) AS end_ct\n   FROM now_ct\nUNION ALL\n SELECT 'all'::text AS \"window\",\n    NULL::timestamp without time zone AS start_ct,\n    NULL::timestamp without time zone AS end_ct\n   FROM now_ct"
+    }
+  },
+  "policies": [
+    {
+      "policy": "Allow authenticated full access to synonyms",
+      "table": "student_name_synonyms",
+      "mode": null,
+      "command": "ALL",
+      "roles": "authenticated",
+      "using": "true",
+      "check": "true"
+    },
+    {
+      "policy": "Allow authenticated users to delete arrivals",
+      "table": "classroom_arrivals",
+      "mode": null,
+      "command": "DELETE",
+      "roles": "authenticated",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Allow authenticated users to insert arrivals",
+      "table": "classroom_arrivals",
+      "mode": null,
+      "command": "INSERT",
+      "roles": "authenticated",
+      "using": null,
+      "check": "true"
+    },
+    {
+      "policy": "Allow authenticated users to select arrivals",
+      "table": "classroom_arrivals",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Allow authenticated users to update arrivals",
+      "table": "classroom_arrivals",
+      "mode": null,
+      "command": "UPDATE",
+      "roles": "authenticated",
+      "using": "true",
+      "check": "true"
+    },
+    {
+      "policy": "Allow kiosk to create new passes",
+      "table": "bathroom_passes",
+      "mode": null,
+      "command": "INSERT",
+      "roles": "anon",
+      "using": null,
+      "check": "true"
+    },
+    {
+      "policy": "Allow kiosk to mark a pass as returned",
+      "table": "bathroom_passes",
+      "mode": null,
+      "command": "UPDATE",
+      "roles": "anon",
+      "using": "(timein IS NULL)",
+      "check": "true"
+    },
+    {
+      "policy": "Allow kiosk to see all passes",
+      "table": "bathroom_passes",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "anon",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Allow public inserts for sign-ins",
+      "table": "classroom_arrivals",
+      "mode": null,
+      "command": "INSERT",
+      "roles": "anon",
+      "using": null,
+      "check": "true"
+    },
+    {
+      "policy": "Allow teachers to manage arrivals",
+      "table": "classroom_arrivals",
+      "mode": null,
+      "command": "ALL",
+      "roles": "authenticated",
+      "using": "true",
+      "check": "true"
+    },
+    {
+      "policy": "Anyone can create hall passes",
+      "table": "hall_passes",
+      "mode": null,
+      "command": "INSERT",
+      "roles": "authenticated, anon",
+      "using": null,
+      "check": "true"
+    },
+    {
+      "policy": "Anyone can update hall passes",
+      "table": "hall_passes",
+      "mode": null,
+      "command": "UPDATE",
+      "roles": "authenticated, anon",
+      "using": "true",
+      "check": "true"
+    },
+    {
+      "policy": "Anyone can view academic terms",
+      "table": "academic_terms",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated, anon",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Anyone can view all hall passes",
+      "table": "hall_passes",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated, anon",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Anyone can view courses",
+      "table": "courses",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated, anon",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Anyone can view locations",
+      "table": "locations",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated, anon",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Anyone can view period_meta",
+      "table": "period_meta",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "PUBLIC",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Anyone can view settings",
+      "table": "settings",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated, anon",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Authenticated full access to classrooms",
+      "table": "classrooms",
+      "mode": null,
+      "command": "ALL",
+      "roles": "authenticated",
+      "using": "true",
+      "check": "true"
+    },
+    {
+      "policy": "Authenticated users access Hall_Passes_deleted_backup",
+      "table": "Hall_Passes_deleted_backup",
+      "mode": null,
+      "command": "ALL",
+      "roles": "PUBLIC",
+      "using": "(auth.role() = 'authenticated'::text)",
+      "check": null
+    },
+    {
+      "policy": "Authenticated users access hall_pass_corrections",
+      "table": "hall_pass_corrections",
+      "mode": null,
+      "command": "ALL",
+      "roles": "PUBLIC",
+      "using": "(auth.role() = 'authenticated'::text)",
+      "check": null
+    },
+    {
+      "policy": "Authenticated users can delete rosters",
+      "table": "rosters",
+      "mode": null,
+      "command": "DELETE",
+      "roles": "authenticated",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Authenticated users can delete students",
+      "table": "students",
+      "mode": null,
+      "command": "DELETE",
+      "roles": "authenticated",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Authenticated users can delete users",
+      "table": "users",
+      "mode": null,
+      "command": "DELETE",
+      "roles": "authenticated",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Authenticated users can insert rosters",
+      "table": "rosters",
+      "mode": null,
+      "command": "INSERT",
+      "roles": "authenticated",
+      "using": null,
+      "check": "true"
+    },
+    {
+      "policy": "Authenticated users can insert students",
+      "table": "students",
+      "mode": null,
+      "command": "INSERT",
+      "roles": "authenticated",
+      "using": null,
+      "check": "true"
+    },
+    {
+      "policy": "Authenticated users can insert users",
+      "table": "users",
+      "mode": null,
+      "command": "INSERT",
+      "roles": "authenticated",
+      "using": null,
+      "check": "true"
+    },
+    {
+      "policy": "Authenticated users can update rosters",
+      "table": "rosters",
+      "mode": null,
+      "command": "UPDATE",
+      "roles": "authenticated",
+      "using": "true",
+      "check": "true"
+    },
+    {
+      "policy": "Authenticated users can update students",
+      "table": "students",
+      "mode": null,
+      "command": "UPDATE",
+      "roles": "authenticated",
+      "using": "true",
+      "check": "true"
+    },
+    {
+      "policy": "Authenticated users can update users",
+      "table": "users",
+      "mode": null,
+      "command": "UPDATE",
+      "roles": "authenticated",
+      "using": "true",
+      "check": "true"
+    },
+    {
+      "policy": "Authenticated users can view all rosters",
+      "table": "rosters",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Authenticated users can view all students",
+      "table": "students",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Authenticated users can view all users",
+      "table": "users",
+      "mode": null,
+      "command": "SELECT",
+      "roles": "authenticated",
+      "using": "true",
+      "check": null
+    },
+    {
+      "policy": "Deny anonymous access to classrooms",
+      "table": "classrooms",
+      "mode": null,
+      "command": "ALL",
+      "roles": "anon",
+      "using": "false",
+      "check": null
+    },
+    {
+      "policy": "Enable ALL actions for authenticated users",
+      "table": "bathroom_passes",
+      "mode": null,
+      "command": "ALL",
+      "roles": "authenticated",
+      "using": "true",
+      "check": "true"
+    }
+  ],
+  "triggers": [
+    {
+      "trigger": "_bp_copy_student_name_biu",
+      "table": "bathroom_passes",
+      "function": "_bp_copy_student_name",
+      "timing_events": "BEFORE INSERT OR UPDATE",
+      "args": ""
+    },
+    {
+      "trigger": "trg_map_student_from_synonym",
+      "table": "bathroom_passes",
+      "function": "map_student_from_synonym",
+      "timing_events": "BEFORE INSERT",
+      "args": ""
+    }
+  ],
+  "functions": [
+    {
+      "function": "_bp_copy_student_name",
+      "args": "",
+      "returns": "trigger",
+      "language": "plpgsql"
+    },
+    {
+      "function": "enforce_period_match",
+      "args": "",
+      "returns": "trigger",
+      "language": "plpgsql"
+    },
+    {
+      "function": "get_full_analytics",
+      "args": "time_frame_arg text",
+      "returns": "jsonb",
+      "language": "plpgsql"
+    },
+    {
+      "function": "get_teacher_dashboard_data",
+      "args": "",
+      "returns": "json",
+      "language": "plpgsql"
+    },
+    {
+      "function": "get_weekly_top_students",
+      "args": "",
+      "returns": "json",
+      "language": "plpgsql"
+    },
+    {
+      "function": "map_student_from_synonym",
+      "args": "",
+      "returns": "trigger",
+      "language": "plpgsql"
+    },
+    {
+      "function": "normalize_name",
+      "args": "txt text",
+      "returns": "text",
+      "language": "sql"
+    },
+    {
+      "function": "set_duration_minutes",
+      "args": "",
+      "returns": "trigger",
+      "language": "plpgsql"
+    },
+    {
+      "function": "to_local_date_toronto",
+      "args": "ts timestamp with time zone",
+      "returns": "date",
+      "language": "sql"
+    },
+    {
+      "function": "verify_teacher_pin",
+      "args": "pin_to_check text",
+      "returns": "boolean",
+      "language": "plpgsql"
+    }
+  ]
+}

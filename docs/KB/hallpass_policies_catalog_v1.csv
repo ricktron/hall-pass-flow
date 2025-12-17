@@ -1,0 +1,36 @@
+policy,table,mode,command,roles,using,check
+Anyone can view academic terms,academic_terms,,SELECT,"authenticated, anon",true,
+Allow kiosk to create new passes,bathroom_passes,,INSERT,anon,,true
+Allow kiosk to mark a pass as returned,bathroom_passes,,UPDATE,anon,(timein IS NULL),true
+Allow kiosk to see all passes,bathroom_passes,,SELECT,anon,true,
+Enable ALL actions for authenticated users,bathroom_passes,,ALL,authenticated,true,true
+Allow authenticated users to delete arrivals,classroom_arrivals,,DELETE,authenticated,true,
+Allow authenticated users to insert arrivals,classroom_arrivals,,INSERT,authenticated,,true
+Allow authenticated users to select arrivals,classroom_arrivals,,SELECT,authenticated,true,
+Allow authenticated users to update arrivals,classroom_arrivals,,UPDATE,authenticated,true,true
+Allow public inserts for sign-ins,classroom_arrivals,,INSERT,anon,,true
+Allow teachers to manage arrivals,classroom_arrivals,,ALL,authenticated,true,true
+Authenticated full access to classrooms,classrooms,,ALL,authenticated,true,true
+Deny anonymous access to classrooms,classrooms,,ALL,anon,false,
+Anyone can view courses,courses,,SELECT,"authenticated, anon",true,
+Authenticated users access hall_pass_corrections,hall_pass_corrections,,ALL,PUBLIC,(auth.role() = 'authenticated'::text),
+Anyone can create hall passes,hall_passes,,INSERT,"authenticated, anon",,true
+Anyone can update hall passes,hall_passes,,UPDATE,"authenticated, anon",true,true
+Anyone can view all hall passes,hall_passes,,SELECT,"authenticated, anon",true,
+Authenticated users access Hall_Passes_deleted_backup,Hall_Passes_deleted_backup,,ALL,PUBLIC,(auth.role() = 'authenticated'::text),
+Anyone can view locations,locations,,SELECT,"authenticated, anon",true,
+Anyone can view period_meta,period_meta,,SELECT,PUBLIC,true,
+Authenticated users can delete rosters,rosters,,DELETE,authenticated,true,
+Authenticated users can insert rosters,rosters,,INSERT,authenticated,,true
+Authenticated users can update rosters,rosters,,UPDATE,authenticated,true,true
+Authenticated users can view all rosters,rosters,,SELECT,authenticated,true,
+Anyone can view settings,settings,,SELECT,"authenticated, anon",true,
+Allow authenticated full access to synonyms,student_name_synonyms,,ALL,authenticated,true,true
+Authenticated users can delete students,students,,DELETE,authenticated,true,
+Authenticated users can insert students,students,,INSERT,authenticated,,true
+Authenticated users can update students,students,,UPDATE,authenticated,true,true
+Authenticated users can view all students,students,,SELECT,authenticated,true,
+Authenticated users can delete users,users,,DELETE,authenticated,true,
+Authenticated users can insert users,users,,INSERT,authenticated,,true
+Authenticated users can update users,users,,UPDATE,authenticated,true,true
+Authenticated users can view all users,users,,SELECT,authenticated,true,

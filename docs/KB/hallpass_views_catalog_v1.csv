@@ -1,0 +1,689 @@
+view,security_invoker_true,definition
+Hall_Passes,True,"SELECT bp.id,
+    bp.student_name AS ""studentName"",
+    bp.student_id AS ""studentId"",
+    bp.period,
+    bp.destination,
+    bp.timeout AS ""timeOut"",
+    bp.timein AS ""timeIn"",
+    bp.notes,
+    bp.classroom
+   FROM public.bathroom_passes bp"
+Hall_Passes_api,True,"SELECT bp.id,
+    bp.timeout AS ""timeOut"",
+    bp.timein AS ""timeIn"",
+    bp.duration_min AS duration,
+        CASE
+            WHEN (bp.timein IS NULL) THEN true
+            ELSE false
+        END AS ""needsReview"",
+    bp.student_id AS ""studentId"",
+    bp.student_name AS ""studentName"",
+    bp.period,
+    bp.destination,
+    split_part(bp.student_name, ' '::text, 1) AS ""firstName"",
+    split_part(bp.student_name, ' '::text, 2) AS ""lastName"",
+    bp.raw_student_name AS ""typedName""
+   FROM public.bathroom_passes bp"
+hp_base,True,"SELECT bathroom_passes.id,
+    bathroom_passes.student_name,
+    bathroom_passes.period,
+    bathroom_passes.timeout,
+    bathroom_passes.timein,
+    bathroom_passes.duration_min AS duration,
+    to_char(bathroom_passes.timeout, 'Day'::text) AS ""dayOfWeek"",
+    bathroom_passes.destination,
+    bathroom_passes.overrode_period AS ""earlyDismissal"",
+    bathroom_passes.classroom
+   FROM public.bathroom_passes"
+hp_bathroom_flyers_all,False,"SELECT b.student_name,
+    count(*) AS passes,
+    sum(
+        CASE
+            WHEN (b.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - b.timeout)) / 60.0)
+            ELSE (EXTRACT(epoch FROM (b.timein - b.timeout)) / 60.0)
+        END) AS total_minutes
+   FROM public.hp_base b
+  WHERE ((b.destination ~~* '%bath%'::text) OR (b.destination ~~* '%restroom%'::text) OR (b.destination ~~* '%rr%'::text))
+  GROUP BY b.student_name"
+hp_bathroom_trips_current_quarter,False,"WITH bounds AS (
+         SELECT date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) AS s,
+            (date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval) AS e
+        )
+ SELECT lower(b.student_name) AS student_key,
+    b.timeout,
+    b.timein,
+    b.duration,
+    b.destination,
+    b.period,
+    b.classroom
+   FROM public.hp_base b,
+    bounds
+  WHERE ((b.timeout IS NOT NULL) AND (b.timeout >= bounds.s) AND (b.timeout < bounds.e) AND (b.destination ~~* ANY (ARRAY['%bath%'::text, '%restroom%'::text, '%rr%'::text])))"
+hp_behavior_hourly_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local
+           FROM public.hp_base
+        ), win AS (
+         SELECT w_1.""window"",
+            w_1.start_ct,
+            w_1.end_ct
+           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,( SELECT COALESCE(min(b_1.t_local), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))) AS ""coalesce""
+                           FROM b b_1),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(""window"", start_ct, end_ct)
+        )
+ SELECT w.""window"",
+    (EXTRACT(hour FROM b.t_local))::integer AS hour_24,
+    count(*) AS passes
+   FROM (win w
+     LEFT JOIN b ON (((b.t_local >= w.start_ct) AND (b.t_local < w.end_ct))))
+  GROUP BY w.""window"", (EXTRACT(hour FROM b.t_local))
+  ORDER BY w.""window"", ((EXTRACT(hour FROM b.t_local))::integer)"
+hp_by_destination_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,
+                CASE
+                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)
+                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)
+                END AS duration_min
+           FROM public.hp_base
+        ), win AS (
+         SELECT w_1.""window"",
+            w_1.start_ct,
+            w_1.end_ct
+           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min
+                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(""window"", start_ct, end_ct)
+        )
+ SELECT w.""window"",
+    COALESCE(x.destination, 'Other'::text) AS destination,
+    count(*) AS passes,
+    (COALESCE(sum(x.duration_min), (0)::numeric))::integer AS minutes_out,
+    (percentile_cont((0.5)::double precision) WITHIN GROUP (ORDER BY ((x.duration_min)::double precision)))::numeric(10,1) AS median_min,
+    (percentile_cont((0.9)::double precision) WITHIN GROUP (ORDER BY ((x.duration_min)::double precision)))::numeric(10,1) AS p90_min
+   FROM (win w
+     JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))
+  GROUP BY w.""window"", COALESCE(x.destination, 'Other'::text)
+  ORDER BY w.""window"", (count(*)) DESC"
+hp_by_period_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,
+                CASE
+                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)
+                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)
+                END AS duration_min
+           FROM public.hp_base
+        ), win AS (
+         SELECT w_1.""window"",
+            w_1.start_ct,
+            w_1.end_ct
+           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min
+                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(""window"", start_ct, end_ct)
+        )
+ SELECT w.""window"",
+    x.period,
+    count(*) AS passes,
+    (COALESCE(sum(x.duration_min), (0)::numeric))::integer AS minutes_out
+   FROM (win w
+     JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))
+  GROUP BY w.""window"", x.period
+  ORDER BY w.""window"", (count(*)) DESC"
+hp_dayofweek_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local
+           FROM public.hp_base
+        ), win AS (
+         SELECT w_1.""window"",
+            w_1.start_ct,
+            w_1.end_ct
+           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,( SELECT COALESCE(min(b_1.t_local), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))) AS ""coalesce""
+                           FROM b b_1),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(""window"", start_ct, end_ct)
+        )
+ SELECT w.""window"",
+    to_char(b.t_local, 'Dy'::text) AS dow_short,
+    count(*) AS passes
+   FROM (win w
+     LEFT JOIN b ON (((b.t_local >= w.start_ct) AND (b.t_local < w.end_ct))))
+  GROUP BY w.""window"", (to_char(b.t_local, 'Dy'::text))
+  ORDER BY w.""window"", (to_char(b.t_local, 'Dy'::text))"
+hp_disruption_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,
+                CASE
+                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)
+                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)
+                END AS duration_min
+           FROM public.hp_base
+        ), win AS (
+         SELECT w_1.""window"",
+            w_1.start_ct,
+            w_1.end_ct
+           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,( SELECT COALESCE(min(b_1.t_local), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))) AS ""coalesce""
+                           FROM b b_1),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(""window"", start_ct, end_ct)
+        )
+ SELECT w.""window"",
+    b.student_name,
+    count(*) AS passes,
+    round(COALESCE(sum(b.duration_min), (0)::numeric), 1) AS minutes_out
+   FROM (win w
+     JOIN b ON (((b.t_local >= w.start_ct) AND (b.t_local < w.end_ct))))
+  GROUP BY w.""window"", b.student_name
+  ORDER BY w.""window"", (round(COALESCE(sum(b.duration_min), (0)::numeric), 1)) DESC, (count(*)) DESC"
+hp_frequent_flyers_bathroom_windows,False,"WITH now_local AS (
+         SELECT (now() AT TIME ZONE 'America/Chicago'::text) AS t
+        ), win AS (
+         SELECT 'day'::text AS ""window"",
+            date_trunc('day'::text, now_local.t) AS s,
+            (date_trunc('day'::text, now_local.t) + '1 day'::interval) AS e
+           FROM now_local
+        UNION ALL
+         SELECT 'week'::text,
+            date_trunc('week'::text, now_local.t) AS date_trunc,
+            (date_trunc('week'::text, now_local.t) + '7 days'::interval)
+           FROM now_local
+        UNION ALL
+         SELECT 'month'::text,
+            date_trunc('month'::text, now_local.t) AS date_trunc,
+            (date_trunc('month'::text, now_local.t) + '1 mon'::interval)
+           FROM now_local
+        UNION ALL
+         SELECT 'quarter'::text,
+            date_trunc('quarter'::text, now_local.t) AS date_trunc,
+            (date_trunc('quarter'::text, now_local.t) + '3 mons'::interval)
+           FROM now_local
+        ), all_bounds AS (
+         SELECT 'all'::text AS ""window"",
+            COALESCE(( SELECT min(hp_base.timeout) AS min
+                   FROM public.hp_base), (( SELECT now_local.t
+                   FROM now_local))::timestamp with time zone) AS s,
+            ( SELECT now_local.t
+                   FROM now_local) AS e
+        )
+ SELECT w.""window"",
+    b.student_name,
+    (count(*))::integer AS passes,
+    (COALESCE(sum(b.duration), (0)::numeric))::numeric(10,1) AS total_minutes,
+    (COALESCE(avg(b.duration), (0)::numeric))::numeric(10,1) AS avg_minutes
+   FROM (( SELECT win.""window"",
+            win.s,
+            win.e
+           FROM win
+        UNION ALL
+         SELECT all_bounds.""window"",
+            all_bounds.s,
+            all_bounds.e
+           FROM all_bounds) w
+     JOIN public.hp_base b ON (((b.timeout >= w.s) AND (b.timeout < w.e))))
+  WHERE (b.destination ~~* ANY (ARRAY['%bath%'::text, '%restroom%'::text, '%rr%'::text]))
+  GROUP BY w.""window"", b.student_name"
+hp_frequent_flyers_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,
+                CASE
+                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)
+                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)
+                END AS duration_min
+           FROM public.hp_base
+        ), win AS (
+         SELECT w_1.""window"",
+            w_1.start_ct,
+            w_1.end_ct
+           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min
+                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(""window"", start_ct, end_ct)
+        )
+ SELECT w.""window"",
+    x.student_name,
+    count(*) AS passes,
+    (COALESCE(sum(x.duration_min), (0)::numeric))::integer AS minutes_out
+   FROM (win w
+     JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))
+  GROUP BY w.""window"", x.student_name
+  ORDER BY w.""window"", (count(*)) DESC, ((COALESCE(sum(x.duration_min), (0)::numeric))::integer) DESC"
+hp_grade_compare_windows,False,"SELECT m.""window"",
+    m.scope,
+    m.student_key,
+    g.term,
+    g.course,
+    g.avg_grade,
+    m.passes,
+    m.total_minutes,
+    m.avg_minutes
+   FROM (public.hp_student_metrics_windows m
+     LEFT JOIN public.grades_normalized g ON ((g.student_key = m.student_key)))"
+hp_grade_compare_with_grades,False,"SELECT hp_grade_compare_windows.""window"",
+    hp_grade_compare_windows.scope,
+    hp_grade_compare_windows.student_key,
+    hp_grade_compare_windows.term,
+    hp_grade_compare_windows.course,
+    hp_grade_compare_windows.avg_grade,
+    hp_grade_compare_windows.passes,
+    hp_grade_compare_windows.total_minutes,
+    hp_grade_compare_windows.avg_minutes
+   FROM public.hp_grade_compare_windows
+  WHERE (hp_grade_compare_windows.avg_grade IS NOT NULL)"
+hp_grade_corr_windows,False,"SELECT c.""window"",
+    c.scope,
+    c.term,
+    (count(*))::integer AS n,
+    corr((c.avg_grade)::double precision, (c.passes)::double precision) AS corr_grade_vs_passes,
+    corr((c.avg_grade)::double precision, (c.total_minutes)::double precision) AS corr_grade_vs_minutes,
+    regr_slope((c.avg_grade)::double precision, (c.passes)::double precision) AS slope_grade_vs_passes,
+    regr_r2((c.avg_grade)::double precision, (c.passes)::double precision) AS r2_grade_vs_passes,
+    regr_slope((c.avg_grade)::double precision, (c.total_minutes)::double precision) AS slope_grade_vs_minutes,
+    regr_r2((c.avg_grade)::double precision, (c.total_minutes)::double precision) AS r2_grade_vs_minutes
+   FROM public.hp_grade_compare_windows c
+  WHERE (c.avg_grade IS NOT NULL)
+  GROUP BY c.""window"", c.scope, c.term"
+hp_grade_outliers_windows,False,"WITH base AS (
+         SELECT c.""window"",
+            c.scope,
+            c.term,
+            c.student_key,
+            (c.avg_grade)::double precision AS avg_grade,
+            (COALESCE(c.passes, 0))::double precision AS passes,
+            (COALESCE(c.total_minutes, (0)::numeric))::double precision AS total_minutes
+           FROM public.hp_grade_compare_windows c
+          WHERE (c.avg_grade IS NOT NULL)
+        ), z AS (
+         SELECT b.""window"",
+            b.scope,
+            b.term,
+            b.student_key,
+            b.avg_grade,
+            b.passes,
+            b.total_minutes,
+            avg(b.avg_grade) OVER (PARTITION BY b.""window"", b.scope, b.term) AS g_mu,
+            stddev_pop(b.avg_grade) OVER (PARTITION BY b.""window"", b.scope, b.term) AS g_sigma,
+            avg(b.passes) OVER (PARTITION BY b.""window"", b.scope, b.term) AS p_mu,
+            stddev_pop(b.passes) OVER (PARTITION BY b.""window"", b.scope, b.term) AS p_sigma,
+            avg(b.total_minutes) OVER (PARTITION BY b.""window"", b.scope, b.term) AS m_mu,
+            stddev_pop(b.total_minutes) OVER (PARTITION BY b.""window"", b.scope, b.term) AS m_sigma
+           FROM base b
+        ), scored AS (
+         SELECT z.""window"",
+            z.scope,
+            z.term,
+            z.student_key,
+            z.avg_grade,
+            z.passes,
+            z.total_minutes,
+                CASE
+                    WHEN (z.g_sigma > (0)::double precision) THEN ((z.avg_grade - z.g_mu) / z.g_sigma)
+                    ELSE (0)::double precision
+                END AS z_grade,
+                CASE
+                    WHEN (z.p_sigma > (0)::double precision) THEN ((z.passes - z.p_mu) / z.p_sigma)
+                    ELSE (0)::double precision
+                END AS z_passes,
+                CASE
+                    WHEN (z.m_sigma > (0)::double precision) THEN ((z.total_minutes - z.m_mu) / z.m_sigma)
+                    ELSE (0)::double precision
+                END AS z_minutes
+           FROM z
+        )
+ SELECT scored.""window"",
+    scored.scope,
+    scored.term,
+    scored.student_key,
+    scored.avg_grade,
+    scored.passes,
+    scored.total_minutes,
+    scored.z_grade,
+    scored.z_passes,
+    scored.z_minutes,
+    ((- scored.z_grade) + GREATEST(scored.z_passes, scored.z_minutes)) AS risk_score
+   FROM scored"
+hp_heatmap_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local
+           FROM public.hp_base
+        ), win AS (
+         SELECT w_1.""window"",
+            w_1.start_ct,
+            w_1.end_ct
+           FROM ( VALUES ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,( SELECT COALESCE(min(b_1.t_local), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))) AS ""coalesce""
+                           FROM b b_1),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(""window"", start_ct, end_ct)
+        )
+ SELECT w.""window"",
+    b.period,
+    to_char(b.t_local, 'Dy'::text) AS day,
+    count(*) AS passes
+   FROM (win w
+     JOIN b ON (((b.t_local >= w.start_ct) AND (b.t_local < w.end_ct))))
+  GROUP BY w.""window"", b.period, (to_char(b.t_local, 'Dy'::text))
+  ORDER BY w.""window"", b.period, (to_char(b.t_local, 'Dy'::text))"
+hp_longest_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,
+                CASE
+                    WHEN (hp_base.timein IS NULL) THEN (EXTRACT(epoch FROM (((now() AT TIME ZONE 'America/Chicago'::text))::timestamp with time zone - hp_base.timeout)) / 60.0)
+                    ELSE (EXTRACT(epoch FROM (hp_base.timein - hp_base.timeout)) / 60.0)
+                END AS duration_min
+           FROM public.hp_base
+        ), win AS (
+         SELECT w_1.""window"",
+            w_1.start_ct,
+            w_1.end_ct
+           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min
+                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w_1(""window"", start_ct, end_ct)
+        )
+ SELECT w.""window"",
+    x.student_name,
+    x.period,
+    x.destination,
+    x.duration_min AS duration,
+    x.timeout,
+    x.timein
+   FROM (win w
+     JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))
+  ORDER BY w.""window"", x.duration_min DESC, x.timeout DESC"
+hp_month_window,True,"SELECT date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) AS start_ct,
+    (date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval) AS end_ct"
+hp_nurse_bathroom_pairs,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.destination,
+            hp_base.timeout,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local,
+            lag(hp_base.destination) OVER (PARTITION BY hp_base.student_name ORDER BY hp_base.timeout) AS prev_dest,
+            lag(hp_base.timeout) OVER (PARTITION BY hp_base.student_name ORDER BY hp_base.timeout) AS prev_time
+           FROM public.hp_base
+        )
+ SELECT b.student_name,
+    b.prev_dest AS first_dest,
+    b.destination AS second_dest,
+    b.prev_time,
+    b.timeout AS curr_time,
+    (EXTRACT(epoch FROM (b.timeout - b.prev_time)) / 60.0) AS minutes_between
+   FROM b
+  WHERE ((b.prev_dest IS NOT NULL) AND (((lower(b.prev_dest) ~~ 'nurse%'::text) AND (lower(b.destination) ~~ 'bath%'::text)) OR ((lower(b.prev_dest) ~~ 'bath%'::text) AND (lower(b.destination) ~~ 'nurse%'::text))) AND ((EXTRACT(epoch FROM (b.timeout - b.prev_time)) >= (0)::numeric) AND (EXTRACT(epoch FROM (b.timeout - b.prev_time)) <= (600)::numeric)))"
+hp_quarter_window,True,"SELECT date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) AS start_ct,
+    (date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval) AS end_ct"
+hp_return_rate_windows,False,"WITH b AS (
+         SELECT hp_base.student_name,
+            hp_base.period,
+            hp_base.destination,
+            hp_base.timeout,
+            hp_base.timein,
+            timezone('America/Chicago'::text, hp_base.timeout) AS t_local
+           FROM public.hp_base
+        ), win AS (
+         SELECT w.""window"",
+            w.start_ct,
+            w.end_ct
+           FROM ( VALUES ('day'::text,date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('day'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 day'::interval)), ('week'::text,date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval)), ('month'::text,date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('month'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '1 mon'::interval)), ('quarter'::text,date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)),(date_trunc('quarter'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '3 mons'::interval)), ('all'::text,COALESCE(( SELECT min(b.t_local) AS min
+                           FROM b), date_trunc('year'::text, (now() AT TIME ZONE 'America/Chicago'::text))),(now() AT TIME ZONE 'America/Chicago'::text))) w(""window"", start_ct, end_ct)
+        ), agg AS (
+         SELECT w.""window"",
+            count(*) FILTER (WHERE (x.t_local IS NOT NULL)) AS total,
+            count(*) FILTER (WHERE ((x.t_local IS NOT NULL) AND (x.timein IS NULL))) AS still_out
+           FROM (win w
+             LEFT JOIN b x ON (((x.t_local >= w.start_ct) AND (x.t_local < w.end_ct))))
+          GROUP BY w.""window""
+        )
+ SELECT agg.""window"",
+    agg.total,
+    agg.still_out,
+        CASE
+            WHEN (agg.total > 0) THEN round((((agg.total - agg.still_out))::numeric / (agg.total)::numeric), 4)
+            ELSE (0)::numeric
+        END AS pct_returned
+   FROM agg
+  ORDER BY agg.""window"""
+hp_streaks_by_period_windows,False,"WITH meetings AS (
+         SELECT b.student_name,
+            b.period,
+            (timezone('America/Chicago'::text, b.timeout))::date AS d_local,
+            (EXTRACT(dow FROM timezone('America/Chicago'::text, b.timeout)))::integer AS dow
+           FROM public.hp_base b
+          WHERE (b.timeout IS NOT NULL)
+        ), cadence_raw AS (
+         SELECT meetings.period,
+            sum(((meetings.dow = ANY (ARRAY[1, 3, 5])))::integer) AS cnt_mwf,
+            sum(((meetings.dow = ANY (ARRAY[1, 2, 4])))::integer) AS cnt_mtth,
+            sum(((meetings.dow <> ALL (ARRAY[1, 2, 4, 3, 5])))::integer) AS cnt_other
+           FROM meetings
+          GROUP BY meetings.period
+        ), cadence AS (
+         SELECT cadence_raw.period,
+                CASE
+                    WHEN (cadence_raw.cnt_mwf > cadence_raw.cnt_mtth) THEN 'M/W/F'::text
+                    WHEN (cadence_raw.cnt_mtth > cadence_raw.cnt_mwf) THEN 'M/T/Th'::text
+                    ELSE 'Mixed'::text
+                END AS cadence
+           FROM cadence_raw
+        ), filtered AS (
+         SELECT m.student_name,
+            m.period,
+            m.d_local,
+            m.dow,
+            c.cadence,
+            (date_trunc('week'::text, (m.d_local)::timestamp with time zone))::date AS wk
+           FROM (meetings m
+             JOIN cadence c USING (period))
+          WHERE (((c.cadence = 'M/W/F'::text) AND (m.dow = ANY (ARRAY[1, 3, 5]))) OR ((c.cadence = 'M/T/Th'::text) AND (m.dow = ANY (ARRAY[1, 2, 4]))) OR (c.cadence = 'Mixed'::text))
+        ), indexed AS (
+         SELECT f.student_name,
+            f.period,
+            f.d_local,
+            f.dow,
+            f.cadence,
+            f.wk,
+            (floor((EXTRACT(epoch FROM (f.wk)::timestamp without time zone) / 604800.0)))::integer AS week_idx,
+                CASE
+                    WHEN (f.cadence = 'M/W/F'::text) THEN (((floor((EXTRACT(epoch FROM (f.wk)::timestamp without time zone) / 604800.0)))::integer * 3) +
+                    CASE
+                        WHEN (f.dow = 1) THEN 0
+                        WHEN (f.dow = 3) THEN 1
+                        WHEN (f.dow = 5) THEN 2
+                        ELSE 0
+                    END)
+                    WHEN (f.cadence = 'M/T/Th'::text) THEN (((floor((EXTRACT(epoch FROM (f.wk)::timestamp without time zone) / 604800.0)))::integer * 3) +
+                    CASE
+                        WHEN (f.dow = 1) THEN 0
+                        WHEN (f.dow = 2) THEN 1
+                        WHEN (f.dow = 4) THEN 2
+                        ELSE 0
+                    END)
+                    ELSE (((floor((EXTRACT(epoch FROM (f.wk)::timestamp without time zone) / 604800.0)))::integer * 5) + f.dow)
+                END AS meeting_index
+           FROM filtered f
+        ), runs AS (
+         SELECT indexed.student_name,
+            indexed.period,
+            indexed.cadence,
+            indexed.d_local,
+            indexed.meeting_index,
+            (indexed.meeting_index - row_number() OVER (PARTITION BY indexed.student_name, indexed.period ORDER BY indexed.meeting_index)) AS grp
+           FROM indexed
+        ), streaks AS (
+         SELECT runs.student_name,
+            runs.period,
+            runs.cadence,
+            min(runs.d_local) AS start_date,
+            max(runs.d_local) AS end_date,
+            count(*) AS streak_len
+           FROM runs
+          GROUP BY runs.student_name, runs.period, runs.cadence, runs.grp
+        )
+ SELECT 'all'::text AS ""window"",
+    streaks.student_name,
+    streaks.period,
+    streaks.cadence,
+    streaks.start_date,
+    streaks.end_date,
+    streaks.streak_len
+   FROM streaks
+  WHERE (streaks.streak_len >= 3)"
+hp_student_metrics_windows,False,"WITH now_local AS (
+         SELECT (now() AT TIME ZONE 'America/Chicago'::text) AS t
+        ), win AS (
+         SELECT 'day'::text AS ""window"",
+            date_trunc('day'::text, now_local.t) AS s,
+            (date_trunc('day'::text, now_local.t) + '1 day'::interval) AS e
+           FROM now_local
+        UNION ALL
+         SELECT 'week'::text,
+            date_trunc('week'::text, now_local.t) AS date_trunc,
+            (date_trunc('week'::text, now_local.t) + '7 days'::interval)
+           FROM now_local
+        UNION ALL
+         SELECT 'month'::text,
+            date_trunc('month'::text, now_local.t) AS date_trunc,
+            (date_trunc('month'::text, now_local.t) + '1 mon'::interval)
+           FROM now_local
+        UNION ALL
+         SELECT 'quarter'::text,
+            date_trunc('quarter'::text, now_local.t) AS date_trunc,
+            (date_trunc('quarter'::text, now_local.t) + '3 mons'::interval)
+           FROM now_local
+        ), all_bounds AS (
+         SELECT 'all'::text AS ""window"",
+            COALESCE(( SELECT min(hp_base.timeout) AS min
+                   FROM public.hp_base), (( SELECT now_local.t
+                   FROM now_local))::timestamp with time zone) AS s,
+            ( SELECT now_local.t
+                   FROM now_local) AS e
+        ), windows AS (
+         SELECT win.""window"",
+            win.s,
+            win.e
+           FROM win
+        UNION ALL
+         SELECT all_bounds.""window"",
+            all_bounds.s,
+            all_bounds.e
+           FROM all_bounds
+        ), base AS (
+         SELECT b.id,
+            b.student_name,
+            b.period,
+            b.timeout,
+            b.timein,
+            b.duration,
+            b.""dayOfWeek"",
+            b.destination,
+            b.""earlyDismissal"",
+            b.classroom,
+            lower(b.student_name) AS student_key
+           FROM public.hp_base b
+        ), scoped AS (
+         SELECT w.""window"",
+            'bathroom'::text AS scope,
+            b.student_key,
+            (count(*))::integer AS passes,
+            (COALESCE(sum(b.duration), (0)::numeric))::numeric(10,1) AS total_minutes,
+            (COALESCE(avg(b.duration), (0)::numeric))::numeric(10,1) AS avg_minutes
+           FROM (windows w
+             JOIN base b ON (((b.timeout >= w.s) AND (b.timeout < w.e))))
+          WHERE (b.destination ~~* ANY (ARRAY['%bath%'::text, '%restroom%'::text, '%rr%'::text]))
+          GROUP BY w.""window"", b.student_key
+        UNION ALL
+         SELECT w.""window"",
+            'all'::text AS scope,
+            b.student_key,
+            (count(*))::integer AS passes,
+            (COALESCE(sum(b.duration), (0)::numeric))::numeric(10,1) AS total_minutes,
+            (COALESCE(avg(b.duration), (0)::numeric))::numeric(10,1) AS avg_minutes
+           FROM (windows w
+             JOIN base b ON (((b.timeout >= w.s) AND (b.timeout < w.e))))
+          GROUP BY w.""window"", b.student_key
+        )
+ SELECT scoped.""window"",
+    scoped.scope,
+    scoped.student_key,
+    scoped.passes,
+    scoped.total_minutes,
+    scoped.avg_minutes
+   FROM scoped"
+hp_summary_windows,True,"SELECT 'day'::text AS ""window"",
+    count(*) AS passes,
+    sum(hp_base.duration) AS minutes_out
+   FROM public.hp_base
+  WHERE (hp_base.timeout >= date_trunc('day'::text, now()))
+  GROUP BY 'day'::text
+UNION ALL
+ SELECT 'week'::text AS ""window"",
+    count(*) AS passes,
+    sum(hp_base.duration) AS minutes_out
+   FROM public.hp_base
+  WHERE (hp_base.timeout >= date_trunc('week'::text, now()))
+  GROUP BY 'week'::text
+UNION ALL
+ SELECT 'month'::text AS ""window"",
+    count(*) AS passes,
+    sum(hp_base.duration) AS minutes_out
+   FROM public.hp_base
+  WHERE (hp_base.timeout >= date_trunc('month'::text, now()))
+  GROUP BY 'month'::text
+UNION ALL
+ SELECT 'quarter'::text AS ""window"",
+    count(*) AS passes,
+    sum(hp_base.duration) AS minutes_out
+   FROM public.hp_base
+  WHERE (hp_base.timeout >= date_trunc('quarter'::text, now()))
+  GROUP BY 'quarter'::text
+UNION ALL
+ SELECT 'all'::text AS ""window"",
+    count(*) AS passes,
+    sum(hp_base.duration) AS minutes_out
+   FROM public.hp_base
+  GROUP BY 'all'::text"
+hp_week_window,True,"SELECT date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) AS start_ct,
+    (date_trunc('week'::text, (now() AT TIME ZONE 'America/Chicago'::text)) + '7 days'::interval) AS end_ct"
+hp_windows,True,"WITH now_ct AS (
+         SELECT (now() AT TIME ZONE 'America/Chicago'::text) AS t
+        )
+ SELECT 'day'::text AS ""window"",
+    date_trunc('day'::text, now_ct.t) AS start_ct,
+    (date_trunc('day'::text, now_ct.t) + '1 day'::interval) AS end_ct
+   FROM now_ct
+UNION ALL
+ SELECT 'week'::text AS ""window"",
+    date_trunc('week'::text, now_ct.t) AS start_ct,
+    (date_trunc('week'::text, now_ct.t) + '7 days'::interval) AS end_ct
+   FROM now_ct
+UNION ALL
+ SELECT 'month'::text AS ""window"",
+    date_trunc('month'::text, now_ct.t) AS start_ct,
+    (date_trunc('month'::text, now_ct.t) + '1 mon'::interval) AS end_ct
+   FROM now_ct
+UNION ALL
+ SELECT 'quarter'::text AS ""window"",
+    date_trunc('quarter'::text, now_ct.t) AS start_ct,
+    (date_trunc('quarter'::text, now_ct.t) + '3 mons'::interval) AS end_ct
+   FROM now_ct
+UNION ALL
+ SELECT 'all'::text AS ""window"",
+    NULL::timestamp without time zone AS start_ct,
+    NULL::timestamp without time zone AS end_ct
+   FROM now_ct"
