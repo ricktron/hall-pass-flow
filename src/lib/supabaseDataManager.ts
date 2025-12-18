@@ -3,6 +3,8 @@ import { calculateDurationMinutes, getLocalTodayBounds, getLocalWeekStart, forma
 
 export interface HallPassRecord {
   id: string;
+  /** UUID of the student from users table (FK to bathroom_passes.student_id) */
+  studentId?: string;
   studentName: string;
   period: string;
   timeOut: Date;
@@ -42,11 +44,16 @@ export const addArrivalRecord = async (data: {
 
 export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
   try {
-    // First, check if the student already has an active pass
+    // Validate student_id is provided - this is required by the DB FK constraint
+    if (!record.studentId) {
+      throw new Error('Student ID is required. Please select your name from the student list.');
+    }
+
+    // First, check if the student already has an active pass (by student_id for accuracy)
     const { data: existingRecords, error: checkError } = await (supabase as any)
       .from('bathroom_passes')
       .select('id, student_name')
-      .eq('student_name', record.studentName)
+      .eq('student_id', record.studentId)
       .is('timein', null);
 
     if (checkError) {
@@ -59,15 +66,24 @@ export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Pro
       throw new Error('You already have an active pass');
     }
 
+    // Build the insert payload with required student_id
+    const insertPayload: Record<string, unknown> = {
+      student_id: record.studentId,
+      student_name: record.studentName,
+      period: record.period,
+      destination: record.destination,
+      timeout: new Date().toISOString()
+    };
+
+    // Include classroom if provided
+    if (record.classroom) {
+      insertPayload.classroom = record.classroom;
+    }
+
     // Now create the new record
     const { error } = await (supabase as any)
       .from('bathroom_passes')
-      .insert({
-        student_name: record.studentName,
-        period: record.period,
-        destination: record.destination,
-        timeout: new Date().toISOString()
-      });
+      .insert(insertPayload);
 
     if (error) {
       console.error("Error adding hall pass record:", error);

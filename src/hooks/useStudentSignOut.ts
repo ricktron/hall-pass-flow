@@ -26,12 +26,22 @@ export const useStudentSignOut = ({ onSignOut, onEarlyDismissal }: UseStudentSig
   };
 
   const handleSubmit = async (
-    firstName: string,
-    lastName: string,
+    studentId: string,
+    studentName: string,
     selectedPeriod: string,
     selectedDestination: string
   ) => {
-    if (!firstName.trim() || !lastName.trim() || !selectedPeriod || !selectedDestination) {
+    // Validate student_id is present (primary guard against null FK)
+    if (!studentId) {
+      toast({
+        title: "Pick your name first",
+        description: "Please select your name from the student list.",
+        variant: "destructive",
+      });
+      return { success: false };
+    }
+
+    if (!studentName.trim() || !selectedPeriod || !selectedDestination) {
       toast({
         title: "Missing Information",
         description: "Please fill in all fields before submitting.",
@@ -50,7 +60,6 @@ export const useStudentSignOut = ({ onSignOut, onEarlyDismissal }: UseStudentSig
       };
       const centralTime = new Date(now.toLocaleString("en-US", centralTimeOptions));
       
-      const studentName = `${firstName.trim()} ${lastName.trim()}`;
       const dayOfWeek = DAYS_OF_WEEK[centralTime.getDay()];
       
       // Infer early dismissal from destination
@@ -72,6 +81,7 @@ export const useStudentSignOut = ({ onSignOut, onEarlyDismissal }: UseStudentSig
       
       try {
         const success = await addHallPassRecord({
+          studentId,
           studentName,
           period: selectedPeriod,
           timeOut: centralTime,
@@ -96,11 +106,17 @@ export const useStudentSignOut = ({ onSignOut, onEarlyDismissal }: UseStudentSig
           }
           return { success: true };
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
+        // Provide friendly error message for common cases
+        const err = error as { code?: string; message?: string };
+        let errorMessage = `${err.code ?? ''} ${err.message ?? ''}`.trim();
+        if (err.code === '23502' && err.message?.includes('student_id')) {
+          errorMessage = 'Student selection is required. Please pick your name from the list.';
+        }
         toast({
           variant: "destructive",
           title: "Sign-out failed",
-          description: `${error.code ?? ''} ${error.message}`.trim()
+          description: errorMessage || 'An unexpected error occurred.'
         });
         return { success: false };
       }

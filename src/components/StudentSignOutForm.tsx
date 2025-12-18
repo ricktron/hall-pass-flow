@@ -3,9 +3,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
-import { getStudentNames, getCurrentlyOutRecords, updateReturnTime } from "@/lib/supabaseDataManager";
+import { getCurrentlyOutRecords, updateReturnTime } from "@/lib/supabaseDataManager";
+import { fetchStudents, type Student } from "@/lib/studentsRepository";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
-import StudentNameInput from "./StudentNameInput";
+import StudentNameInput, { type SelectedStudent } from "./StudentNameInput";
 import PeriodDestinationSelects from "./PeriodDestinationSelects";
 import { useStudentSignOut } from "@/hooks/useStudentSignOut";
 import { useToast } from "@/hooks/use-toast";
@@ -28,11 +29,10 @@ interface StudentRecord {
 }
 
 const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormProps) => {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<SelectedStudent | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [selectedDestination, setSelectedDestination] = useState("");
-  const [studentNames, setStudentNames] = useState<string[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [currentlyOutStudents, setCurrentlyOutStudents] = useState<StudentRecord[]>([]);
   const [showCurrentlyOut, setShowCurrentlyOut] = useState(false);
   const { toast } = useToast();
@@ -43,11 +43,11 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   });
 
   useEffect(() => {
-    const loadStudentNames = async () => {
-      const names = await getStudentNames();
-      setStudentNames(names);
+    const loadStudents = async () => {
+      const studentList = await fetchStudents();
+      setStudents(studentList);
     };
-    loadStudentNames();
+    loadStudents();
   }, []);
 
   const loadCurrentlyOutStudents = async () => {
@@ -63,8 +63,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   };
 
   const resetForm = () => {
-    setFirstName("");
-    setLastName("");
+    setSelectedStudent(null);
     setSelectedPeriod("");
     setSelectedDestination("");
   };
@@ -88,7 +87,31 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   };
 
   const handleFormSubmit = async () => {
-    const result = await handleSubmit(firstName, lastName, selectedPeriod, selectedDestination);
+    // Guard: require student selection
+    if (!selectedStudent) {
+      toast({
+        title: "Pick your name first",
+        description: "Please select your name from the list before signing out.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedDestination) {
+      toast({
+        title: "Select a destination",
+        description: "Please select where you are going.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const result = await handleSubmit(
+      selectedStudent.id,
+      selectedStudent.name,
+      selectedPeriod,
+      selectedDestination
+    );
     
     if (result.success) {
       resetForm();
@@ -100,7 +123,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
     }
   };
 
-  const isFormValid = firstName.trim() && lastName.trim() && selectedPeriod && selectedDestination;
+  const isFormValid = selectedStudent !== null && selectedPeriod && selectedDestination;
 
   const handleKeyDown = (e: React.KeyboardEvent, nextFieldId?: string) => {
     if (e.key === 'Enter') {
@@ -134,11 +157,9 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
         </CardHeader>
         <CardContent className="space-y-6">
           <StudentNameInput
-            firstName={firstName}
-            lastName={lastName}
-            onFirstNameChange={setFirstName}
-            onLastNameChange={setLastName}
-            studentNames={studentNames}
+            students={students}
+            selectedStudent={selectedStudent}
+            onStudentSelect={setSelectedStudent}
             onKeyDown={handleKeyDown}
           />
 
