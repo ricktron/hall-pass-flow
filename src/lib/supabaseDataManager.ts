@@ -1,6 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 import { calculateDurationMinutes, getLocalTodayBounds, getLocalWeekStart, formatDurationHMS } from "@/lib/timeUtils";
 
+/**
+ * Record shape for inserting a new hall pass.
+ * studentId is REQUIRED - the DB FK constraint will reject nulls.
+ */
+export interface NewPassInsertRecord {
+  /** UUID of the student from users table (FK to bathroom_passes.student_id) - REQUIRED */
+  studentId: string;
+  studentName: string;
+  period: string;
+  timeOut: Date;
+  timeIn: Date | null;
+  duration: number | null;
+  dayOfWeek: string;
+  destination?: string;
+  earlyDismissal?: boolean;
+  classroom?: string;
+}
+
+/**
+ * Record shape for reading/displaying hall passes.
+ * studentId may be absent for legacy records or view queries.
+ */
 export interface HallPassRecord {
   id: string;
   /** UUID of the student from users table (FK to bathroom_passes.student_id) */
@@ -42,9 +64,10 @@ export const addArrivalRecord = async (data: {
   }
 };
 
-export const addHallPassRecord = async (record: Omit<HallPassRecord, 'id'>): Promise<boolean> => {
+export const addHallPassRecord = async (record: NewPassInsertRecord): Promise<boolean> => {
   try {
-    // Validate student_id is provided - this is required by the DB FK constraint
+    // studentId is now required by the type - this is a compile-time guarantee.
+    // Runtime check kept for defense-in-depth against JS callers or type bypasses.
     if (!record.studentId) {
       throw new Error('Student ID is required. Please select your name from the student list.');
     }
