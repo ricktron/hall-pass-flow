@@ -20,13 +20,11 @@ export type DestinationOption = {
 export async function fetchActiveDestinations(): Promise<DestinationOption[]> {
   try {
     // Query with type assertion to include sort_order (may not be in types.ts yet)
-    // Using 'active' column as per types.ts (requirements mention 'is_active' but types show 'active')
     const { data, error } = await (supabase
       .from("hall_pass_destinations")
-      .select("key, label, active") as any)
-      .select("key, label, sort_order, active")
-      .eq("active", true)
-      .order("sort_order", { ascending: true, nullsFirst: false });
+      .select("key, label, sort_order, is_active")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true, nullsFirst: false }) as any);
 
     if (error) {
       console.error("[destinationsRepository] fetchActiveDestinations error:", error.message);
