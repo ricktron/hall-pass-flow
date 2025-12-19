@@ -2,6 +2,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { AlertCircle } from "lucide-react";
 import type { Student } from "@/lib/studentsRepository";
 
 export interface SelectedStudent {
@@ -17,19 +19,79 @@ interface StudentNameInputProps {
   /** Called when a student is selected from the dropdown */
   onStudentSelect: (student: SelectedStudent | null) => void;
   onKeyDown?: (e: React.KeyboardEvent, nextFieldId?: string) => void;
+  /** Called when teacher override is requested (student not in list) */
+  onTeacherOverride?: (rawName: string) => void;
+}
+
+/**
+ * Tokenizes a name for order-agnostic matching.
+ * Normalizes: lowercase, removes punctuation, splits on whitespace and comma.
+ * Supports: "first last", "last first", "last, first"
+ */
+function tokenizeName(name: string): string[] {
+  return name
+    .toLowerCase()
+    .replace(/[''.\-]/g, '') // Remove apostrophes, periods, hyphens
+    .split(/[\s,]+/) // Split on whitespace and commas
+    .map(t => t.trim())
+    .filter(t => t.length > 0);
+}
+
+/**
+ * Token-based matching: checks if all input tokens match the start of any student token.
+ * Order-agnostic: "smith john" matches "John Smith"
+ */
+function matchesTokens(studentTokens: string[], inputTokens: string[]): boolean {
+  if (inputTokens.length === 0) return false;
+  
+  // Each input token must match the start of at least one student token
+  return inputTokens.every(inputToken => 
+    studentTokens.some(studentToken => 
+      studentToken.startsWith(inputToken)
+    )
+  );
+}
+
+/**
+ * Scores how well input tokens match student tokens.
+ * Higher score = better match.
+ */
+function scoreMatch(studentTokens: string[], inputTokens: string[]): number {
+  let score = 0;
+  for (const inputToken of inputTokens) {
+    for (const studentToken of studentTokens) {
+      if (studentToken === inputToken) {
+        score += 10; // Exact match
+      } else if (studentToken.startsWith(inputToken)) {
+        score += inputToken.length; // Partial match by length
+      }
+    }
+  }
+  return score;
 }
 
 const StudentNameInput = ({
   students,
   selectedStudent,
   onStudentSelect,
-  onKeyDown
+  onKeyDown,
+  onTeacherOverride
 }: StudentNameInputProps) => {
   const [inputValue, setInputValue] = useState("");
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Pre-compute tokenized names for efficient matching
+  const studentTokensMap = useRef<Map<string, string[]>>(new Map());
+  
+  useEffect(() => {
+    studentTokensMap.current.clear();
+    for (const student of students) {
+      studentTokensMap.current.set(student.id, tokenizeName(student.name));
+    }
+  }, [students]);
 
   // Update input when selectedStudent changes externally
   useEffect(() => {
@@ -40,20 +102,33 @@ const StudentNameInput = ({
     }
   }, [selectedStudent]);
 
-  // Filter students based on input
+  // Filter students based on input using token-based matching
   useEffect(() => {
     if (inputValue.trim().length > 0) {
-      const searchTerm = inputValue.toLowerCase();
-      const filtered = students.filter(student => 
-        student.name.toLowerCase().includes(searchTerm) ||
-        student.firstName.toLowerCase().includes(searchTerm) ||
-        student.lastName.toLowerCase().includes(searchTerm)
-      ).slice(0, 8);
-      setFilteredStudents(filtered);
+      const inputTokens = tokenizeName(inputValue);
+      
+      // Filter students whose tokens match input tokens
+      const matches = students
+        .filter(student => {
+          const studentTokens = studentTokensMap.current.get(student.id) || tokenizeName(student.name);
+          return matchesTokens(studentTokens, inputTokens);
+        })
+        .map(student => {
+          const studentTokens = studentTokensMap.current.get(student.id) || tokenizeName(student.name);
+          return {
+            student,
+            score: scoreMatch(studentTokens, inputTokens)
+          };
+        })
+        .sort((a, b) => b.score - a.score) // Best matches first
+        .slice(0, 8)
+        .map(m => m.student);
+      
+      setFilteredStudents(matches);
       // Only show suggestions if we don't have an exact match selected
       const exactMatch = selectedStudent && 
         selectedStudent.name.toLowerCase() === inputValue.toLowerCase();
-      setShowSuggestions(filtered.length > 0 && !exactMatch);
+      setShowSuggestions(matches.length > 0 && !exactMatch);
     } else {
       setFilteredStudents([]);
       setShowSuggestions(false);
@@ -110,6 +185,18 @@ const StudentNameInput = ({
     }
   };
 
+  const handleTeacherOverrideClick = () => {
+    if (onTeacherOverride && inputValue.trim().length > 0) {
+      onTeacherOverride(inputValue.trim());
+    }
+  };
+
+  // Determine if we should show "not in list" state
+  const trimmedInput = inputValue.trim();
+  const showNotInList = !selectedStudent && 
+    trimmedInput.length >= 3 && 
+    filteredStudents.length === 0;
+
   return (
     <div className="space-y-2 relative">
       <Label htmlFor="studentName">Student Name</Label>
@@ -120,22 +207,49 @@ const StudentNameInput = ({
         placeholder="Start typing student name..."
         value={inputValue}
         onChange={(e) => handleInputChange(e.target.value)}
-        onFocus={() => inputValue.trim().length > 0 && setShowSuggestions(true)}
+        onFocus={() => inputValue.trim().length > 0 && !showNotInList && setShowSuggestions(filteredStudents.length > 0)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         onKeyDown={handleKeyDown}
         autoComplete="off"
-        className={selectedStudent ? "border-green-500 bg-green-50" : ""}
+        className={selectedStudent ? "border-green-500 bg-green-50" : showNotInList ? "border-amber-500 bg-amber-50" : ""}
       />
       {selectedStudent && (
         <p className="text-xs text-green-600">
           ✓ {selectedStudent.name} selected
         </p>
       )}
-      {!selectedStudent && inputValue.trim().length > 0 && (
+      {!selectedStudent && trimmedInput.length > 0 && !showNotInList && (
         <p className="text-xs text-amber-600">
           Select your name from the list below
         </p>
       )}
+      
+      {/* Not in list state */}
+      {showNotInList && (
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-amber-800">
+              Not in list, talk to Garnett.
+            </p>
+            <p className="text-xs text-amber-600 mt-1">
+              If your name isn't appearing, ask your teacher for help.
+            </p>
+          </div>
+          {onTeacherOverride && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleTeacherOverrideClick}
+              className="flex-shrink-0 border-amber-400 text-amber-700 hover:bg-amber-100"
+            >
+              Teacher Override
+            </Button>
+          )}
+        </div>
+      )}
+      
       {showSuggestions && (
         <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto mt-1">
           {filteredStudents.map((student, index) => (
@@ -152,11 +266,6 @@ const StudentNameInput = ({
               <span className="font-medium">{student.name}</span>
             </div>
           ))}
-          {filteredStudents.length === 0 && inputValue.trim().length > 0 && (
-            <div className="px-3 py-2 text-gray-500 italic">
-              No matching students found
-            </div>
-          )}
         </div>
       )}
     </div>

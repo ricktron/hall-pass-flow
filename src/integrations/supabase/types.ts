@@ -43,6 +43,7 @@ export type Database = {
           destination: string | null
           duration_min: number | null
           id: string
+          is_unknown: boolean
           manual_adjust_min: number | null
           manual_adjust_reason: string | null
           notes: string | null
@@ -56,6 +57,7 @@ export type Database = {
           student_name: string | null
           timein: string | null
           timeout: string | null
+          unknown_name_id: string | null
           updated_at: string
           was_auto_closed: boolean
         }
@@ -66,6 +68,7 @@ export type Database = {
           destination?: string | null
           duration_min?: number | null
           id?: string
+          is_unknown?: boolean
           manual_adjust_min?: number | null
           manual_adjust_reason?: string | null
           notes?: string | null
@@ -79,6 +82,7 @@ export type Database = {
           student_name?: string | null
           timein?: string | null
           timeout?: string | null
+          unknown_name_id?: string | null
           updated_at?: string
           was_auto_closed?: boolean
         }
@@ -89,6 +93,7 @@ export type Database = {
           destination?: string | null
           duration_min?: number | null
           id?: string
+          is_unknown?: boolean
           manual_adjust_min?: number | null
           manual_adjust_reason?: string | null
           notes?: string | null
@@ -102,6 +107,7 @@ export type Database = {
           student_name?: string | null
           timein?: string | null
           timeout?: string | null
+          unknown_name_id?: string | null
           updated_at?: string
           was_auto_closed?: boolean
         }
@@ -264,6 +270,56 @@ export type Database = {
           pass_id?: string
         }
         Relationships: []
+      }
+      hp_unknown_names: {
+        Row: {
+          id: string
+          raw_name: string
+          raw_norm: string
+          period: string | null
+          destination: string | null
+          status: string
+          created_at: string
+          resolved_at: string | null
+          resolved_student_id: string | null
+          resolved_by: string | null
+          seen_count: number
+        }
+        Insert: {
+          id?: string
+          raw_name: string
+          raw_norm: string
+          period?: string | null
+          destination?: string | null
+          status?: string
+          created_at?: string
+          resolved_at?: string | null
+          resolved_student_id?: string | null
+          resolved_by?: string | null
+          seen_count?: number
+        }
+        Update: {
+          id?: string
+          raw_name?: string
+          raw_norm?: string
+          period?: string | null
+          destination?: string | null
+          status?: string
+          created_at?: string
+          resolved_at?: string | null
+          resolved_student_id?: string | null
+          resolved_by?: string | null
+          seen_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hp_unknown_names_resolved_student_id_fkey"
+            columns: ["resolved_student_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       hall_pass_destinations: {
         Row: {
@@ -586,6 +642,19 @@ export type Database = {
       }
     }
     Views: {
+      hp_unmatched_names: {
+        Row: {
+          id: string | null
+          raw_student_name: string | null
+          raw_norm: string | null
+          period: string | null
+          destination: string | null
+          count: number | null
+          first_seen_at: string | null
+          last_seen_at: string | null
+        }
+        Relationships: []
+      }
       Hall_Passes: {
         Row: {
           classroom: string | null
@@ -984,6 +1053,29 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       to_local_date_toronto: { Args: { ts: string }; Returns: string }
+      create_unknown_signout: {
+        Args: {
+          p_pin: string
+          p_raw_name: string
+          p_period: string
+          p_destination: string
+          p_classroom?: string
+        }
+        Returns: Json
+      }
+      resolve_unknown_signout: {
+        Args: {
+          p_unknown_id: string
+          p_student_id: string
+        }
+        Returns: Json
+      }
+      dismiss_unknown: {
+        Args: {
+          p_unknown_id: string
+        }
+        Returns: Json
+      }
       verify_teacher_pin: { Args: { pin_to_check: string }; Returns: boolean }
     }
     Enums: {

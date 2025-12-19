@@ -8,6 +8,7 @@ import { fetchStudents, type Student } from "@/lib/studentsRepository";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import StudentNameInput, { type SelectedStudent } from "./StudentNameInput";
 import PeriodDestinationSelects from "./PeriodDestinationSelects";
+import UnknownOverrideDialog from "./UnknownOverrideDialog";
 import { useStudentSignOut } from "@/hooks/useStudentSignOut";
 import { useToast } from "@/hooks/use-toast";
 
@@ -35,6 +36,11 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   const [students, setStudents] = useState<Student[]>([]);
   const [currentlyOutStudents, setCurrentlyOutStudents] = useState<StudentRecord[]>([]);
   const [showCurrentlyOut, setShowCurrentlyOut] = useState(false);
+  
+  // Unknown override state
+  const [showOverrideDialog, setShowOverrideDialog] = useState(false);
+  const [overrideRawName, setOverrideRawName] = useState("");
+  
   const { toast } = useToast();
 
   const { isSubmitting, handleSubmit } = useStudentSignOut({
@@ -123,6 +129,32 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
     }
   };
 
+  const handleTeacherOverride = (rawName: string) => {
+    setOverrideRawName(rawName);
+    setShowOverrideDialog(true);
+  };
+
+  const handleOverrideSuccess = (data: { studentName: string; period: string; destination: string }) => {
+    setShowOverrideDialog(false);
+    setOverrideRawName("");
+    
+    // Trigger the same callback as normal sign-out
+    onSignOut({
+      studentName: data.studentName,
+      period: data.period,
+      timeOut: new Date(),
+      destination: data.destination,
+    });
+    
+    // Reset the form
+    resetForm();
+  };
+
+  const handleOverrideCancel = () => {
+    setShowOverrideDialog(false);
+    setOverrideRawName("");
+  };
+
   const isFormValid = selectedStudent !== null && selectedPeriod && selectedDestination;
 
   const handleKeyDown = (e: React.KeyboardEvent, nextFieldId?: string) => {
@@ -161,6 +193,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
             selectedStudent={selectedStudent}
             onStudentSelect={setSelectedStudent}
             onKeyDown={handleKeyDown}
+            onTeacherOverride={handleTeacherOverride}
           />
 
           <PeriodDestinationSelects
@@ -200,6 +233,16 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
           onClose={() => setShowCurrentlyOut(false)}
         />
       )}
+
+      {/* Unknown Override Dialog */}
+      <UnknownOverrideDialog
+        isOpen={showOverrideDialog}
+        rawName={overrideRawName}
+        initialPeriod={selectedPeriod}
+        initialDestination={selectedDestination}
+        onSuccess={handleOverrideSuccess}
+        onCancel={handleOverrideCancel}
+      />
     </div>
   );
 };

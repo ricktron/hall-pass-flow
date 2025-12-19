@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Users, BarChart3, UserCheck, UserCog, LogOut, Plus } from "lucide-react";
+import { ArrowLeft, Users, BarChart3, UserCheck, UserCog, LogOut, Plus, UserX } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import AnalyticsView from "./AnalyticsView";
 import NameCorrections from "./NameCorrections";
+import UnknownsQueue from "./UnknownsQueue";
 import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,7 +67,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'overview' | 'analytics' | 'corrections'>('overview');
+  const [activeView, setActiveView] = useState<'overview' | 'analytics' | 'corrections' | 'unknowns'>('overview');
   const [weeklyTopStudents, setWeeklyTopStudents] = useState<Array<{ studentName: string; totalMinutes: number; tripCount: number }>>([]);
   
   // Early dismissal state
@@ -335,6 +336,14 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
               <UserCog className="w-4 h-4" />
               Name Corrections
             </Button>
+            <Button
+              variant={activeView === 'unknowns' ? 'default' : 'outline'}
+              onClick={() => setActiveView('unknowns')}
+              className="flex items-center gap-2"
+            >
+              <UserX className="w-4 h-4" />
+              Unknowns
+            </Button>
           </div>
         </div>
 
@@ -508,6 +517,10 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
         {activeView === 'corrections' && (
           <NameCorrections />
+        )}
+
+        {activeView === 'unknowns' && (
+          <UnknownsQueue />
         )}
       </div>
     </div>
