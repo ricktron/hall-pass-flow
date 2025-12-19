@@ -43,28 +43,21 @@ const NameCorrections = () => {
   const fetchUnmatchedNames = async () => {
     try {
       const { data, error } = await supabase
-        .from("bathroom_passes")
-        .select("raw_student_name")
-        .is("student_id", null)
-        .not("raw_student_name", "is", null);
+        .from("hp_unmatched_names")
+        .select("*");
 
       if (error) {
         console.error("Error fetching unmatched names:", error);
         return;
       }
 
-      // Count occurrences of each raw_student_name
-      const nameCounts: Record<string, number> = {};
-      (data || []).forEach((row) => {
-        const name = row.raw_student_name;
-        if (name) {
-          nameCounts[name] = (nameCounts[name] || 0) + 1;
-        }
-      });
-
-      // Convert to array and sort by count descending
-      const nameList: UnmatchedName[] = Object.entries(nameCounts)
-        .map(([raw_student_name, count]) => ({ raw_student_name, count }))
+      // Map view data to UnmatchedName format
+      const nameList: UnmatchedName[] = (data || [])
+        .filter((row) => row.raw_student_name)
+        .map((row) => ({
+          raw_student_name: row.raw_student_name!,
+          count: row.count || 1,
+        }))
         .sort((a, b) => b.count - a.count);
 
       setUnmatchedNames(nameList);
@@ -119,27 +112,29 @@ const NameCorrections = () => {
     setLinkingName(rawName);
 
     try {
-      const { data, error } = await supabase.rpc("link_student_name", {
-        p_raw_name: rawName,
-        p_student_id: userId,
+      // Type assertion needed because hp_resolve_unknown_name RPC may not be in types.ts yet
+      const { data, error } = await (supabase.rpc as any)("hp_resolve_unknown_name", {
+        p_raw_input: rawName,
+        p_user_id: userId,
       });
 
       if (error) {
         toast({
           variant: "destructive",
-          title: "Link failed",
+          title: "Resolve failed",
           description: error.message,
         });
         setLinkingName(null);
         return;
       }
 
-      const result = data as LinkResult;
+      // The RPC should return a JSON result
+      const result = (data as unknown) as LinkResult;
 
       if (!result.success) {
         toast({
           variant: "destructive",
-          title: "Link failed",
+          title: "Resolve failed",
           description: result.error || "Unknown error",
         });
         setLinkingName(null);
@@ -147,14 +142,14 @@ const NameCorrections = () => {
       }
 
       toast({
-        title: "Name linked successfully",
-        description: `Updated ${result.updated_count} records. "${rawName}" now maps to ${result.student_name}.${result.synonym_created ? " Synonym created for future passes." : ""}`,
+        title: "Name resolved successfully",
+        description: `Updated ${result.updated_count || 0} records. "${rawName}" now maps to ${result.student_name || "student"}.${result.synonym_created ? " Synonym created for future passes." : ""}`,
       });
 
-      // Remove the linked name from the list
-      setUnmatchedNames((prev) =>
-        prev.filter((n) => n.raw_student_name !== rawName)
-      );
+      // Refresh the unmatched names list
+      await fetchUnmatchedNames();
+      
+      // Clear selection for this name
       setSelectedUsers((prev) => {
         const updated = { ...prev };
         delete updated[rawName];
@@ -163,7 +158,7 @@ const NameCorrections = () => {
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Link failed",
+        title: "Resolve failed",
         description: "An unexpected error occurred",
       });
     } finally {

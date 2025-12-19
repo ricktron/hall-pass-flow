@@ -7,27 +7,29 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-export interface Destination {
-  /** The value stored in bathroom_passes.destination */
-  value: string;
-  /** Display label for UI */
+export type DestinationOption = {
+  key: string;
   label: string;
-}
+  sort_order?: number | null;
+};
 
 /**
  * Fetches active destinations from the database, ordered by sort_order.
  * Falls back to hardcoded list if DB query fails.
  */
-export async function fetchDestinations(): Promise<Destination[]> {
+export async function fetchActiveDestinations(): Promise<DestinationOption[]> {
   try {
-    const { data, error } = await supabase
+    // Query with type assertion to include sort_order (may not be in types.ts yet)
+    // Using 'active' column as per types.ts (requirements mention 'is_active' but types show 'active')
+    const { data, error } = await (supabase
       .from("hall_pass_destinations")
-      .select("key, label, sort_order")
+      .select("key, label, active") as any)
+      .select("key, label, sort_order, active")
       .eq("active", true)
-      .order("sort_order", { ascending: true });
+      .order("sort_order", { ascending: true, nullsFirst: false });
 
     if (error) {
-      console.error("[destinationsRepository] fetchDestinations error:", error.message);
+      console.error("[destinationsRepository] fetchActiveDestinations error:", error.message);
       return getFallbackDestinations();
     }
 
@@ -36,14 +38,21 @@ export async function fetchDestinations(): Promise<Destination[]> {
       return getFallbackDestinations();
     }
 
-    // Use label as the stored value for backward compatibility with existing data
-    // Exception: testing_center is stored as "testing_center" not "Testing Center"
-    return data.map((row) => ({
-      value: row.key === "testing_center" ? "testing_center" : row.label,
+    // Type assertion for data with sort_order
+    const typedData = data as Array<{ key: string; label: string; sort_order?: number | null }>;
+    
+    return typedData.map((row) => ({
+      key: row.key,
       label: row.label,
-    }));
+      sort_order: row.sort_order ?? null,
+    })).sort((a, b) => {
+      const aOrder = a.sort_order ?? 999;
+      const bOrder = b.sort_order ?? 999;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return a.label.localeCompare(b.label);
+    });
   } catch (err) {
-    console.error("[destinationsRepository] fetchDestinations exception:", err);
+    console.error("[destinationsRepository] fetchActiveDestinations exception:", err);
     return getFallbackDestinations();
   }
 }
@@ -52,19 +61,36 @@ export async function fetchDestinations(): Promise<Destination[]> {
  * Fallback destinations in case DB query fails.
  * Matches the existing hardcoded list to maintain backward compatibility.
  */
-function getFallbackDestinations(): Destination[] {
+function getFallbackDestinations(): DestinationOption[] {
   return [
-    { value: "Bathroom", label: "Bathroom" },
-    { value: "Locker", label: "Locker" },
-    { value: "Counselor", label: "Counselor" },
-    { value: "Dean of Students", label: "Dean of Students" },
-    { value: "Dean of Academics", label: "Dean of Academics" },
-    { value: "Nurse", label: "Nurse" },
-    { value: "testing_center", label: "Testing Center" },
-    { value: "College Visit", label: "College Visit" },
-    { value: "Football Meeting", label: "Football Meeting" },
-    { value: "Early Dismissal", label: "Early Dismissal" },
-    { value: "Other", label: "Other" },
+    { key: "bathroom", label: "Bathroom", sort_order: 1 },
+    { key: "locker", label: "Locker", sort_order: 2 },
+    { key: "counselor", label: "Counselor", sort_order: 3 },
+    { key: "dean_students", label: "Dean of Students", sort_order: 4 },
+    { key: "dean_academics", label: "Dean of Academics", sort_order: 5 },
+    { key: "nurse", label: "Nurse", sort_order: 6 },
+    { key: "testing_center", label: "Testing Center", sort_order: 7 },
+    { key: "college_visit", label: "College Visit", sort_order: 8 },
+    { key: "football_meeting", label: "Football Meeting", sort_order: 9 },
+    { key: "early_dismissal", label: "Early Dismissal", sort_order: 95 },
+    { key: "other", label: "Other", sort_order: 90 },
   ];
+}
+
+// Legacy export for backward compatibility
+export interface Destination {
+  value: string;
+  label: string;
+}
+
+/**
+ * @deprecated Use fetchActiveDestinations() instead. This function is kept for backward compatibility.
+ */
+export async function fetchDestinations(): Promise<Destination[]> {
+  const options = await fetchActiveDestinations();
+  return options.map((opt) => ({
+    value: opt.key === "testing_center" ? "testing_center" : opt.label,
+    label: opt.label,
+  }));
 }
 

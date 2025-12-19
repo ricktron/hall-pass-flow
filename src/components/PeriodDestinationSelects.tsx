@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PERIOD_OPTIONS } from "@/constants/formOptions";
-import { fetchDestinations, type Destination } from "@/lib/destinationsRepository";
+import { fetchActiveDestinations, type DestinationOption } from "@/lib/destinationsRepository";
 
 interface PeriodDestinationSelectsProps {
   selectedPeriod: string;
@@ -19,11 +19,11 @@ const PeriodDestinationSelects = ({
   onDestinationChange,
   onKeyDown
 }: PeriodDestinationSelectsProps) => {
-  const [destinations, setDestinations] = useState<Destination[]>([]);
+  const [destinations, setDestinations] = useState<DestinationOption[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchDestinations().then((data) => {
+    fetchActiveDestinations().then((data) => {
       if (!cancelled) {
         setDestinations(data);
       }
@@ -57,7 +57,7 @@ const PeriodDestinationSelects = ({
           </SelectTrigger>
           <SelectContent>
             {destinations.map((destination) => (
-              <SelectItem key={destination.value} value={destination.value}>
+              <SelectItem key={destination.key} value={destination.key === "testing_center" ? "testing_center" : destination.label}>
                 {destination.label}
               </SelectItem>
             ))}

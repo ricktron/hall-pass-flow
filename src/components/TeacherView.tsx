@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Users, BarChart3, UserCheck, UserCog, LogOut, Plus, UserX } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
@@ -13,7 +14,7 @@ import UnknownsQueue from "./UnknownsQueue";
 import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchTodaySignouts, recordDaySignout, type DaySignout } from "@/lib/earlyDismissalRepository";
+import { fetchTodaySignouts, recordDaySignout, type DaySignoutRow } from "@/lib/earlyDismissalRepository";
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
@@ -71,10 +72,11 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [weeklyTopStudents, setWeeklyTopStudents] = useState<Array<{ studentName: string; totalMinutes: number; tripCount: number }>>([]);
   
   // Early dismissal state
-  const [todaySignouts, setTodaySignouts] = useState<DaySignout[]>([]);
+  const [todaySignouts, setTodaySignouts] = useState<DaySignoutRow[]>([]);
   const [signoutDialogOpen, setSignoutDialogOpen] = useState(false);
   const [signoutStudentName, setSignoutStudentName] = useState("");
   const [signoutReason, setSignoutReason] = useState("");
+  const [signoutPeriod, setSignoutPeriod] = useState<string | null>(null);
   const [signoutSubmitting, setSignoutSubmitting] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
@@ -214,31 +216,23 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
 
     setSignoutSubmitting(true);
     try {
-      const result = await recordDaySignout(
-        CLASSROOM_ID,
-        signoutStudentName.trim(),
-        signoutReason.trim() || undefined,
-        "Mr. Garnett"
-      );
-
-      if (!result.success) {
-        toast({
-          variant: "destructive",
-          title: "Failed to record",
-          description: result.error || "Unknown error",
-        });
-        setSignoutSubmitting(false);
-        return;
-      }
+      await recordDaySignout({
+        classroom: CLASSROOM_ID,
+        student_name: signoutStudentName.trim(),
+        reason: signoutReason.trim() || undefined,
+        period: signoutPeriod || null,
+        student_id: null, // Could be enhanced to lookup student_id if roster picker is available
+      });
 
       toast({
         title: "Early dismissal recorded",
-        description: `${result.student_name} has been signed out for the day.`,
+        description: `${signoutStudentName.trim()} has been signed out for the day.`,
       });
 
       // Reset form and close dialog
       setSignoutStudentName("");
       setSignoutReason("");
+      setSignoutPeriod(null);
       setSignoutDialogOpen(false);
 
       // Refresh the signouts list
@@ -248,7 +242,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "An unexpected error occurred",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
       });
     } finally {
       setSignoutSubmitting(false);
@@ -450,6 +444,22 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                           placeholder="First Last"
                           autoFocus
                         />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="signout-period">Period (optional)</Label>
+                        <Select value={signoutPeriod || ""} onValueChange={(value) => setSignoutPeriod(value || null)}>
+                          <SelectTrigger id="signout-period">
+                            <SelectValue placeholder="Select period" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {PERIODS.map((period) => (
+                              <SelectItem key={period} value={period}>
+                                {period}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="signout-reason">Reason (optional)</Label>
