@@ -179,6 +179,14 @@ Before deploying analytics changes, verify in the browser:
 - **Frequent Flyers**: Students sorted by pass count
 - **Heatmap**: Only shows data for Week/Month/Quarter/All (Day returns empty, which is expected)
 
+## Auto-close policy
+
+Passes older than 45 minutes are auto-closed server-side by `hp_auto_close_overdue_passes` (cron every minute if available), setting `timein` and `was_auto_closed=true`.
+
+## Destination ordering
+
+Destinations are ordered by `hall_pass_destinations.sort_order`, and `ui_test` exists for dev testing.
+
 ## Changelog
 
 - **v2.2 (2024-12)**: Stabilized time window handling; `normalizeTimeWindow()` now accepts `unknown` and defaults to "all" for invalid inputs; `AnalyticsView` fully migrated to use `analyticsRepository` layer
