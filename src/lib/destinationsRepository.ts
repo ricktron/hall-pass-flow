@@ -22,8 +22,8 @@ export async function fetchActiveDestinations(): Promise<DestinationOption[]> {
     // Query with type assertion to include sort_order (may not be in types.ts yet)
     const { data, error } = await (supabase
       .from("hall_pass_destinations")
-      .select("key, label, sort_order, is_active")
-      .eq("is_active", true)
+      .select("key,label,sort_order,active")
+      .eq("active", true)
       .order("sort_order", { ascending: true, nullsFirst: false }) as any);
 
     if (error) {

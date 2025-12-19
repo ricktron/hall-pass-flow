@@ -53,12 +53,13 @@ export async function recordDaySignout(args: {
 }): Promise<string> {
   try {
     // Type assertion needed because record_day_signout RPC may not be in types.ts yet
-    // Function signature: (p_classroom text, p_student_name text, p_reason text, p_recorded_by text)
+    // Function signature: record_day_signout(p_classroom, p_student_name, p_reason, p_period, p_student_id)
     const { data, error } = await (supabase.rpc as any)("record_day_signout", {
       p_classroom: args.classroom,
       p_student_name: args.student_name,
       p_reason: args.reason || null,
-      p_recorded_by: null, // Optional parameter, not currently passed from callers
+      p_period: args.period || null,
+      p_student_id: args.student_id || null,
     });
 
     if (error) {
