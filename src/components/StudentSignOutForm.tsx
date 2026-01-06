@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
 import { getCurrentlyOutRecords, updateReturnTime } from "@/lib/supabaseDataManager";
-import { fetchStudents, type Student } from "@/lib/studentsRepository";
+import { fetchRosterStudents, type RosterStudent } from "@/lib/roster";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import StudentNameInput, { type SelectedStudent } from "./StudentNameInput";
 import PeriodDestinationSelects from "./PeriodDestinationSelects";
@@ -33,9 +33,10 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   const [selectedStudent, setSelectedStudent] = useState<SelectedStudent | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [selectedDestination, setSelectedDestination] = useState("");
-  const [students, setStudents] = useState<Student[]>([]);
+  const [students, setStudents] = useState<RosterStudent[]>([]);
   const [currentlyOutStudents, setCurrentlyOutStudents] = useState<StudentRecord[]>([]);
   const [showCurrentlyOut, setShowCurrentlyOut] = useState(false);
+  const [rosterLoading, setRosterLoading] = useState(false);
   
   // Unknown override state
   const [showOverrideDialog, setShowOverrideDialog] = useState(false);
@@ -48,13 +49,38 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
     onEarlyDismissal
   });
 
+  // Load roster when period changes (or on mount if period is already selected)
   useEffect(() => {
     const loadStudents = async () => {
-      const studentList = await fetchStudents();
-      setStudents(studentList);
+      if (!selectedPeriod) {
+        // If no period selected, don't load roster yet
+        setStudents([]);
+        return;
+      }
+      
+      setRosterLoading(true);
+      try {
+        const studentList = await fetchRosterStudents({
+          period: selectedPeriod,
+          // Course is optional - if not provided, returns all students for the period
+        });
+        setStudents(studentList);
+      } catch (error) {
+        console.error("Failed to load roster:", error);
+        setStudents([]);
+      } finally {
+        setRosterLoading(false);
+      }
     };
     loadStudents();
-  }, []);
+  }, [selectedPeriod]);
+
+  // Clear selected student when period changes
+  useEffect(() => {
+    if (selectedPeriod) {
+      setSelectedStudent(null);
+    }
+  }, [selectedPeriod]);
 
   const loadCurrentlyOutStudents = async () => {
     const records = await getCurrentlyOutRecords();
@@ -188,8 +214,14 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          {rosterLoading && selectedPeriod && (
+            <div className="text-sm text-gray-500">Loading roster...</div>
+          )}
+          {!selectedPeriod && (
+            <div className="text-sm text-amber-600">Please select a period first to load the student roster.</div>
+          )}
           <StudentNameInput
-            students={students}
+            students={students.map(s => ({ id: s.id, name: s.name, firstName: s.firstName, lastName: s.lastName }))}
             selectedStudent={selectedStudent}
             onStudentSelect={setSelectedStudent}
             onKeyDown={handleKeyDown}

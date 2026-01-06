@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Users, BarChart3, UserCheck, UserCog, LogOut, Plus, UserX } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ArrowLeft, Users, BarChart3, UserCheck, UserCog, LogOut, Plus, UserX, ChevronDown, ChevronRight, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import AnalyticsView from "./AnalyticsView";
@@ -15,6 +16,7 @@ import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTodaySignouts, recordDaySignout, type DaySignoutRow } from "@/lib/earlyDismissalRepository";
+import { fetchRosterStudentsWithMeta, getAcademicContext } from "@/lib/roster";
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
@@ -78,6 +80,12 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [signoutReason, setSignoutReason] = useState("");
   const [signoutPeriod, setSignoutPeriod] = useState<string | null>(null);
   const [signoutSubmitting, setSignoutSubmitting] = useState(false);
+  
+  // Roster health state
+  const [rosterHealthOpen, setRosterHealthOpen] = useState(false);
+  const [rosterHealthPeriod, setRosterHealthPeriod] = useState<string>("A");
+  const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'enrollments' | 'legacy'; reason?: string } | null>(null);
+  const [rosterHealthLoading, setRosterHealthLoading] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
     if (DEBUG) console.log('[TeacherView] fetch reason:', reason);
@@ -203,6 +211,31 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     // This could be used to hide the currently out display if needed
     // For now, we'll keep it always visible in the teacher view
   };
+
+  const checkRosterHealth = async (period: string) => {
+    setRosterHealthLoading(true);
+    try {
+      const result = await fetchRosterStudentsWithMeta({ period });
+      setRosterHealthMetadata({
+        source: result.metadata.source,
+        reason: result.metadata.reason
+      });
+    } catch (error) {
+      console.error("Failed to check roster health:", error);
+      setRosterHealthMetadata({
+        source: 'legacy',
+        reason: 'Health check failed'
+      });
+    } finally {
+      setRosterHealthLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (rosterHealthOpen && rosterHealthPeriod) {
+      checkRosterHealth(rosterHealthPeriod);
+    }
+  }, [rosterHealthOpen, rosterHealthPeriod]);
 
   const handleRecordEarlyDismissal = async () => {
     if (!signoutStudentName.trim()) {
@@ -362,6 +395,94 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 value={`${dashboardData.todayStats.avgDurationMinutes}m`} 
               />
             </div>
+
+            {/* Roster Health Indicator */}
+            <Collapsible open={rosterHealthOpen} onOpenChange={setRosterHealthOpen}>
+              <Card className="shadow-lg">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {rosterHealthOpen ? (
+                          <ChevronDown className="w-4 h-4 text-gray-500" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-gray-500" />
+                        )}
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Info className="w-4 h-4 text-blue-600" />
+                          Roster Health
+                        </CardTitle>
+                      </div>
+                      {rosterHealthMetadata && (
+                        <div className={`text-xs px-2 py-1 rounded ${
+                          rosterHealthMetadata.source === 'enrollments' 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {rosterHealthMetadata.source === 'enrollments' ? '✓ Enrollments' : '⚠ Legacy'}
+                        </div>
+                      )}
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">School Year:</span>
+                        <span className="ml-2 font-medium">{getAcademicContext().schoolYear}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Semester:</span>
+                        <span className="ml-2 font-medium">{getAcademicContext().semester}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="roster-health-period">Check Period</Label>
+                      <Select value={rosterHealthPeriod} onValueChange={setRosterHealthPeriod}>
+                        <SelectTrigger id="roster-health-period" className="w-48">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PERIODS.map((p) => (
+                            <SelectItem key={p} value={p}>
+                              {p} Period
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {rosterHealthLoading ? (
+                      <div className="text-sm text-gray-500">Checking roster health...</div>
+                    ) : rosterHealthMetadata ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">Roster Source:</span>
+                          <span className={`text-sm font-medium ${
+                            rosterHealthMetadata.source === 'enrollments' 
+                              ? 'text-green-700' 
+                              : 'text-amber-700'
+                          }`}>
+                            {rosterHealthMetadata.source === 'enrollments' ? 'Enrollments' : 'Legacy Fallback'}
+                          </span>
+                        </div>
+                        {rosterHealthMetadata.source === 'legacy' && rosterHealthMetadata.reason && (
+                          <div className="p-2 bg-amber-50 border border-amber-200 rounded-md">
+                            <p className="text-xs text-amber-800">
+                              {rosterHealthMetadata.reason.includes('RLS') || rosterHealthMetadata.reason.includes('error')
+                                ? 'Enrollments unavailable or empty. Check RLS/policies or roster sync.'
+                                : 'Enrollments unavailable or empty. Check RLS/policies or roster sync.'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
 
             {dashboardData.currentlyOutCount === 0 ? (
               <Card className="shadow-lg">
