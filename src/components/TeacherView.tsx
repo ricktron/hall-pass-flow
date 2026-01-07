@@ -84,7 +84,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   // Roster health state
   const [rosterHealthOpen, setRosterHealthOpen] = useState(false);
   const [rosterHealthPeriod, setRosterHealthPeriod] = useState<string>("A");
-  const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'enrollments' | 'legacy'; reason?: string } | null>(null);
+  const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'enrollments' | 'legacy'; reason?: string; errorCode?: string; errorStatus?: number } | null>(null);
   const [rosterHealthLoading, setRosterHealthLoading] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
@@ -220,7 +220,9 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       const result = await fetchRosterStudentsWithMeta({ period: normalizedPeriod });
       setRosterHealthMetadata({
         source: result.metadata.source,
-        reason: result.metadata.reason
+        reason: result.metadata.reason,
+        errorCode: result.metadata.errorCode,
+        errorStatus: result.metadata.errorStatus
       });
     } catch (error) {
       console.error("Failed to check roster health:", error);
@@ -478,10 +480,19 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                         </div>
                         {rosterHealthMetadata.source === 'legacy' && rosterHealthMetadata.reason && (
                           <div className="p-2 bg-amber-50 border border-amber-200 rounded-md">
-                            <p className="text-xs text-amber-800">
+                            <p className="text-xs text-amber-800 font-medium mb-1">
+                              Reason: {rosterHealthMetadata.reason}
+                            </p>
+                            {rosterHealthMetadata.errorCode && (
+                              <p className="text-xs text-amber-700">
+                                Error Code: {rosterHealthMetadata.errorCode}
+                                {rosterHealthMetadata.errorStatus && ` (Status: ${rosterHealthMetadata.errorStatus})`}
+                              </p>
+                            )}
+                            <p className="text-xs text-amber-700 mt-1">
                               {rosterHealthMetadata.reason.includes('RLS') || rosterHealthMetadata.reason.includes('error')
-                                ? 'Enrollments unavailable or empty. Check RLS/policies or roster sync.'
-                                : 'Enrollments unavailable or empty. Check RLS/policies or roster sync.'}
+                                ? 'Check RPC function permissions or roster data sync.'
+                                : 'Verify enrollments exist in database for this period.'}
                             </p>
                           </div>
                         )}
