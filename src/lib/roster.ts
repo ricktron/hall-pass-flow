@@ -64,6 +64,22 @@ export function getAcademicContext(): AcademicContext {
   return { schoolYear, semester };
 }
 
+/**
+ * Normalizes a period string by removing trailing " Period" (case-insensitive) and trimming whitespace.
+ * 
+ * Examples:
+ * - "A Period" -> "A"
+ * - "B period" -> "B"
+ * - "C" -> "C"
+ * - "House Small Group" -> "House Small Group"
+ * 
+ * @param period - Period string that may include " Period" suffix
+ * @returns Normalized period string (letter or full name without " Period" suffix)
+ */
+export function normalizePeriod(period: string): string {
+  return period.replace(/\s*Period\s*$/i, "").trim();
+}
+
 interface EnrollmentError {
   code?: string;
   status?: number;
@@ -82,6 +98,9 @@ async function fetchFromEnrollments(
   filter: RosterFilter
 ): Promise<{ students: RosterStudent[] | null; error?: EnrollmentError }> {
   try {
+    // Normalize period before querying (DB stores letters like "A", "B", not "A Period")
+    const normalizedPeriod = normalizePeriod(filter.period);
+    
     // Build query for student_enrollments
     // Note: student_enrollments may not be in generated types yet, so we use type assertion
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -90,7 +109,7 @@ async function fetchFromEnrollments(
       .select("student_id")
       .eq("school_year", context.schoolYear)
       .eq("semester", context.semester)
-      .eq("period", filter.period);
+      .eq("period", normalizedPeriod);
     
     // Add course filter if provided
     if (filter.course) {
@@ -107,7 +126,7 @@ async function fetchFromEnrollments(
       
       if (import.meta.env.DEV) {
         console.warn(
-          `[roster] student_enrollments query failed for ${context.schoolYear}/${context.semester}/${filter.period}:`,
+          `[roster] student_enrollments query failed for ${context.schoolYear}/${context.semester}/${normalizedPeriod}:`,
           enrollError.message,
           `| Code: ${errorCode}, Status: ${errorStatus || "unknown"}`,
           `| ${isRLSBlocked ? "RLS blocked - check authenticated role" : "Other error - falling back"}`
@@ -123,7 +142,7 @@ async function fetchFromEnrollments(
       // No enrollments found for this filter - fallback
       if (import.meta.env.DEV) {
         console.warn(
-          `[roster] No enrollments found for ${context.schoolYear}/${context.semester}/${filter.period}${filter.course ? `/${filter.course}` : ""} - falling back to legacy roster`
+          `[roster] No enrollments found for ${context.schoolYear}/${context.semester}/${normalizedPeriod}${filter.course ? `/${filter.course}` : ""} - falling back to legacy roster`
         );
       }
       return { students: null };
@@ -223,8 +242,14 @@ export async function fetchRosterStudentsWithMeta(
 ): Promise<RosterResult> {
   const context = getAcademicContext();
   
+  // Normalize period at entry point for defense in depth
+  const normalizedFilter: RosterFilter = {
+    ...filter,
+    period: normalizePeriod(filter.period)
+  };
+  
   // Try preferred path: student_enrollments
-  const enrollmentResult = await fetchFromEnrollments(context, filter);
+  const enrollmentResult = await fetchFromEnrollments(context, normalizedFilter);
   
   if (enrollmentResult.students && enrollmentResult.students.length > 0) {
     return {
@@ -251,10 +276,10 @@ export async function fetchRosterStudentsWithMeta(
     
     // If course filter was provided, we can't filter legacy students by course,
     // so we return all students (period filter is handled at UI level if needed)
-    if (import.meta.env.DEV && filter.course) {
+    if (import.meta.env.DEV && normalizedFilter.course) {
       console.warn(
         "[roster] Course filter",
-        filter.course,
+        normalizedFilter.course,
         "ignored in fallback mode (legacy roster doesn't support course filtering)"
       );
     }
@@ -294,7 +319,12 @@ export async function fetchRosterStudentsWithMeta(
 export async function fetchRosterStudents(
   filter: RosterFilter
 ): Promise<RosterStudent[]> {
-  const result = await fetchRosterStudentsWithMeta(filter);
+  // Normalize period at entry point (fetchRosterStudentsWithMeta also normalizes, but this ensures consistency)
+  const normalizedFilter: RosterFilter = {
+    ...filter,
+    period: normalizePeriod(filter.period)
+  };
+  const result = await fetchRosterStudentsWithMeta(normalizedFilter);
   return result.students;
 }
 
