@@ -12,10 +12,24 @@ on conflict (email) do update
 set role='student'::user_role,
     is_test_user=true;
 
--- Step C: Load roster JSON and match to users, then seed enrollments
+-- Step C: Upsert Rick Garnett enrollment directly
+insert into public.student_enrollments (student_id, school_year, semester, course, period)
+select 
+  u.id,
+  '2025-2026'::text,
+  'S2'::text,
+  'Earth and Space'::text,
+  'A'::text
+from public.users u
+where u.email = '26rgarnett@student.nchstx.org'
+on conflict (student_id, school_year, semester, course)
+do update set period = excluded.period;
+
+-- Step D: Load roster JSON and match to users, then seed enrollments (only if S2 not already seeded)
 do $$
 declare
   conflicts jsonb;
+  s2_already_seeded boolean;
   roster_json jsonb := '[
   {"first_name": "Alana", "last_name": "Demma", "course": "Earth and Space", "period": "A Period"},
   {"first_name": "Isabel", "last_name": "Durham", "course": "Earth and Space", "period": "A Period"},
@@ -102,146 +116,154 @@ declare
   {"first_name": "Jake", "last_name": "Werline", "course": "Ecology", "period": "E Period"}
 ]'::jsonb;
 begin
-  -- Create temp table for roster import
-  create temp table roster_import (
-    roster_first_name text,
-    roster_last_name text,
-    roster_course text,
-    roster_period text,
-    canonical_course text,
-    canonical_period text,
-    student_id uuid,
-    match_count int
-  );
+  -- Check if S2 enrollments already exist
+  select exists (
+    select 1 
+    from public.student_enrollments 
+    where school_year = '2025-2026' 
+      and semester = 'S2'
+  ) into s2_already_seeded;
 
-  -- Insert roster data with canonical mappings
-  insert into roster_import (roster_first_name, roster_last_name, roster_course, roster_period, canonical_course, canonical_period)
-  select 
-    r->>'first_name' as roster_first_name,
-    r->>'last_name' as roster_last_name,
-    r->>'course' as roster_course,
-    r->>'period' as roster_period,
-    case 
-      when r->>'course' = 'Earth and Space' then 'ESS'
-      when r->>'course' = 'Ecology' then 'ECO'
-      else r->>'course'
-    end as canonical_course,
-    case 
-      when r->>'period' = 'A Period' then 'A'
-      when r->>'period' = 'B Period' then 'B'
-      when r->>'period' = 'D Period' then 'D'
-      when r->>'period' = 'E Period' then 'E'
-      when r->>'period' = 'H Period' then 'H'
-      else regexp_replace(r->>'period', ' Period$', '', 'g')
-    end as canonical_period
-  from jsonb_array_elements(roster_json) r;
+  if s2_already_seeded then
+    raise notice 'S2 enrollments already present; skipping roster seed import';
+  else
+    -- Create temp table for roster import
+    create temp table roster_import (
+      roster_first_name text,
+      roster_last_name text,
+      roster_course text,
+      roster_period text,
+      canonical_course text,
+      canonical_period text,
+      student_id uuid,
+      match_count int
+    );
 
-  -- Add Rick Garnett enrollment
-  insert into roster_import (roster_first_name, roster_last_name, roster_course, roster_period, canonical_course, canonical_period)
-  values ('Rick', 'Garnett', 'Earth and Space', 'A Period', 'ESS', 'A');
-
-  -- Match roster entries to users
-  -- Match by: normalized last name AND (normalized first name OR normalized nickname/preferred_name/display_name/full_name/name OR first token of roster first name)
-  with matched_roster as (
+    -- Insert roster data with canonical mappings (course uses raw values, period normalized)
+    insert into roster_import (roster_first_name, roster_last_name, roster_course, roster_period, canonical_course, canonical_period)
     select 
-      ri.roster_first_name,
-      ri.roster_last_name,
-      ri.canonical_course,
-      ri.canonical_period,
-      u.id as student_id,
-      count(*) over (partition by ri.roster_first_name, ri.roster_last_name) as match_count
-    from roster_import ri
-    cross join lateral (
-      select u2.id
-      from public.users u2
-      where u2.role = 'student'::user_role
-        and lower(regexp_replace(coalesce(ri.roster_last_name, ''), '[^a-z0-9]+', '', 'g')) = 
-            lower(regexp_replace(coalesce(u2.last_name, ''), '[^a-z0-9]+', '', 'g'))
-        and (
-          -- Match first name exactly (normalized)
-          lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
-          lower(regexp_replace(coalesce(u2.first_name, ''), '[^a-z0-9]+', '', 'g'))
-          -- OR match first token of roster first name (handles "John David", "Jaden M")
-          or lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
-             lower(regexp_replace(coalesce(u2.first_name, ''), '[^a-z0-9]+', '', 'g'))
-          -- OR match against nickname if column exists
-          or (to_jsonb(u2)->>'nickname' is not null 
-              and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'nickname', ''), '[^a-z0-9]+', '', 'g')))
-          or (to_jsonb(u2)->>'nickname' is not null 
-              and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'nickname', ''), '[^a-z0-9]+', '', 'g')))
-          -- OR match against preferred_name if column exists
-          or (to_jsonb(u2)->>'preferred_name' is not null 
-              and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'preferred_name', ''), '[^a-z0-9]+', '', 'g')))
-          or (to_jsonb(u2)->>'preferred_name' is not null 
-              and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'preferred_name', ''), '[^a-z0-9]+', '', 'g')))
-          -- OR match against display_name if column exists
-          or (to_jsonb(u2)->>'display_name' is not null 
-              and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'display_name', ''), '[^a-z0-9]+', '', 'g')))
-          or (to_jsonb(u2)->>'display_name' is not null 
-              and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'display_name', ''), '[^a-z0-9]+', '', 'g')))
-          -- OR match against full_name if column exists
-          or (to_jsonb(u2)->>'full_name' is not null 
-              and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'full_name', ''), '[^a-z0-9]+', '', 'g')))
-          or (to_jsonb(u2)->>'full_name' is not null 
-              and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'full_name', ''), '[^a-z0-9]+', '', 'g')))
-          -- OR match against name if column exists
-          or (to_jsonb(u2)->>'name' is not null 
-              and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'name', ''), '[^a-z0-9]+', '', 'g')))
-          or (to_jsonb(u2)->>'name' is not null 
-              and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
-                  lower(regexp_replace(coalesce(to_jsonb(u2)->>'name', ''), '[^a-z0-9]+', '', 'g')))
-        )
-      limit 1
-    ) u
-    where u.id is not null
-  )
-  update roster_import ri
-  set student_id = mr.student_id,
-      match_count = mr.match_count
-  from matched_roster mr
-  where ri.roster_first_name = mr.roster_first_name
-    and ri.roster_last_name = mr.roster_last_name;
+      r->>'first_name' as roster_first_name,
+      r->>'last_name' as roster_last_name,
+      r->>'course' as roster_course,
+      r->>'period' as roster_period,
+      r->>'course' as canonical_course,
+      case 
+        when r->>'period' = 'A Period' then 'A'
+        when r->>'period' = 'B Period' then 'B'
+        when r->>'period' = 'D Period' then 'D'
+        when r->>'period' = 'E Period' then 'E'
+        when r->>'period' = 'H Period' then 'H'
+        else regexp_replace(r->>'period', ' Period$', '', 'g')
+      end as canonical_period
+    from jsonb_array_elements(roster_json) r;
 
-  -- Check for conflicts (unresolved or ambiguous matches)
-  select jsonb_agg(
-    jsonb_build_object(
-      'roster_name', roster_first_name || ' ' || roster_last_name,
-      'match_count', coalesce(match_count, 0),
-      'student_id', student_id
+    -- Add Rick Garnett enrollment
+    insert into roster_import (roster_first_name, roster_last_name, roster_course, roster_period, canonical_course, canonical_period)
+    values ('Rick', 'Garnett', 'Earth and Space', 'A Period', 'Earth and Space', 'A');
+
+    -- Match roster entries to users
+    -- Match by: normalized last name AND (normalized first name OR normalized nickname/preferred_name/display_name/full_name/name OR first token of roster first name)
+    with matched_roster as (
+      select 
+        ri.roster_first_name,
+        ri.roster_last_name,
+        ri.canonical_course,
+        ri.canonical_period,
+        u.id as student_id,
+        count(*) over (partition by ri.roster_first_name, ri.roster_last_name) as match_count
+      from roster_import ri
+      cross join lateral (
+        select u2.id
+        from public.users u2
+        where u2.role = 'student'::user_role
+          and lower(regexp_replace(coalesce(ri.roster_last_name, ''), '[^a-z0-9]+', '', 'g')) = 
+              lower(regexp_replace(coalesce(u2.last_name, ''), '[^a-z0-9]+', '', 'g'))
+          and (
+            -- Match first name exactly (normalized)
+            lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
+            lower(regexp_replace(coalesce(u2.first_name, ''), '[^a-z0-9]+', '', 'g'))
+            -- OR match first token of roster first name (handles "John David", "Jaden M")
+            or lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
+               lower(regexp_replace(coalesce(u2.first_name, ''), '[^a-z0-9]+', '', 'g'))
+            -- OR match against nickname if column exists
+            or (to_jsonb(u2)->>'nickname' is not null 
+                and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'nickname', ''), '[^a-z0-9]+', '', 'g')))
+            or (to_jsonb(u2)->>'nickname' is not null 
+                and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'nickname', ''), '[^a-z0-9]+', '', 'g')))
+            -- OR match against preferred_name if column exists
+            or (to_jsonb(u2)->>'preferred_name' is not null 
+                and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'preferred_name', ''), '[^a-z0-9]+', '', 'g')))
+            or (to_jsonb(u2)->>'preferred_name' is not null 
+                and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'preferred_name', ''), '[^a-z0-9]+', '', 'g')))
+            -- OR match against display_name if column exists
+            or (to_jsonb(u2)->>'display_name' is not null 
+                and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'display_name', ''), '[^a-z0-9]+', '', 'g')))
+            or (to_jsonb(u2)->>'display_name' is not null 
+                and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'display_name', ''), '[^a-z0-9]+', '', 'g')))
+            -- OR match against full_name if column exists
+            or (to_jsonb(u2)->>'full_name' is not null 
+                and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'full_name', ''), '[^a-z0-9]+', '', 'g')))
+            or (to_jsonb(u2)->>'full_name' is not null 
+                and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'full_name', ''), '[^a-z0-9]+', '', 'g')))
+            -- OR match against name if column exists
+            or (to_jsonb(u2)->>'name' is not null 
+                and lower(regexp_replace(coalesce(ri.roster_first_name, ''), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'name', ''), '[^a-z0-9]+', '', 'g')))
+            or (to_jsonb(u2)->>'name' is not null 
+                and lower(regexp_replace(split_part(coalesce(ri.roster_first_name, ''), ' ', 1), '[^a-z0-9]+', '', 'g')) = 
+                    lower(regexp_replace(coalesce(to_jsonb(u2)->>'name', ''), '[^a-z0-9]+', '', 'g')))
+          )
+        limit 1
+      ) u
+      where u.id is not null
     )
-  )
-  into conflicts
-  from roster_import
-  where match_count != 1 or student_id is null;
+    update roster_import ri
+    set student_id = mr.student_id,
+        match_count = mr.match_count
+    from matched_roster mr
+    where ri.roster_first_name = mr.roster_first_name
+      and ri.roster_last_name = mr.roster_last_name;
 
-  -- Abort if conflicts found
-  if conflicts is not null and jsonb_array_length(conflicts) > 0 then
-    raise exception 'Roster seed conflicts: %', conflicts;
+    -- Check for conflicts (unresolved or ambiguous matches)
+    select jsonb_agg(
+      jsonb_build_object(
+        'roster_name', roster_first_name || ' ' || roster_last_name,
+        'match_count', coalesce(match_count, 0),
+        'student_id', student_id
+      )
+    )
+    into conflicts
+    from roster_import
+    where match_count != 1 or student_id is null;
+
+    -- Abort if conflicts found
+    if conflicts is not null and jsonb_array_length(conflicts) > 0 then
+      raise exception 'Roster seed conflicts: %', conflicts;
+    end if;
+
+    -- Insert enrollments (ON CONFLICT updates period if needed)
+    insert into public.student_enrollments (student_id, school_year, semester, course, period)
+    select 
+      student_id,
+      '2025-2026'::text,
+      'S2'::text,
+      canonical_course,
+      canonical_period
+    from roster_import
+    where student_id is not null
+    on conflict (student_id, school_year, semester, course) 
+    do update set period = excluded.period;
+
+    -- Clean up temp table
+    drop table roster_import;
   end if;
-
-  -- Insert enrollments (ON CONFLICT updates period if needed)
-  insert into public.student_enrollments (student_id, school_year, semester, course, period)
-  select 
-    student_id,
-    '2025-2026'::text,
-    'S2'::text,
-    canonical_course,
-    canonical_period
-  from roster_import
-  where student_id is not null
-  on conflict (student_id, school_year, semester, course) 
-  do update set period = excluded.period;
-
-  -- Clean up temp table
-  drop table roster_import;
 end $$;
 
