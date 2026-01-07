@@ -35,3 +35,6 @@ supabase/.temp/
 
 # Local-only backups
 supabase/migrations_backups/
+
+# Supabase local branch metadata
+supabase/.branches/
