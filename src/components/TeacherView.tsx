@@ -16,7 +16,7 @@ import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTodaySignouts, recordDaySignout, type DaySignoutRow } from "@/lib/earlyDismissalRepository";
-import { fetchRosterStudentsWithMeta, getAcademicContext } from "@/lib/roster";
+import { fetchRosterStudentsWithMeta, getAcademicContext, normalizePeriod } from "@/lib/roster";
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
@@ -215,7 +215,9 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const checkRosterHealth = async (period: string) => {
     setRosterHealthLoading(true);
     try {
-      const result = await fetchRosterStudentsWithMeta({ period });
+      // Normalize period before querying (defense-in-depth, though fetchRosterStudentsWithMeta also normalizes)
+      const normalizedPeriod = normalizePeriod(period);
+      const result = await fetchRosterStudentsWithMeta({ period: normalizedPeriod });
       setRosterHealthMetadata({
         source: result.metadata.source,
         reason: result.metadata.reason
@@ -440,7 +442,13 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                     
                     <div className="space-y-2">
                       <Label htmlFor="roster-health-period">Check Period</Label>
-                      <Select value={rosterHealthPeriod} onValueChange={setRosterHealthPeriod}>
+                      <Select 
+                        value={rosterHealthPeriod} 
+                        onValueChange={(value) => {
+                          // Normalize period value when selected (defense-in-depth)
+                          setRosterHealthPeriod(normalizePeriod(value));
+                        }}
+                      >
                         <SelectTrigger id="roster-health-period" className="w-48">
                           <SelectValue />
                         </SelectTrigger>
