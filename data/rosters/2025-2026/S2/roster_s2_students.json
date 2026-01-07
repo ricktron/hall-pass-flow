@@ -1,0 +1,501 @@
+[
+  {
+    "first_name": "Alana",
+    "last_name": "Demma",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Isabel",
+    "last_name": "Durham",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Julian",
+    "last_name": "Esparza",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Xavier",
+    "last_name": "Garcia",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Payne",
+    "last_name": "Holbert",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Danny",
+    "last_name": "Johnson",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Preston",
+    "last_name": "Kennedy",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Xavier",
+    "last_name": "Malone",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Destiny",
+    "last_name": "Munoz",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Jaden M",
+    "last_name": "Nguyen",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Camila",
+    "last_name": "Sanchez",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Gabe",
+    "last_name": "Spurgeon",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Julyanna",
+    "last_name": "Villegas",
+    "course": "Earth and Space",
+    "period": "A Period"
+  },
+  {
+    "first_name": "Isabella",
+    "last_name": "Barajas",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Brenna",
+    "last_name": "Belauskas",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Josie",
+    "last_name": "Burgdorf",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Sebastian",
+    "last_name": "Calzada",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Manuel",
+    "last_name": "Castillo",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "James",
+    "last_name": "Dalton",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Antonio",
+    "last_name": "Del Signore",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Tyler",
+    "last_name": "Delatore",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Antonio",
+    "last_name": "Garcia",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Luke",
+    "last_name": "Heidemann",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Brandon",
+    "last_name": "Hoang",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Jojo",
+    "last_name": "Irvin",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Myu",
+    "last_name": "Lataw",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "German",
+    "last_name": "Macias",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "John David",
+    "last_name": "Mattox",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Lauren",
+    "last_name": "McGrail",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Cooper",
+    "last_name": "Orand",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Ivana",
+    "last_name": "Paltsev",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Hayden",
+    "last_name": "Pior",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Jocelyn",
+    "last_name": "Ramirez",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Sidney",
+    "last_name": "Sholars-Anderson",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Sophia",
+    "last_name": "Taylor",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Clara",
+    "last_name": "Vu",
+    "course": "Earth and Space",
+    "period": "D Period"
+  },
+  {
+    "first_name": "Thomas",
+    "last_name": "Adami",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Valerie",
+    "last_name": "Betancourt",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Ann Marie",
+    "last_name": "Cademartori",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Jon",
+    "last_name": "Fry",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Andrew",
+    "last_name": "Gandara",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Moises",
+    "last_name": "Garcia",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Olivia",
+    "last_name": "Leuschner",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Brayden",
+    "last_name": "Meche",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Michael",
+    "last_name": "Neidecker",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Ashlynn",
+    "last_name": "Perez",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Ricky",
+    "last_name": "Salazar",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Lyrix",
+    "last_name": "Sallee",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Kassandra",
+    "last_name": "Sanchez",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Jackson",
+    "last_name": "Schuster",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Jaden",
+    "last_name": "Torres",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Ellorie",
+    "last_name": "Wheeler",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Ty",
+    "last_name": "Wise",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Hunter",
+    "last_name": "Zenk",
+    "course": "Earth and Space",
+    "period": "H Period"
+  },
+  {
+    "first_name": "Danny",
+    "last_name": "Cantarella",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Elizabeth",
+    "last_name": "Endres",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Josie",
+    "last_name": "Folzenlogen",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Sam",
+    "last_name": "Jackman",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Gavrielle",
+    "last_name": "Kapend",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Owen",
+    "last_name": "May",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Bella",
+    "last_name": "Mock",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Mimi",
+    "last_name": "Moore",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Sara",
+    "last_name": "Najera",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Claire",
+    "last_name": "Perales",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Phillip",
+    "last_name": "Porras",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Paul",
+    "last_name": "Reimer",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Amanda",
+    "last_name": "Salcedo",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Avery",
+    "last_name": "Schmidt",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Sofia",
+    "last_name": "Serna",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Jimmy",
+    "last_name": "Suter",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Tristan",
+    "last_name": "Williams",
+    "course": "Ecology",
+    "period": "B Period"
+  },
+  {
+    "first_name": "Kate",
+    "last_name": "Button",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Mia Garcia",
+    "last_name": "Garcia",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Meg",
+    "last_name": "Gillen",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Nick",
+    "last_name": "Koelzer",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Vincent",
+    "last_name": "Le",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Keeley",
+    "last_name": "Moore",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Faith",
+    "last_name": "Pelzel",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Lauren",
+    "last_name": "Rodriquez",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Stellamae",
+    "last_name": "Stavens",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Nick",
+    "last_name": "Swigart",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Ava",
+    "last_name": "Talabock",
+    "course": "Ecology",
+    "period": "E Period"
+  },
+  {
+    "first_name": "Jake",
+    "last_name": "Werline",
+    "course": "Ecology",
+    "period": "E Period"
+  }
+]
+
