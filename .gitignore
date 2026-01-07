@@ -29,3 +29,9 @@ data.sql
 *.tgz
 *.dump
 *_export.*
+
+# Supabase CLI temp
+supabase/.temp/
+
+# Local-only backups
+supabase/migrations_backups/
