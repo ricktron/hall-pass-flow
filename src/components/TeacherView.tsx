@@ -242,9 +242,16 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       });
     } catch (error) {
       console.error("Failed to check roster health:", error);
+      const context = getAcademicContext();
+      // For S2, preserve RPC source even on errors (RPC is the primary path)
+      // For non-S2, use legacy as fallback
+      const source = context.semester === 'S2' ? 'supabase_rpc' : 'legacy';
+      const errorDetails = error as { code?: string; status?: number; message?: string };
       setRosterHealthMetadata({
-        source: 'legacy',
-        reason: 'Health check failed'
+        source,
+        reason: errorDetails?.message || 'Health check failed',
+        errorCode: errorDetails?.code,
+        errorStatus: errorDetails?.status
       });
     } finally {
       setRosterHealthLoading(false);
