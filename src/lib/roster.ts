@@ -80,6 +80,24 @@ export function normalizePeriod(period: string): string {
   return period.replace(/\s*Period\s*$/i, "").trim();
 }
 
+/**
+ * Maps course codes to full course names used in the database.
+ * If the course is not a known code, returns it unchanged.
+ * 
+ * @param course - Course code (e.g., "ESS", "ECO") or full name
+ * @returns Full course name as stored in database, or original value if not a code
+ */
+function mapCourseCode(course: string | undefined | null): string | null {
+  if (!course) return null;
+  
+  const courseMap: Record<string, string> = {
+    'ESS': 'Earth and Space',
+    'ECO': 'Ecology',
+  };
+  
+  return courseMap[course.toUpperCase()] || course;
+}
+
 interface EnrollmentError {
   code?: string;
   status?: number;
@@ -100,6 +118,9 @@ async function fetchFromEnrollments(
     // Normalize period before querying (RPC will also normalize, but we do it here for logging)
     const normalizedPeriod = normalizePeriod(filter.period);
     
+    // Map course code to full name if needed (e.g., "ESS" -> "Earth and Space")
+    const mappedCourse = mapCourseCode(filter.course);
+    
     // Log the query parameters for debugging
     if (import.meta.env.DEV) {
       console.log(
@@ -109,17 +130,19 @@ async function fetchFromEnrollments(
           semester: context.semester,
           period: filter.period,
           normalized_period: normalizedPeriod,
-          course: filter.course || null
+          course: filter.course || null,
+          mapped_course: mappedCourse
         }
       );
     }
     
     // Call RPC function (RLS-safe, works for anon role)
+    // Pass normalized period for consistency (RPC also normalizes internally)
     const { data: rosterRows, error: rpcError } = await supabase.rpc('hp_get_roster', {
       p_school_year: context.schoolYear,
       p_semester: context.semester,
-      p_period: filter.period, // Pass original period, RPC will normalize
-      p_course: filter.course || null
+      p_period: normalizedPeriod, // Pass normalized period for consistency
+      p_course: mappedCourse
     });
     
     if (rpcError) {

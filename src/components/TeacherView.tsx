@@ -475,7 +475,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                               ? 'text-green-700' 
                               : 'text-amber-700'
                           }`}>
-                            {rosterHealthMetadata.source === 'enrollments' ? 'Enrollments' : 'Legacy Fallback'}
+                            {rosterHealthMetadata.source === 'enrollments' ? 'Supabase (RPC)' : 'Legacy Fallback'}
                           </span>
                         </div>
                         {rosterHealthMetadata.source === 'legacy' && rosterHealthMetadata.reason && (
