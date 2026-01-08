@@ -123,20 +123,22 @@ async function fetchFromEnrollments(
     // Map course code to full name if needed (e.g., "ESS" -> "Earth and Space")
     const mappedCourse = mapCourseCode(filter.course);
     
-    // Log the query parameters for debugging
-    if (import.meta.env.DEV) {
-      console.log(
-        `[roster] Calling hp_get_roster RPC with:`,
-        {
+    // Debug logging: log inputs after normalization
+    console.debug(
+      `[roster] Calling hp_get_roster RPC:`,
+      {
+        inputs: {
           school_year: context.schoolYear,
           semester: context.semester,
           period: filter.period,
-          normalized_period: normalizedPeriod,
-          course: filter.course || null,
-          mapped_course: mappedCourse
+          course: filter.course || null
+        },
+        normalized: {
+          period: normalizedPeriod,
+          course: mappedCourse
         }
-      );
-    }
+      }
+    );
     
     // Call RPC function via wrapper (RLS-safe, works for anon role)
     // Pass normalized period for consistency (RPC also normalizes internally)
@@ -228,10 +230,11 @@ function convertLegacyStudents(students: Student[]): RosterStudent[] {
 /**
  * Fetches roster students for a given course and period with metadata.
  * 
- * Preferred path: hp_get_roster RPC (filtered by school_year, semester, course, period)
- * Fallback path: legacy fetchStudents() (all students, no filtering) - only for non-S2 or RPC errors
+ * Primary path: hp_get_roster RPC (filtered by school_year, semester, course, period)
  * 
- * For S2: If RPC returns 0 rows (no error), returns empty array (no legacy fallback).
+ * Fallback behavior:
+ * - For S2: NEVER falls back to legacy, even on RPC errors. Returns empty array with RPC source metadata.
+ * - For non-S2: Falls back to legacy fetchStudents() ONLY if RPC throws an error (not if it returns empty).
  * 
  * If course is not provided, returns all students enrolled in the period across all courses.
  * 
@@ -262,73 +265,105 @@ export async function fetchRosterStudentsWithMeta(
     };
   }
   
-  // For S2, if RPC returns no data (but no error), don't fall back to legacy (RPC should have data)
-  // Only use legacy fallback if RPC throws an error (not just empty result)
-  if (context.semester === 'S2' && !enrollmentResult.error) {
+  // For S2: NEVER fall back to legacy, even on RPC errors
+  // Return empty result with RPC source metadata
+  if (context.semester === 'S2') {
+    const reason = enrollmentResult.error
+      ? `RPC error (${enrollmentResult.error.code || 'unknown'}): ${enrollmentResult.error.message || 'Unknown error'}`
+      : `No students found for ${context.schoolYear}/${context.semester}/${normalizedFilter.period}${normalizedFilter.course ? `/${normalizedFilter.course}` : ''}`;
+    
     if (import.meta.env.DEV) {
       console.warn(
-        `[roster] RPC returned 0 students for S2 ${context.schoolYear}/${normalizedFilter.period} - not using legacy fallback`
+        `[roster] S2 roster: RPC ${enrollmentResult.error ? 'error' : 'returned 0 students'} - NOT using legacy fallback`,
+        {
+          schoolYear: context.schoolYear,
+          semester: context.semester,
+          period: normalizedFilter.period,
+          course: normalizedFilter.course || null,
+          error: enrollmentResult.error
+        }
       );
     }
-    // Debug logging: log RPC returned 0 rows (no error)
-    console.info(`[roster] Roster load strategy: rpc (0 students, no error)`);
+    
+    // Debug logging: log RPC result (error or empty) for S2
+    console.info(`[roster] Roster load strategy: rpc (S2, ${enrollmentResult.error ? 'error' : '0 students'}, no legacy fallback)`);
+    
     return {
       students: [],
       metadata: {
         source: 'supabase_rpc',
-        reason: 'No students found for this period in S2 roster'
-      }
-    };
-  }
-  
-  // Fallback: legacy roster logic (only for non-S2 or when RPC throws error)
-  const reason = enrollmentResult.error 
-    ? `RPC error (${enrollmentResult.error.code || 'unknown'})`
-    : 'No enrollments found for this period';
-  
-  // Debug logging: log legacy fallback
-  console.info(`[roster] Roster load strategy: legacy (reason: ${reason})`);
-  
-  if (import.meta.env.DEV) {
-    console.warn(
-      "[roster] Using fallback roster (legacy fetchStudents). Reason:",
-      reason
-    );
-  }
-  
-  try {
-    const legacyStudents = await fetchStudents();
-    const converted = convertLegacyStudents(legacyStudents);
-    
-    // If course filter was provided, we can't filter legacy students by course,
-    // so we return all students (period filter is handled at UI level if needed)
-    if (import.meta.env.DEV && normalizedFilter.course) {
-      console.warn(
-        "[roster] Course filter",
-        normalizedFilter.course,
-        "ignored in fallback mode (legacy roster doesn't support course filtering)"
-      );
-    }
-    
-    return {
-      students: converted,
-      metadata: {
-        source: 'legacy',
         reason,
         errorCode: enrollmentResult.error?.code,
         errorStatus: enrollmentResult.error?.status
       }
     };
-  } catch (err) {
-    console.error("[roster] Fallback roster fetch failed:", err);
-    return {
-      students: [],
-      metadata: {
-        source: 'legacy',
-        reason: 'Fallback fetch failed'
-      }
-    };
   }
+  
+  // For non-S2: Fall back to legacy only if RPC throws an error (not if it returns empty)
+  if (enrollmentResult.error) {
+    const reason = `RPC error (${enrollmentResult.error.code || 'unknown'}): ${enrollmentResult.error.message || 'Unknown error'}`;
+    
+    // Debug logging: log legacy fallback for non-S2
+    console.info(`[roster] Roster load strategy: legacy (non-S2, reason: ${reason})`);
+    
+    if (import.meta.env.DEV) {
+      console.warn(
+        "[roster] Using fallback roster (legacy fetchStudents) for non-S2. Reason:",
+        reason
+      );
+    }
+    
+    try {
+      const legacyStudents = await fetchStudents();
+      const converted = convertLegacyStudents(legacyStudents);
+      
+      // If course filter was provided, we can't filter legacy students by course,
+      // so we return all students (period filter is handled at UI level if needed)
+      if (import.meta.env.DEV && normalizedFilter.course) {
+        console.warn(
+          "[roster] Course filter",
+          normalizedFilter.course,
+          "ignored in fallback mode (legacy roster doesn't support course filtering)"
+        );
+      }
+      
+      return {
+        students: converted,
+        metadata: {
+          source: 'legacy',
+          reason,
+          errorCode: enrollmentResult.error.code,
+          errorStatus: enrollmentResult.error.status
+        }
+      };
+    } catch (err) {
+      console.error("[roster] Fallback roster fetch failed:", err);
+      return {
+        students: [],
+        metadata: {
+          source: 'legacy',
+          reason: 'Fallback fetch failed'
+        }
+      };
+    }
+  }
+  
+  // For non-S2: RPC returned empty (no error) - return empty with RPC source
+  if (import.meta.env.DEV) {
+    console.warn(
+      `[roster] RPC returned 0 students for non-S2 ${context.schoolYear}/${normalizedFilter.period} - returning empty (no legacy fallback for empty results)`
+    );
+  }
+  
+  console.info(`[roster] Roster load strategy: rpc (non-S2, 0 students, no error)`);
+  
+  return {
+    students: [],
+    metadata: {
+      source: 'supabase_rpc',
+      reason: `No students found for ${context.schoolYear}/${context.semester}/${normalizedFilter.period}${normalizedFilter.course ? `/${normalizedFilter.course}` : ''}`
+    }
+  };
 }
 
 /**

@@ -507,6 +507,32 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                             {rosterHealthMetadata.source === 'supabase_rpc' ? 'Supabase (RPC)' : 'Legacy Fallback'}
                           </span>
                         </div>
+                        {rosterHealthMetadata.source === 'supabase_rpc' && rosterHealthMetadata.reason && (
+                          <div className={`p-2 border rounded-md ${
+                            rosterHealthMetadata.errorCode
+                              ? 'bg-red-50 border-red-200'
+                              : 'bg-blue-50 border-blue-200'
+                          }`}>
+                            <p className={`text-xs font-medium mb-1 ${
+                              rosterHealthMetadata.errorCode
+                                ? 'text-red-800'
+                                : 'text-blue-800'
+                            }`}>
+                              {rosterHealthMetadata.errorCode ? 'RPC Error:' : 'Info:'} {rosterHealthMetadata.reason}
+                            </p>
+                            {rosterHealthMetadata.errorCode && (
+                              <p className="text-xs text-red-700">
+                                Error Code: {rosterHealthMetadata.errorCode}
+                                {rosterHealthMetadata.errorStatus && ` (Status: ${rosterHealthMetadata.errorStatus})`}
+                              </p>
+                            )}
+                            {!rosterHealthMetadata.errorCode && (
+                              <p className="text-xs text-blue-700 mt-1">
+                                Query: {getAcademicContext().schoolYear}/{getAcademicContext().semester}/{rosterHealthPeriod}
+                              </p>
+                            )}
+                          </div>
+                        )}
                         {rosterHealthMetadata.source === 'legacy' && rosterHealthMetadata.reason && (
                           <div className="p-2 bg-amber-50 border border-amber-200 rounded-md">
                             <p className="text-xs text-amber-800 font-medium mb-1">
