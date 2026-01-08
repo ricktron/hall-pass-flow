@@ -10,6 +10,7 @@ interface PeriodDestinationSelectsProps {
   onPeriodChange: (value: string) => void;
   onDestinationChange: (value: string) => void;
   onKeyDown?: (e: React.KeyboardEvent, nextFieldId?: string) => void;
+  disabled?: boolean;
 }
 
 const PeriodDestinationSelects = ({
@@ -17,7 +18,8 @@ const PeriodDestinationSelects = ({
   selectedDestination,
   onPeriodChange,
   onDestinationChange,
-  onKeyDown
+  onKeyDown,
+  disabled = false
 }: PeriodDestinationSelectsProps) => {
   const [destinations, setDestinations] = useState<DestinationOption[]>([]);
 
@@ -36,7 +38,7 @@ const PeriodDestinationSelects = ({
       <div className="space-y-2">
         <Label htmlFor="period">Class Period</Label>
         <Select value={selectedPeriod} onValueChange={onPeriodChange}>
-          <SelectTrigger id="period-select" onKeyDown={(e) => onKeyDown?.(e, 'destination-select')}>
+          <SelectTrigger id="period-select" onKeyDown={(e) => onKeyDown?.(e, 'studentName')}>
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent>
@@ -47,13 +49,24 @@ const PeriodDestinationSelects = ({
             ))}
           </SelectContent>
         </Select>
+        {!selectedPeriod && (
+          <p className="text-xs text-gray-500">Select your period to load the roster.</p>
+        )}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="destination">Destination</Label>
-        <Select value={selectedDestination} onValueChange={onDestinationChange}>
-          <SelectTrigger id="destination-select" onKeyDown={(e) => onKeyDown?.(e, 'signOutButton')}>
-            <SelectValue placeholder="Select destination" />
+        <Select 
+          value={selectedDestination} 
+          onValueChange={onDestinationChange}
+          disabled={!selectedPeriod}
+        >
+          <SelectTrigger 
+            id="destination-select" 
+            onKeyDown={(e) => onKeyDown?.(e, 'signOutButton')}
+            className={!selectedPeriod ? "bg-gray-100 cursor-not-allowed" : ""}
+          >
+            <SelectValue placeholder={!selectedPeriod ? "Select a period first..." : "Select destination"} />
           </SelectTrigger>
           <SelectContent>
             {destinations.map((destination) => (

@@ -1,16 +1,17 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock } from "lucide-react";
 import { getCurrentlyOutRecords, updateReturnTime } from "@/lib/supabaseDataManager";
 import { fetchRosterStudents, type RosterStudent } from "@/lib/roster";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
-import StudentNameInput, { type SelectedStudent } from "./StudentNameInput";
+import StudentNameInput, { type SelectedStudent, type StudentNameInputRef } from "./StudentNameInput";
 import PeriodDestinationSelects from "./PeriodDestinationSelects";
 import UnknownOverrideDialog from "./UnknownOverrideDialog";
 import { useStudentSignOut } from "@/hooks/useStudentSignOut";
 import { useToast } from "@/hooks/use-toast";
+import { PERIOD_OPTIONS } from "@/constants/formOptions";
 
 interface StudentSignOutFormProps {
   onSignOut: (studentRecord: {
@@ -29,6 +30,8 @@ interface StudentRecord {
   destination: string;
 }
 
+const STUDENT_SIGN_OUT_STORAGE_KEY = "hp:lastSelectedPeriod";
+
 const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormProps) => {
   const [selectedStudent, setSelectedStudent] = useState<SelectedStudent | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState("");
@@ -42,12 +45,43 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   const [showOverrideDialog, setShowOverrideDialog] = useState(false);
   const [overrideRawName, setOverrideRawName] = useState("");
   
+  // Ref for auto-focusing student name input
+  const studentNameInputRef = useRef<StudentNameInputRef>(null);
+  
   const { toast } = useToast();
 
   const { isSubmitting, handleSubmit } = useStudentSignOut({
     onSignOut,
     onEarlyDismissal
   });
+
+  // Load last selected period from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedPeriod = localStorage.getItem(STUDENT_SIGN_OUT_STORAGE_KEY);
+      if (savedPeriod) {
+        // Validate that the saved period is in the valid options
+        const isValidPeriod = PERIOD_OPTIONS.some(opt => opt.value === savedPeriod);
+        if (isValidPeriod) {
+          setSelectedPeriod(savedPeriod);
+        }
+      }
+    } catch (error) {
+      // localStorage may not be available (e.g., in private mode)
+      console.warn("Could not load saved period from localStorage:", error);
+    }
+  }, []);
+
+  // Save period to localStorage when it changes
+  useEffect(() => {
+    if (selectedPeriod) {
+      try {
+        localStorage.setItem(STUDENT_SIGN_OUT_STORAGE_KEY, selectedPeriod);
+      } catch (error) {
+        console.warn("Could not save period to localStorage:", error);
+      }
+    }
+  }, [selectedPeriod]);
 
   // Load roster when period changes (or on mount if period is already selected)
   useEffect(() => {
@@ -80,8 +114,22 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   useEffect(() => {
     if (selectedPeriod) {
       setSelectedStudent(null);
+      setSelectedDestination("");
     }
   }, [selectedPeriod]);
+
+  // Auto-focus student name input when period is selected and roster is loaded
+  useEffect(() => {
+    if (selectedPeriod && !rosterLoading && students.length > 0) {
+      // Small delay to ensure the input is rendered and enabled
+      const timer = setTimeout(() => {
+        if (studentNameInputRef.current) {
+          studentNameInputRef.current.focus();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedPeriod, rosterLoading, students.length]);
 
   const loadCurrentlyOutStudents = async () => {
     const records = await getCurrentlyOutRecords();
@@ -218,23 +266,23 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
           {rosterLoading && selectedPeriod && (
             <div className="text-sm text-gray-500">Loading roster...</div>
           )}
-          {!selectedPeriod && (
-            <div className="text-sm text-amber-600">Please select a period first to load the student roster.</div>
-          )}
-          <StudentNameInput
-            students={students.map(s => ({ id: s.id, name: s.name, firstName: s.firstName, lastName: s.lastName }))}
-            selectedStudent={selectedStudent}
-            onStudentSelect={setSelectedStudent}
-            onKeyDown={handleKeyDown}
-            onTeacherOverride={handleTeacherOverride}
-          />
-
+          
           <PeriodDestinationSelects
             selectedPeriod={selectedPeriod}
             selectedDestination={selectedDestination}
             onPeriodChange={setSelectedPeriod}
             onDestinationChange={setSelectedDestination}
             onKeyDown={handleKeyDown}
+          />
+
+          <StudentNameInput
+            ref={studentNameInputRef}
+            students={students.map(s => ({ id: s.id, name: s.name, firstName: s.firstName, lastName: s.lastName }))}
+            selectedStudent={selectedStudent}
+            onStudentSelect={setSelectedStudent}
+            onKeyDown={handleKeyDown}
+            onTeacherOverride={handleTeacherOverride}
+            disabled={!selectedPeriod}
           />
 
           <Button 
