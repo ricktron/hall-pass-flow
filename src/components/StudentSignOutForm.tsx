@@ -60,6 +60,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
       
       setRosterLoading(true);
       try {
+        // fetchRosterStudents calls hp_get_roster RPC internally
         const studentList = await fetchRosterStudents({
           period: selectedPeriod,
           // Course is optional - if not provided, returns all students for the period

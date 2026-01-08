@@ -9,6 +9,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { fetchStudents, type Student } from "@/lib/studentsRepository";
+import { hpGetRoster, type HpRosterRow } from "@/lib/hpRosterRpc";
+import { CURRENT_SCHOOL_YEAR, CURRENT_SEMESTER } from "@/lib/academicContext";
 
 export interface AcademicContext {
   schoolYear: string;
@@ -29,7 +31,7 @@ export interface RosterStudent {
 }
 
 export interface RosterMetadata {
-  source: 'enrollments' | 'legacy';
+  source: 'supabase_rpc' | 'legacy';
   reason?: string; // Only present when source is 'legacy'
   errorCode?: string; // Only present when fallback due to error
   errorStatus?: number; // Only present when fallback due to error
@@ -53,15 +55,49 @@ export function getAcademicContext(): AcademicContext {
     import.meta.env.VITE_SCHOOL_YEAR ||
     import.meta.env.NEXT_PUBLIC_SCHOOL_YEAR ||
     import.meta.env.REACT_APP_SCHOOL_YEAR ||
-    "2025-2026";
+    CURRENT_SCHOOL_YEAR;
   
   const semester =
     import.meta.env.VITE_SEMESTER ||
     import.meta.env.NEXT_PUBLIC_SEMESTER ||
     import.meta.env.REACT_APP_SEMESTER ||
-    "S2";
+    CURRENT_SEMESTER;
   
   return { schoolYear, semester };
+}
+
+/**
+ * Normalizes a period string by removing trailing " Period" (case-insensitive) and trimming whitespace.
+ * 
+ * Examples:
+ * - "A Period" -> "A"
+ * - "B period" -> "B"
+ * - "C" -> "C"
+ * - "House Small Group" -> "House Small Group"
+ * 
+ * @param period - Period string that may include " Period" suffix
+ * @returns Normalized period string (letter or full name without " Period" suffix)
+ */
+export function normalizePeriod(period: string): string {
+  return period.replace(/\s*Period\s*$/i, "").trim();
+}
+
+/**
+ * Maps course codes to full course names used in the database.
+ * If the course is not a known code, returns it unchanged.
+ * 
+ * @param course - Course code (e.g., "ESS", "ECO") or full name
+ * @returns Full course name as stored in database, or original value if not a code
+ */
+function mapCourseCode(course: string | undefined | null): string | null {
+  if (!course) return null;
+  
+  const courseMap: Record<string, string> = {
+    'ESS': 'Earth and Space',
+    'ECO': 'Ecology',
+  };
+  
+  return courseMap[course.toUpperCase()] || course;
 }
 
 interface EnrollmentError {
@@ -71,9 +107,8 @@ interface EnrollmentError {
 }
 
 /**
- * Fetches students from student_enrollments table (preferred path).
- * Queries enrollments filtered by school_year, semester, course (optional), and period.
- * Then fetches user details (id, name, email) for the enrolled students.
+ * Fetches students from student_enrollments table via RPC (preferred path).
+ * Uses hp_get_roster RPC function which bypasses RLS safely.
  * 
  * Returns null if query fails or table doesn't exist (safe fallback).
  */
@@ -82,91 +117,61 @@ async function fetchFromEnrollments(
   filter: RosterFilter
 ): Promise<{ students: RosterStudent[] | null; error?: EnrollmentError }> {
   try {
-    // Build query for student_enrollments
-    // Note: student_enrollments may not be in generated types yet, so we use type assertion
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let query = (supabase as any)
-      .from("student_enrollments")
-      .select("student_id")
-      .eq("school_year", context.schoolYear)
-      .eq("semester", context.semester)
-      .eq("period", filter.period);
+    // Normalize period before querying (RPC will also normalize, but we do it here for logging)
+    const normalizedPeriod = normalizePeriod(filter.period);
     
-    // Add course filter if provided
-    if (filter.course) {
-      query = query.eq("course", filter.course);
-    }
+    // Map course code to full name if needed (e.g., "ESS" -> "Earth and Space")
+    const mappedCourse = mapCourseCode(filter.course);
     
-    const { data: enrollments, error: enrollError } = await query;
-    
-    if (enrollError) {
-      // RLS blocked, table doesn't exist, or other error - fallback
-      const errorCode = enrollError.code || "unknown";
-      const errorStatus = (enrollError as EnrollmentError).status;
-      const isRLSBlocked = errorCode === "PGRST301" || errorStatus === 401 || errorStatus === 403;
-      
-      if (import.meta.env.DEV) {
-        console.warn(
-          `[roster] student_enrollments query failed for ${context.schoolYear}/${context.semester}/${filter.period}:`,
-          enrollError.message,
-          `| Code: ${errorCode}, Status: ${errorStatus || "unknown"}`,
-          `| ${isRLSBlocked ? "RLS blocked - check authenticated role" : "Other error - falling back"}`
-        );
+    // Debug logging: log inputs after normalization
+    console.debug(
+      `[roster] Calling hp_get_roster RPC:`,
+      {
+        inputs: {
+          school_year: context.schoolYear,
+          semester: context.semester,
+          period: filter.period,
+          course: filter.course || null
+        },
+        normalized: {
+          period: normalizedPeriod,
+          course: mappedCourse
+        }
       }
-      return { 
-        students: null, 
-        error: { code: errorCode, status: errorStatus, message: enrollError.message } 
-      };
-    }
+    );
     
-    if (!enrollments || enrollments.length === 0) {
-      // No enrollments found for this filter - fallback
+    // Call RPC function via wrapper (RLS-safe, works for anon role)
+    // Pass normalized period for consistency (RPC also normalizes internally)
+    const rosterRows = await hpGetRoster(supabase, {
+      schoolYear: context.schoolYear,
+      semester: context.semester,
+      period: normalizedPeriod,
+      course: mappedCourse
+    });
+    
+    if (!rosterRows || rosterRows.length === 0) {
+      // No enrollments found for this filter - return null to allow fallback logic
       if (import.meta.env.DEV) {
         console.warn(
-          `[roster] No enrollments found for ${context.schoolYear}/${context.semester}/${filter.period}${filter.course ? `/${filter.course}` : ""} - falling back to legacy roster`
+          `[roster] No enrollments found for ${context.schoolYear}/${context.semester}/${normalizedPeriod}${filter.course ? `/${filter.course}` : ""} - RPC returned 0 rows`
         );
       }
       return { students: null };
     }
     
-    // Extract unique student IDs
-    const studentIds = [...new Set(
-      (enrollments as Array<{ student_id: string }>).map((e) => e.student_id)
-    )] as string[];
-    
-    if (studentIds.length === 0) {
-      return { students: null };
-    }
-    
-    // Fetch user details for enrolled students
-    const { data: users, error: usersError } = await supabase
-      .from("users")
-      .select("id, first_name, last_name, email")
-      .in("id", studentIds)
-      .eq("role", "student");
-    
-    if (usersError) {
-      if (import.meta.env.DEV) {
-        console.warn("[roster] Failed to fetch user details:", usersError.message);
-      }
-      return { 
-        students: null, 
-        error: { code: usersError.code, message: usersError.message } 
-      };
-    }
-    
-    if (!users || users.length === 0) {
-      return { students: null };
-    }
-    
-    // Map to RosterStudent format, sorted by name
-    const rosterStudents: RosterStudent[] = users
-      .map((user) => ({
-        id: user.id,
-        name: `${user.first_name} ${user.last_name}`,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        email: user.email,
+    // Map RPC results to RosterStudent format
+    // RPC returns: student_id, first_name, last_name, preferred_first_name, display_name, period, course
+    const rosterStudents: RosterStudent[] = rosterRows
+      .map((row: HpRosterRow) => ({
+        id: row.student_id,
+        // Use display_name from RPC (which includes preferred_first_name logic)
+        name: row.display_name || `${row.first_name} ${row.last_name}`,
+        // Use preferred_first_name for firstName (nickname if available, else first_name)
+        // Fallback to first_name if preferred_first_name is null
+        firstName: row.preferred_first_name || row.first_name,
+        lastName: row.last_name,
+        // Email not returned by RPC for privacy, but we can fetch it if needed later
+        email: undefined,
       }))
       .sort((a, b) => {
         const lastCmp = a.lastName.localeCompare(b.lastName);
@@ -180,18 +185,33 @@ async function fetchFromEnrollments(
     
     if (import.meta.env.DEV) {
       console.log(
-        `[roster] Fetched ${uniqueStudents.length} students from student_enrollments for`,
-        { ...context, ...filter }
+        `[roster] Fetched ${uniqueStudents.length} students from hp_get_roster RPC for`,
+        { ...context, ...filter, row_count: rosterRows.length }
       );
     }
     
     return { students: uniqueStudents };
   } catch (err) {
-    // Unexpected error - fallback
+    // RPC error - log details and fallback
+    const error = err as { code?: string; status?: number; message?: string };
+    const errorCode = error?.code || "unknown";
+    const errorStatus = error?.status;
+    const errorMessage = error?.message || String(err);
+    
     if (import.meta.env.DEV) {
-      console.warn("[roster] Exception in fetchFromEnrollments:", err);
+      console.error(
+        `[roster] hp_get_roster RPC failed for ${context.schoolYear}/${context.semester}/${normalizePeriod(filter.period)}:`,
+        errorMessage,
+        `| Code: ${errorCode}, Status: ${errorStatus || "unknown"}`,
+        `| Error details:`,
+        err
+      );
     }
-    return { students: null };
+    
+    return { 
+      students: null, 
+      error: { code: errorCode, status: errorStatus, message: errorMessage } 
+    };
   }
 }
 
@@ -210,8 +230,11 @@ function convertLegacyStudents(students: Student[]): RosterStudent[] {
 /**
  * Fetches roster students for a given course and period with metadata.
  * 
- * Preferred path: student_enrollments table (filtered by school_year, semester, course, period)
- * Fallback path: legacy fetchStudents() (all students, no filtering)
+ * Primary path: hp_get_roster RPC (filtered by school_year, semester, course, period)
+ * 
+ * Fallback behavior:
+ * - For S2: NEVER falls back to legacy, even on RPC errors. Returns empty array with RPC source metadata.
+ * - For non-S2: Falls back to legacy fetchStudents() ONLY if RPC throws an error (not if it returns empty).
  * 
  * If course is not provided, returns all students enrolled in the period across all courses.
  * 
@@ -223,68 +246,131 @@ export async function fetchRosterStudentsWithMeta(
 ): Promise<RosterResult> {
   const context = getAcademicContext();
   
-  // Try preferred path: student_enrollments
-  const enrollmentResult = await fetchFromEnrollments(context, filter);
+  // Normalize period at entry point for defense in depth
+  const normalizedFilter: RosterFilter = {
+    ...filter,
+    period: normalizePeriod(filter.period)
+  };
   
+  // Try preferred path: student_enrollments
+  const enrollmentResult = await fetchFromEnrollments(context, normalizedFilter);
+  
+  // If RPC returned students, use them (regardless of semester)
   if (enrollmentResult.students && enrollmentResult.students.length > 0) {
+    // Debug logging: log successful RPC load
+    console.info(`[roster] Roster load strategy: rpc (${enrollmentResult.students.length} students)`);
     return {
       students: enrollmentResult.students,
-      metadata: { source: 'enrollments' }
+      metadata: { source: 'supabase_rpc' }
     };
   }
   
-  // Fallback: legacy roster logic
-  const reason = enrollmentResult.error 
-    ? `RLS or query error (${enrollmentResult.error.code || 'unknown'})`
-    : 'No enrollments found for this period';
-  
-  if (import.meta.env.DEV) {
-    console.warn(
-      "[roster] Using fallback roster (legacy fetchStudents). Reason:",
-      reason
-    );
-  }
-  
-  try {
-    const legacyStudents = await fetchStudents();
-    const converted = convertLegacyStudents(legacyStudents);
+  // For S2: NEVER fall back to legacy, even on RPC errors
+  // Return empty result with RPC source metadata
+  if (context.semester === 'S2') {
+    const reason = enrollmentResult.error
+      ? `RPC error (${enrollmentResult.error.code || 'unknown'}): ${enrollmentResult.error.message || 'Unknown error'}`
+      : `No students found for ${context.schoolYear}/${context.semester}/${normalizedFilter.period}${normalizedFilter.course ? `/${normalizedFilter.course}` : ''}`;
     
-    // If course filter was provided, we can't filter legacy students by course,
-    // so we return all students (period filter is handled at UI level if needed)
-    if (import.meta.env.DEV && filter.course) {
+    if (import.meta.env.DEV) {
       console.warn(
-        "[roster] Course filter",
-        filter.course,
-        "ignored in fallback mode (legacy roster doesn't support course filtering)"
+        `[roster] S2 roster: RPC ${enrollmentResult.error ? 'error' : 'returned 0 students'} - NOT using legacy fallback`,
+        {
+          schoolYear: context.schoolYear,
+          semester: context.semester,
+          period: normalizedFilter.period,
+          course: normalizedFilter.course || null,
+          error: enrollmentResult.error
+        }
       );
     }
     
+    // Debug logging: log RPC result (error or empty) for S2
+    console.info(`[roster] Roster load strategy: rpc (S2, ${enrollmentResult.error ? 'error' : '0 students'}, no legacy fallback)`);
+    
     return {
-      students: converted,
+      students: [],
       metadata: {
-        source: 'legacy',
+        source: 'supabase_rpc',
         reason,
         errorCode: enrollmentResult.error?.code,
         errorStatus: enrollmentResult.error?.status
       }
     };
-  } catch (err) {
-    console.error("[roster] Fallback roster fetch failed:", err);
-    return {
-      students: [],
-      metadata: {
-        source: 'legacy',
-        reason: 'Fallback fetch failed'
-      }
-    };
   }
+  
+  // For non-S2: Fall back to legacy only if RPC throws an error (not if it returns empty)
+  if (enrollmentResult.error) {
+    const reason = `RPC error (${enrollmentResult.error.code || 'unknown'}): ${enrollmentResult.error.message || 'Unknown error'}`;
+    
+    // Debug logging: log legacy fallback for non-S2
+    console.info(`[roster] Roster load strategy: legacy (non-S2, reason: ${reason})`);
+    
+    if (import.meta.env.DEV) {
+      console.warn(
+        "[roster] Using fallback roster (legacy fetchStudents) for non-S2. Reason:",
+        reason
+      );
+    }
+    
+    try {
+      const legacyStudents = await fetchStudents();
+      const converted = convertLegacyStudents(legacyStudents);
+      
+      // If course filter was provided, we can't filter legacy students by course,
+      // so we return all students (period filter is handled at UI level if needed)
+      if (import.meta.env.DEV && normalizedFilter.course) {
+        console.warn(
+          "[roster] Course filter",
+          normalizedFilter.course,
+          "ignored in fallback mode (legacy roster doesn't support course filtering)"
+        );
+      }
+      
+      return {
+        students: converted,
+        metadata: {
+          source: 'legacy',
+          reason,
+          errorCode: enrollmentResult.error.code,
+          errorStatus: enrollmentResult.error.status
+        }
+      };
+    } catch (err) {
+      console.error("[roster] Fallback roster fetch failed:", err);
+      return {
+        students: [],
+        metadata: {
+          source: 'legacy',
+          reason: 'Fallback fetch failed'
+        }
+      };
+    }
+  }
+  
+  // For non-S2: RPC returned empty (no error) - return empty with RPC source
+  if (import.meta.env.DEV) {
+    console.warn(
+      `[roster] RPC returned 0 students for non-S2 ${context.schoolYear}/${normalizedFilter.period} - returning empty (no legacy fallback for empty results)`
+    );
+  }
+  
+  console.info(`[roster] Roster load strategy: rpc (non-S2, 0 students, no error)`);
+  
+  return {
+    students: [],
+    metadata: {
+      source: 'supabase_rpc',
+      reason: `No students found for ${context.schoolYear}/${context.semester}/${normalizedFilter.period}${normalizedFilter.course ? `/${normalizedFilter.course}` : ''}`
+    }
+  };
 }
 
 /**
  * Fetches roster students for a given course and period.
  * 
- * Preferred path: student_enrollments table (filtered by school_year, semester, course, period)
- * Fallback path: legacy fetchStudents() (all students, no filtering)
+ * Preferred path: hp_get_roster RPC (filtered by school_year, semester, course, period)
+ * Fallback path: legacy fetchStudents() (all students, no filtering) - only for non-S2 or RPC errors
  * 
  * If course is not provided, returns all students enrolled in the period across all courses.
  * 
@@ -294,7 +380,79 @@ export async function fetchRosterStudentsWithMeta(
 export async function fetchRosterStudents(
   filter: RosterFilter
 ): Promise<RosterStudent[]> {
-  const result = await fetchRosterStudentsWithMeta(filter);
+  // Normalize period at entry point (fetchRosterStudentsWithMeta also normalizes, but this ensures consistency)
+  const normalizedFilter: RosterFilter = {
+    ...filter,
+    period: normalizePeriod(filter.period)
+  };
+  const result = await fetchRosterStudentsWithMeta(normalizedFilter);
   return result.students;
+}
+
+/**
+ * Dev-only smoke test helper for hp_get_roster RPC.
+ * 
+ * Usage (in browser console):
+ *   import { smokeTestRosterRpc } from '@/lib/roster';
+ *   await smokeTestRosterRpc();
+ * 
+ * Or call from a dev page/component.
+ * 
+ * This function is only available in development builds.
+ */
+export async function smokeTestRosterRpc(): Promise<void> {
+  if (!import.meta.env.DEV) {
+    console.warn('[smokeTestRosterRpc] This function is only available in development mode');
+    return;
+  }
+  
+  console.log('[smokeTestRosterRpc] Starting smoke test for hp_get_roster RPC...');
+  
+  try {
+    const context = getAcademicContext();
+    const testPeriod = 'A';
+    const testCourse = null;
+    
+    console.log('[smokeTestRosterRpc] Test parameters:', {
+      schoolYear: context.schoolYear,
+      semester: context.semester,
+      period: testPeriod,
+      course: testCourse
+    });
+    
+    const result = await fetchRosterStudentsWithMeta({
+      period: testPeriod,
+      course: testCourse
+    });
+    
+    console.log('[smokeTestRosterRpc] Result:', {
+      source: result.metadata.source,
+      studentCount: result.students.length,
+      firstThreeStudents: result.students.slice(0, 3).map(s => ({
+        id: s.id,
+        displayName: s.name,
+        firstName: s.firstName,
+        lastName: s.lastName
+      })),
+      metadata: result.metadata
+    });
+    
+    if (result.students.length > 0) {
+      console.log('[smokeTestRosterRpc] ✅ SUCCESS: RPC returned', result.students.length, 'students');
+      console.log('[smokeTestRosterRpc] First 3 students:', result.students.slice(0, 3));
+    } else {
+      console.warn('[smokeTestRosterRpc] ⚠️ WARNING: RPC returned 0 students');
+    }
+    
+    // Assert that we got data (non-blocking)
+    if (result.students.length === 0) {
+      console.error('[smokeTestRosterRpc] ❌ FAILED: Expected at least 1 student, got 0');
+    } else {
+      console.log('[smokeTestRosterRpc] ✅ PASSED: RPC returned', result.students.length, 'students');
+    }
+  } catch (error) {
+    console.error('[smokeTestRosterRpc] ❌ ERROR:', error);
+    throw error;
+  }
 }
 

@@ -16,7 +16,7 @@ import { CLASSROOM_ID } from "@/config/classroom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTodaySignouts, recordDaySignout, type DaySignoutRow } from "@/lib/earlyDismissalRepository";
-import { fetchRosterStudentsWithMeta, getAcademicContext } from "@/lib/roster";
+import { fetchRosterStudentsWithMeta, getAcademicContext, normalizePeriod } from "@/lib/roster";
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
@@ -84,7 +84,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   // Roster health state
   const [rosterHealthOpen, setRosterHealthOpen] = useState(false);
   const [rosterHealthPeriod, setRosterHealthPeriod] = useState<string>("A");
-  const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'enrollments' | 'legacy'; reason?: string } | null>(null);
+  const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'supabase_rpc' | 'legacy'; reason?: string; errorCode?: string; errorStatus?: number } | null>(null);
   const [rosterHealthLoading, setRosterHealthLoading] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
@@ -215,27 +215,67 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const checkRosterHealth = async (period: string) => {
     setRosterHealthLoading(true);
     try {
-      const result = await fetchRosterStudentsWithMeta({ period });
+      // Normalize period before querying (defense-in-depth, though fetchRosterStudentsWithMeta also normalizes)
+      const normalizedPeriod = normalizePeriod(period);
+      const context = getAcademicContext();
+      
+      // Debug logging: log roster health check attempt
+      console.info('[TeacherView] checkRosterHealth: checking roster for period', normalizedPeriod, {
+        schoolYear: context.schoolYear,
+        semester: context.semester
+      });
+      
+      const result = await fetchRosterStudentsWithMeta({ period: normalizedPeriod });
+      
+      // Debug logging: log result
+      console.info('[TeacherView] checkRosterHealth: result', {
+        source: result.metadata.source,
+        studentCount: result.students.length,
+        reason: result.metadata.reason
+      });
+      
       setRosterHealthMetadata({
         source: result.metadata.source,
-        reason: result.metadata.reason
+        reason: result.metadata.reason,
+        errorCode: result.metadata.errorCode,
+        errorStatus: result.metadata.errorStatus
       });
     } catch (error) {
       console.error("Failed to check roster health:", error);
+      const context = getAcademicContext();
+      // For S2, preserve RPC source even on errors (RPC is the primary path)
+      // For non-S2, use legacy as fallback
+      const source = context.semester === 'S2' ? 'supabase_rpc' : 'legacy';
+      const errorDetails = error as { code?: string; status?: number; message?: string };
       setRosterHealthMetadata({
-        source: 'legacy',
-        reason: 'Health check failed'
+        source,
+        reason: errorDetails?.message || 'Health check failed',
+        errorCode: errorDetails?.code,
+        errorStatus: errorDetails?.status
       });
     } finally {
       setRosterHealthLoading(false);
     }
   };
 
+  // Check roster health when section is opened or period changes
   useEffect(() => {
     if (rosterHealthOpen && rosterHealthPeriod) {
       checkRosterHealth(rosterHealthPeriod);
     }
   }, [rosterHealthOpen, rosterHealthPeriod]);
+
+  // Auto-check roster health on dashboard mount (once)
+  useEffect(() => {
+    // Check roster health for default period "A" when dashboard first loads
+    // This ensures the RPC is called and network request is visible in devtools
+    const timer = setTimeout(() => {
+      checkRosterHealth(rosterHealthPeriod);
+    }, 500); // Small delay to avoid blocking initial render
+    
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const handleRecordEarlyDismissal = async () => {
     if (!signoutStudentName.trim()) {
@@ -415,11 +455,11 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                       </div>
                       {rosterHealthMetadata && (
                         <div className={`text-xs px-2 py-1 rounded ${
-                          rosterHealthMetadata.source === 'enrollments' 
+                          rosterHealthMetadata.source === 'supabase_rpc' 
                             ? 'bg-green-100 text-green-700' 
                             : 'bg-amber-100 text-amber-700'
                         }`}>
-                          {rosterHealthMetadata.source === 'enrollments' ? '✓ Enrollments' : '⚠ Legacy'}
+                          {rosterHealthMetadata.source === 'supabase_rpc' ? '✓ Supabase (RPC)' : '⚠ Legacy'}
                         </div>
                       )}
                     </div>
@@ -440,7 +480,13 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                     
                     <div className="space-y-2">
                       <Label htmlFor="roster-health-period">Check Period</Label>
-                      <Select value={rosterHealthPeriod} onValueChange={setRosterHealthPeriod}>
+                      <Select 
+                        value={rosterHealthPeriod} 
+                        onValueChange={(value) => {
+                          // Normalize period value when selected (defense-in-depth)
+                          setRosterHealthPeriod(normalizePeriod(value));
+                        }}
+                      >
                         <SelectTrigger id="roster-health-period" className="w-48">
                           <SelectValue />
                         </SelectTrigger>
@@ -461,19 +507,54 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-gray-600">Roster Source:</span>
                           <span className={`text-sm font-medium ${
-                            rosterHealthMetadata.source === 'enrollments' 
+                            rosterHealthMetadata.source === 'supabase_rpc' 
                               ? 'text-green-700' 
                               : 'text-amber-700'
                           }`}>
-                            {rosterHealthMetadata.source === 'enrollments' ? 'Enrollments' : 'Legacy Fallback'}
+                            {rosterHealthMetadata.source === 'supabase_rpc' ? 'Supabase (RPC)' : 'Legacy Fallback'}
                           </span>
                         </div>
+                        {rosterHealthMetadata.source === 'supabase_rpc' && rosterHealthMetadata.reason && (
+                          <div className={`p-2 border rounded-md ${
+                            rosterHealthMetadata.errorCode
+                              ? 'bg-red-50 border-red-200'
+                              : 'bg-blue-50 border-blue-200'
+                          }`}>
+                            <p className={`text-xs font-medium mb-1 ${
+                              rosterHealthMetadata.errorCode
+                                ? 'text-red-800'
+                                : 'text-blue-800'
+                            }`}>
+                              {rosterHealthMetadata.errorCode ? 'RPC Error:' : 'Info:'} {rosterHealthMetadata.reason}
+                            </p>
+                            {rosterHealthMetadata.errorCode && (
+                              <p className="text-xs text-red-700">
+                                Error Code: {rosterHealthMetadata.errorCode}
+                                {rosterHealthMetadata.errorStatus && ` (Status: ${rosterHealthMetadata.errorStatus})`}
+                              </p>
+                            )}
+                            {!rosterHealthMetadata.errorCode && (
+                              <p className="text-xs text-blue-700 mt-1">
+                                Query: {getAcademicContext().schoolYear}/{getAcademicContext().semester}/{rosterHealthPeriod}
+                              </p>
+                            )}
+                          </div>
+                        )}
                         {rosterHealthMetadata.source === 'legacy' && rosterHealthMetadata.reason && (
                           <div className="p-2 bg-amber-50 border border-amber-200 rounded-md">
-                            <p className="text-xs text-amber-800">
+                            <p className="text-xs text-amber-800 font-medium mb-1">
+                              Reason: {rosterHealthMetadata.reason}
+                            </p>
+                            {rosterHealthMetadata.errorCode && (
+                              <p className="text-xs text-amber-700">
+                                Error Code: {rosterHealthMetadata.errorCode}
+                                {rosterHealthMetadata.errorStatus && ` (Status: ${rosterHealthMetadata.errorStatus})`}
+                              </p>
+                            )}
+                            <p className="text-xs text-amber-700 mt-1">
                               {rosterHealthMetadata.reason.includes('RLS') || rosterHealthMetadata.reason.includes('error')
-                                ? 'Enrollments unavailable or empty. Check RLS/policies or roster sync.'
-                                : 'Enrollments unavailable or empty. Check RLS/policies or roster sync.'}
+                                ? 'Check RPC function permissions or roster data sync.'
+                                : 'Verify enrollments exist in database for this period.'}
                             </p>
                           </div>
                         )}
