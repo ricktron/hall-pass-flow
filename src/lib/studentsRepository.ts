@@ -8,6 +8,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { getAcademicContext, normalizePeriod } from "@/lib/roster";
+import { hpGetRoster, type HpRosterRow } from "@/lib/hpRosterRpc";
+import { CURRENT_SCHOOL_YEAR, CURRENT_SEMESTER } from "@/lib/academicContext";
 
 export interface Student {
   /** The UUID from users table - required for bathroom_passes.student_id FK */
@@ -58,6 +60,70 @@ async function fetchFromUsersWithRole(): Promise<Student[] | null> {
 }
 
 /**
+ * Maps RPC roster rows to Student format.
+ */
+function mapRosterRowsToStudents(rosterRows: HpRosterRow[]): Student[] {
+  return rosterRows.map((row) => ({
+    id: row.student_id,
+    name: row.display_name || `${row.first_name} ${row.last_name}`,
+    firstName: row.preferred_first_name || row.first_name,
+    lastName: row.last_name,
+  }));
+}
+
+/**
+ * Fetches students for a specific period via RPC.
+ * This is the preferred method for S2 rosters as it bypasses RLS safely.
+ * 
+ * @param period - Period code (e.g., "A", "B") - will be normalized
+ * @param course - Optional course filter
+ * @returns Array of students for the period, or empty array if none found
+ */
+export async function fetchStudentsForPeriod(
+  period: string,
+  course?: string | null
+): Promise<Student[]> {
+  try {
+    const context = getAcademicContext();
+    const normalizedPeriod = normalizePeriod(period);
+    
+    const rosterRows = await hpGetRoster(supabase, {
+      schoolYear: context.schoolYear,
+      semester: context.semester,
+      period: normalizedPeriod,
+      course: course ?? null
+    });
+    
+    if (!rosterRows || rosterRows.length === 0) {
+      return [];
+    }
+    
+    const students = mapRosterRowsToStudents(rosterRows);
+    // Sort by last name, then first name
+    students.sort((a, b) => {
+      const lastCmp = a.lastName.localeCompare(b.lastName);
+      return lastCmp !== 0 ? lastCmp : a.firstName.localeCompare(b.firstName);
+    });
+    
+    // Remove duplicates by ID (defensive)
+    const uniqueStudents = Array.from(
+      new Map(students.map((s) => [s.id, s])).values()
+    );
+    
+    if (import.meta.env.DEV) {
+      console.log(`[studentsRepository] fetchStudentsForPeriod succeeded with ${uniqueStudents.length} students for period ${normalizedPeriod}`);
+    }
+    
+    return uniqueStudents;
+  } catch (err) {
+    if (import.meta.env.DEV) {
+      console.error(`[studentsRepository] fetchStudentsForPeriod failed for period ${period}:`, err);
+    }
+    return [];
+  }
+}
+
+/**
  * RPC-first strategy: fetch students via hp_get_roster RPC.
  * This is the preferred method for S2 rosters as it bypasses RLS safely.
  * Tries common periods (A, B, D, E, H) to get a representative sample.
@@ -70,33 +136,30 @@ async function fetchFromRpc(): Promise<Student[] | null> {
     const allStudents = new Map<string, Student>();
     
     for (const period of commonPeriods) {
-      const { data: rosterRows, error: rpcError } = await supabase.rpc('hp_get_roster', {
-        p_school_year: context.schoolYear,
-        p_semester: context.semester,
-        p_period: period,
-        p_course: null // Get all courses for the period
-      });
-      
-      if (rpcError) {
+      try {
+        const rosterRows = await hpGetRoster(supabase, {
+          schoolYear: context.schoolYear,
+          semester: context.semester,
+          period: period,
+          course: null // Get all courses for the period
+        });
+        
+        if (rosterRows && rosterRows.length > 0) {
+          // Map RPC results to Student format
+          const periodStudents = mapRosterRowsToStudents(rosterRows);
+          for (const student of periodStudents) {
+            if (!allStudents.has(student.id)) {
+              allStudents.set(student.id, student);
+            }
+          }
+        }
+      } catch (rpcError) {
         if (import.meta.env.DEV) {
-          console.warn(`[studentsRepository] RPC failed for period ${period}:`, rpcError.message);
+          const error = rpcError as { message?: string };
+          console.warn(`[studentsRepository] RPC failed for period ${period}:`, error?.message || String(rpcError));
         }
         // Continue to next period
         continue;
-      }
-      
-      if (rosterRows && rosterRows.length > 0) {
-        // Map RPC results to Student format
-        for (const row of rosterRows) {
-          if (!allStudents.has(row.student_id)) {
-            allStudents.set(row.student_id, {
-              id: row.student_id,
-              name: row.display_name,
-              firstName: row.preferred_first_name,
-              lastName: row.last_name,
-            });
-          }
-        }
       }
     }
     

@@ -9,6 +9,8 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { fetchStudents, type Student } from "@/lib/studentsRepository";
+import { hpGetRoster, type HpRosterRow } from "@/lib/hpRosterRpc";
+import { CURRENT_SCHOOL_YEAR, CURRENT_SEMESTER } from "@/lib/academicContext";
 
 export interface AcademicContext {
   schoolYear: string;
@@ -53,13 +55,13 @@ export function getAcademicContext(): AcademicContext {
     import.meta.env.VITE_SCHOOL_YEAR ||
     import.meta.env.NEXT_PUBLIC_SCHOOL_YEAR ||
     import.meta.env.REACT_APP_SCHOOL_YEAR ||
-    "2025-2026";
+    CURRENT_SCHOOL_YEAR;
   
   const semester =
     import.meta.env.VITE_SEMESTER ||
     import.meta.env.NEXT_PUBLIC_SEMESTER ||
     import.meta.env.REACT_APP_SEMESTER ||
-    "S2";
+    CURRENT_SEMESTER;
   
   return { schoolYear, semester };
 }
@@ -136,34 +138,14 @@ async function fetchFromEnrollments(
       );
     }
     
-    // Call RPC function (RLS-safe, works for anon role)
+    // Call RPC function via wrapper (RLS-safe, works for anon role)
     // Pass normalized period for consistency (RPC also normalizes internally)
-    const { data: rosterRows, error: rpcError } = await supabase.rpc('hp_get_roster', {
-      p_school_year: context.schoolYear,
-      p_semester: context.semester,
-      p_period: normalizedPeriod, // Pass normalized period for consistency
-      p_course: mappedCourse
+    const rosterRows = await hpGetRoster(supabase, {
+      schoolYear: context.schoolYear,
+      semester: context.semester,
+      period: normalizedPeriod,
+      course: mappedCourse
     });
-    
-    if (rpcError) {
-      // RPC error - log details and fallback
-      const errorCode = rpcError.code || "unknown";
-      const errorStatus = (rpcError as EnrollmentError).status;
-      
-      if (import.meta.env.DEV) {
-        console.error(
-          `[roster] hp_get_roster RPC failed for ${context.schoolYear}/${context.semester}/${normalizedPeriod}:`,
-          rpcError.message,
-          `| Code: ${errorCode}, Status: ${errorStatus || "unknown"}`,
-          `| Error details:`,
-          rpcError
-        );
-      }
-      return { 
-        students: null, 
-        error: { code: errorCode, status: errorStatus, message: rpcError.message } 
-      };
-    }
     
     if (!rosterRows || rosterRows.length === 0) {
       // No enrollments found for this filter - fallback
@@ -178,20 +160,13 @@ async function fetchFromEnrollments(
     // Map RPC results to RosterStudent format
     // RPC returns: student_id, first_name, last_name, preferred_first_name, display_name, period, course
     const rosterStudents: RosterStudent[] = rosterRows
-      .map((row: {
-        student_id: string;
-        first_name: string;
-        last_name: string;
-        preferred_first_name: string;
-        display_name: string;
-        period: string;
-        course: string;
-      }) => ({
+      .map((row: HpRosterRow) => ({
         id: row.student_id,
         // Use display_name from RPC (which includes preferred_first_name logic)
-        name: row.display_name,
+        name: row.display_name || `${row.first_name} ${row.last_name}`,
         // Use preferred_first_name for firstName (nickname if available, else first_name)
-        firstName: row.preferred_first_name,
+        // Fallback to first_name if preferred_first_name is null
+        firstName: row.preferred_first_name || row.first_name,
         lastName: row.last_name,
         // Email not returned by RPC for privacy, but we can fetch it if needed later
         email: undefined,
@@ -215,11 +190,26 @@ async function fetchFromEnrollments(
     
     return { students: uniqueStudents };
   } catch (err) {
-    // Unexpected error - fallback
+    // RPC error - log details and fallback
+    const error = err as { code?: string; status?: number; message?: string };
+    const errorCode = error?.code || "unknown";
+    const errorStatus = error?.status;
+    const errorMessage = error?.message || String(err);
+    
     if (import.meta.env.DEV) {
-      console.error("[roster] Exception in fetchFromEnrollments:", err);
+      console.error(
+        `[roster] hp_get_roster RPC failed for ${context.schoolYear}/${context.semester}/${normalizePeriod(filter.period)}:`,
+        errorMessage,
+        `| Code: ${errorCode}, Status: ${errorStatus || "unknown"}`,
+        `| Error details:`,
+        err
+      );
     }
-    return { students: null };
+    
+    return { 
+      students: null, 
+      error: { code: errorCode, status: errorStatus, message: errorMessage } 
+    };
   }
 }
 
