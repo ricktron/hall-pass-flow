@@ -37,13 +37,20 @@ export async function hpGetRoster(
   supabase: SupabaseClient<Database>,
   args: HpRosterArgs
 ): Promise<HpRosterRow[]> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)("hp_get_roster", {
+  // Build RPC payload - omit p_course if course is null/undefined
+  const payload: Record<string, unknown> = {
     p_school_year: args.schoolYear,
     p_semester: args.semester,
     p_period: args.period,
-    p_course: args.course ?? null,
-  });
+  };
+  
+  // Only include p_course if course is provided (not null/undefined)
+  if (args.course != null) {
+    payload.p_course = args.course;
+  }
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)("hp_get_roster", payload);
   if (error) throw error;
   return (data ?? []) as HpRosterRow[];
 }

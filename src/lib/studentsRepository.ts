@@ -131,6 +131,18 @@ export async function fetchStudentsForPeriod(
 async function fetchFromRpc(): Promise<Student[] | null> {
   try {
     const context = getAcademicContext();
+    
+    if (import.meta.env.DEV) {
+      console.log(
+        `[studentsRepository] RPC strategy: attempting to fetch students via hp_get_roster`,
+        {
+          schoolYear: context.schoolYear,
+          semester: context.semester,
+          periods: ['A', 'B', 'D', 'E', 'H']
+        }
+      );
+    }
+    
     // Try common periods to get students (RPC requires period parameter)
     const commonPeriods = ['A', 'B', 'D', 'E', 'H'];
     const allStudents = new Map<string, Student>();
@@ -141,7 +153,7 @@ async function fetchFromRpc(): Promise<Student[] | null> {
           schoolYear: context.schoolYear,
           semester: context.semester,
           period: period,
-          course: null // Get all courses for the period
+          course: null // Get all courses for the period (omitted in RPC call)
         });
         
         if (rosterRows && rosterRows.length > 0) {
@@ -152,11 +164,21 @@ async function fetchFromRpc(): Promise<Student[] | null> {
               allStudents.set(student.id, student);
             }
           }
+          
+          if (import.meta.env.DEV) {
+            console.log(
+              `[studentsRepository] RPC strategy: period ${period} returned ${rosterRows.length} rows, ${periodStudents.length} students (${allStudents.size} unique total)`
+            );
+          }
+        } else {
+          if (import.meta.env.DEV) {
+            console.log(`[studentsRepository] RPC strategy: period ${period} returned 0 rows`);
+          }
         }
       } catch (rpcError) {
         if (import.meta.env.DEV) {
           const error = rpcError as { message?: string };
-          console.warn(`[studentsRepository] RPC failed for period ${period}:`, error?.message || String(rpcError));
+          console.warn(`[studentsRepository] RPC strategy: period ${period} failed:`, error?.message || String(rpcError));
         }
         // Continue to next period
         continue;
@@ -172,11 +194,27 @@ async function fetchFromRpc(): Promise<Student[] | null> {
       });
       
       if (import.meta.env.DEV) {
-        console.log(`[studentsRepository] RPC strategy succeeded with ${students.length} unique students`);
+        console.log(
+          `[studentsRepository] RPC strategy succeeded: ${students.length} unique students returned`,
+          {
+            schoolYear: context.schoolYear,
+            semester: context.semester,
+            strategy: 'hp_get_roster RPC'
+          }
+        );
       }
       return students;
     }
     
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[studentsRepository] RPC strategy: no students found across all periods`,
+        {
+          schoolYear: context.schoolYear,
+          semester: context.semester
+        }
+      );
+    }
     return null;
   } catch (err) {
     if (import.meta.env.DEV) {
@@ -240,39 +278,100 @@ async function fetchFromStudentsJoinUsers(): Promise<Student[] | null> {
  * Returns sorted by last name, then first name.
  */
 export async function fetchStudents(): Promise<Student[]> {
+  const context = getAcademicContext();
+  
   try {
     // Strategy 1: RPC-first (preferred for S2 rosters)
+    if (import.meta.env.DEV) {
+      console.log(
+        `[studentsRepository] fetchStudents: starting with RPC strategy`,
+        {
+          schoolYear: context.schoolYear,
+          semester: context.semester
+        }
+      );
+    }
+    
     const rpcResult = await fetchFromRpc();
     if (rpcResult && rpcResult.length > 0) {
       if (import.meta.env.DEV) {
-        console.log(`[studentsRepository] RPC strategy succeeded with ${rpcResult.length} students`);
+        console.log(
+          `[studentsRepository] fetchStudents: RPC strategy succeeded`,
+          {
+            strategy: 'hp_get_roster RPC',
+            studentCount: rpcResult.length,
+            schoolYear: context.schoolYear,
+            semester: context.semester
+          }
+        );
       }
       return rpcResult;
     }
     
     if (import.meta.env.DEV) {
-      console.warn("[studentsRepository] RPC strategy returned no students, attempting primary query");
+      console.warn(
+        "[studentsRepository] fetchStudents: RPC strategy returned no students, attempting primary query",
+        {
+          schoolYear: context.schoolYear,
+          semester: context.semester
+        }
+      );
     }
 
     // Strategy 2: Primary query
     const primaryResult = await fetchFromUsersWithRole();
     if (primaryResult && primaryResult.length > 0) {
+      if (import.meta.env.DEV) {
+        console.log(
+          `[studentsRepository] fetchStudents: primary query succeeded`,
+          {
+            strategy: 'users.role=student',
+            studentCount: primaryResult.length
+          }
+        );
+      }
       return primaryResult;
     }
 
     // Strategy 3: Fallback: students join users
     if (import.meta.env.DEV) {
-      console.warn("[studentsRepository] Primary query returned no students, attempting fallback via students table");
+      console.warn(
+        "[studentsRepository] fetchStudents: primary query returned no students, attempting fallback via students table"
+      );
     }
     const fallbackResult = await fetchFromStudentsJoinUsers();
     if (fallbackResult && fallbackResult.length > 0) {
       if (import.meta.env.DEV) {
-        console.warn(`[studentsRepository] Fallback succeeded with ${fallbackResult.length} students`);
+        console.warn(
+          `[studentsRepository] fetchStudents: fallback succeeded`,
+          {
+            strategy: 'students join users',
+            studentCount: fallbackResult.length
+          }
+        );
       }
       return fallbackResult;
     }
 
-    console.warn("[studentsRepository] No students found via any query strategy");
+    // Only warn if we're in S2 and RPC should have worked
+    if (context.semester === 'S2') {
+      console.warn(
+        "[studentsRepository] fetchStudents: No students found via any query strategy (S2 should use RPC)",
+        {
+          schoolYear: context.schoolYear,
+          semester: context.semester,
+          strategiesAttempted: ['hp_get_roster RPC', 'users.role=student', 'students join users']
+        }
+      );
+    } else {
+      console.warn(
+        "[studentsRepository] fetchStudents: No students found via any query strategy",
+        {
+          schoolYear: context.schoolYear,
+          semester: context.semester
+        }
+      );
+    }
     return [];
   } catch (err) {
     console.error("[studentsRepository] fetchStudents exception:", err);

@@ -84,7 +84,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   // Roster health state
   const [rosterHealthOpen, setRosterHealthOpen] = useState(false);
   const [rosterHealthPeriod, setRosterHealthPeriod] = useState<string>("A");
-  const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'enrollments' | 'legacy'; reason?: string; errorCode?: string; errorStatus?: number } | null>(null);
+  const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'supabase_rpc' | 'legacy'; reason?: string; errorCode?: string; errorStatus?: number } | null>(null);
   const [rosterHealthLoading, setRosterHealthLoading] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
@@ -419,11 +419,11 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                       </div>
                       {rosterHealthMetadata && (
                         <div className={`text-xs px-2 py-1 rounded ${
-                          rosterHealthMetadata.source === 'enrollments' 
+                          rosterHealthMetadata.source === 'supabase_rpc' 
                             ? 'bg-green-100 text-green-700' 
                             : 'bg-amber-100 text-amber-700'
                         }`}>
-                          {rosterHealthMetadata.source === 'enrollments' ? '✓ Enrollments' : '⚠ Legacy'}
+                          {rosterHealthMetadata.source === 'supabase_rpc' ? '✓ Supabase (RPC)' : '⚠ Legacy'}
                         </div>
                       )}
                     </div>
@@ -471,11 +471,11 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-gray-600">Roster Source:</span>
                           <span className={`text-sm font-medium ${
-                            rosterHealthMetadata.source === 'enrollments' 
+                            rosterHealthMetadata.source === 'supabase_rpc' 
                               ? 'text-green-700' 
                               : 'text-amber-700'
                           }`}>
-                            {rosterHealthMetadata.source === 'enrollments' ? 'Supabase (RPC)' : 'Legacy Fallback'}
+                            {rosterHealthMetadata.source === 'supabase_rpc' ? 'Supabase (RPC)' : 'Legacy Fallback'}
                           </span>
                         </div>
                         {rosterHealthMetadata.source === 'legacy' && rosterHealthMetadata.reason && (
