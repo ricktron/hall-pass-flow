@@ -148,13 +148,20 @@ const Index = () => {
             </Card>
           </div>
 
-          <div className="w-full">
+          <div className="w-full space-y-3">
             <Button 
               variant="outline" 
               className="w-full py-3 text-lg"
               onClick={() => window.location.href = '/sign-in'}
             >
               Sign In to Class (Late Arrival)
+            </Button>
+            <Button 
+              variant="outline" 
+              className="w-full py-3 text-lg"
+              onClick={() => window.location.href = '/early-exit'}
+            >
+              Leaving Class Early (No Return)
             </Button>
           </div>
         </div>

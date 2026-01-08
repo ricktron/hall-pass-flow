@@ -1,10 +1,11 @@
 
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { AlertCircle } from "lucide-react";
 import type { Student } from "@/lib/studentsRepository";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface SelectedStudent {
   id: string;
@@ -23,6 +24,8 @@ interface StudentNameInputProps {
   onTeacherOverride?: (rawName: string) => void;
   /** Whether the input is disabled */
   disabled?: boolean;
+  /** Current period - used to determine if directory search should be used (House Small Group) */
+  period?: string;
 }
 
 export interface StudentNameInputRef {
@@ -82,13 +85,20 @@ const StudentNameInput = forwardRef<StudentNameInputRef, StudentNameInputProps>(
   onStudentSelect,
   onKeyDown,
   onTeacherOverride,
-  disabled = false
+  disabled = false,
+  period = ""
 }, ref) => {
   const [inputValue, setInputValue] = useState("");
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [directorySearchResults, setDirectorySearchResults] = useState<Student[]>([]);
+  const [directorySearchLoading, setDirectorySearchLoading] = useState(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Check if we should use directory search (House Small Group)
+  const useDirectorySearch = period === "House Small Group";
 
   // Expose focus method via ref
   useImperativeHandle(ref, () => ({
@@ -116,8 +126,86 @@ const StudentNameInput = forwardRef<StudentNameInputRef, StudentNameInputProps>(
     }
   }, [selectedStudent]);
 
-  // Filter students based on input using token-based matching
+  // Directory search function for House Small Group
+  const performDirectorySearch = useCallback(async (searchTerm: string) => {
+    if (searchTerm.trim().length < 2) {
+      setDirectorySearchResults([]);
+      return;
+    }
+
+    setDirectorySearchLoading(true);
+    try {
+      // Query users table for students matching the search term
+      // Search in first_name and last_name
+      const searchLower = searchTerm.toLowerCase();
+      const { data, error } = await supabase
+        .from("users")
+        .select("id, first_name, last_name")
+        .eq("role", "student")
+        .or(`first_name.ilike.%${searchLower}%,last_name.ilike.%${searchLower}%`)
+        .order("last_name", { ascending: true })
+        .order("first_name", { ascending: true })
+        .limit(20);
+
+      if (error) {
+        console.error("[StudentNameInput] Directory search error:", error);
+        setDirectorySearchResults([]);
+        return;
+      }
+
+      // Map results to Student format
+      const searchResults: Student[] = (data || []).map((row) => ({
+        id: row.id,
+        name: `${row.first_name} ${row.last_name}`,
+        firstName: row.first_name,
+        lastName: row.last_name,
+      }));
+
+      setDirectorySearchResults(searchResults);
+    } catch (err) {
+      console.error("[StudentNameInput] Directory search exception:", err);
+      setDirectorySearchResults([]);
+    } finally {
+      setDirectorySearchLoading(false);
+    }
+  }, []);
+
+  // Debounced directory search for House Small Group
   useEffect(() => {
+    if (!useDirectorySearch) {
+      setDirectorySearchResults([]);
+      return;
+    }
+
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Debounce directory search (250ms)
+    debounceTimerRef.current = setTimeout(() => {
+      performDirectorySearch(inputValue);
+    }, 250);
+
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [inputValue, useDirectorySearch, performDirectorySearch]);
+
+  // Filter students based on input using token-based matching (for normal periods)
+  useEffect(() => {
+    if (useDirectorySearch) {
+      // For House Small Group, use directory search results
+      setFilteredStudents(directorySearchResults);
+      const exactMatch = selectedStudent && 
+        selectedStudent.name.toLowerCase() === inputValue.toLowerCase();
+      setShowSuggestions(directorySearchResults.length > 0 && !exactMatch && inputValue.trim().length >= 2);
+      return;
+    }
+
+    // Normal period: use roster-based filtering
     if (inputValue.trim().length > 0) {
       const inputTokens = tokenizeName(inputValue);
       
@@ -148,7 +236,7 @@ const StudentNameInput = forwardRef<StudentNameInputRef, StudentNameInputProps>(
       setShowSuggestions(false);
     }
     setHighlightedIndex(-1);
-  }, [inputValue, students, selectedStudent]);
+  }, [inputValue, students, selectedStudent, useDirectorySearch, directorySearchResults]);
 
   const handleInputChange = (value: string) => {
     setInputValue(value);
@@ -218,7 +306,7 @@ const StudentNameInput = forwardRef<StudentNameInputRef, StudentNameInputProps>(
         ref={inputRef}
         id="studentName"
         type="text"
-        placeholder={disabled ? "Select a period first..." : "Start typing student name..."}
+        placeholder={disabled ? "Select a period first..." : useDirectorySearch ? "Type at least 2 characters to search..." : "Start typing student name..."}
         value={inputValue}
         onChange={(e) => handleInputChange(e.target.value)}
         onFocus={() => !disabled && inputValue.trim().length > 0 && !showNotInList && setShowSuggestions(filteredStudents.length > 0)}
@@ -228,14 +316,22 @@ const StudentNameInput = forwardRef<StudentNameInputRef, StudentNameInputProps>(
         disabled={disabled}
         className={disabled ? "bg-gray-100 cursor-not-allowed" : selectedStudent ? "border-green-500 bg-green-50" : showNotInList ? "border-amber-500 bg-amber-50" : ""}
       />
+      {useDirectorySearch && directorySearchLoading && inputValue.trim().length >= 2 && (
+        <p className="text-xs text-gray-500">Searching...</p>
+      )}
       {selectedStudent && (
         <p className="text-xs text-green-600">
           ✓ {selectedStudent.name} selected
         </p>
       )}
-      {!selectedStudent && trimmedInput.length > 0 && !showNotInList && (
+      {!selectedStudent && trimmedInput.length > 0 && !showNotInList && !useDirectorySearch && (
         <p className="text-xs text-amber-600">
           Select your name from the list below
+        </p>
+      )}
+      {useDirectorySearch && trimmedInput.length > 0 && trimmedInput.length < 2 && (
+        <p className="text-xs text-gray-500">
+          Type at least 2 characters to search for students
         </p>
       )}
       
