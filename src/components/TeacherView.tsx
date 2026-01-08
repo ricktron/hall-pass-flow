@@ -217,6 +217,17 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     try {
       // Normalize period before querying (defense-in-depth, though fetchRosterStudentsWithMeta also normalizes)
       const normalizedPeriod = normalizePeriod(period);
+      
+      // House Small Group is not tracked in Supabase roster - show expected message
+      if (normalizedPeriod === "House Small Group") {
+        setRosterHealthMetadata({
+          source: 'supabase_rpc',
+          reason: 'House Small Group roster is not maintained in Supabase (expected).'
+        });
+        setRosterHealthLoading(false);
+        return;
+      }
+      
       const context = getAcademicContext();
       
       // Debug logging: log roster health check attempt
@@ -514,7 +525,16 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                             {rosterHealthMetadata.source === 'supabase_rpc' ? 'Supabase (RPC)' : 'Legacy Fallback'}
                           </span>
                         </div>
-                        {rosterHealthMetadata.source === 'supabase_rpc' && rosterHealthMetadata.reason && (
+                        {rosterHealthPeriod === "House Small Group" && rosterHealthMetadata.reason?.includes('not maintained') ? (
+                          <div className="p-2 bg-blue-50 border border-blue-200 rounded-md">
+                            <p className="text-xs text-blue-800 font-medium">
+                              {rosterHealthMetadata.reason}
+                            </p>
+                            <p className="text-xs text-blue-700 mt-1">
+                              House Small Group uses directory search instead of roster-based selection.
+                            </p>
+                          </div>
+                        ) : rosterHealthMetadata.source === 'supabase_rpc' && rosterHealthMetadata.reason && (
                           <div className={`p-2 border rounded-md ${
                             rosterHealthMetadata.errorCode
                               ? 'bg-red-50 border-red-200'
