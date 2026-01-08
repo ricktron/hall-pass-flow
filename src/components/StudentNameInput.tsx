@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,12 @@ interface StudentNameInputProps {
   onKeyDown?: (e: React.KeyboardEvent, nextFieldId?: string) => void;
   /** Called when teacher override is requested (student not in list) */
   onTeacherOverride?: (rawName: string) => void;
+  /** Whether the input is disabled */
+  disabled?: boolean;
+}
+
+export interface StudentNameInputRef {
+  focus: () => void;
 }
 
 /**
@@ -31,7 +37,7 @@ interface StudentNameInputProps {
 function tokenizeName(name: string): string[] {
   return name
     .toLowerCase()
-    .replace(/[''.\-]/g, '') // Remove apostrophes, periods, hyphens
+    .replace(/[''.-]/g, '') // Remove apostrophes, periods, hyphens
     .split(/[\s,]+/) // Split on whitespace and commas
     .map(t => t.trim())
     .filter(t => t.length > 0);
@@ -70,18 +76,26 @@ function scoreMatch(studentTokens: string[], inputTokens: string[]): number {
   return score;
 }
 
-const StudentNameInput = ({
+const StudentNameInput = forwardRef<StudentNameInputRef, StudentNameInputProps>(({
   students,
   selectedStudent,
   onStudentSelect,
   onKeyDown,
-  onTeacherOverride
-}: StudentNameInputProps) => {
+  onTeacherOverride,
+  disabled = false
+}, ref) => {
   const [inputValue, setInputValue] = useState("");
   const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Expose focus method via ref
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      inputRef.current?.focus();
+    }
+  }));
 
   // Pre-compute tokenized names for efficient matching
   const studentTokensMap = useRef<Map<string, string[]>>(new Map());
@@ -148,8 +162,8 @@ const StudentNameInput = ({
     onStudentSelect({ id: student.id, name: student.name });
     setInputValue(student.name);
     setShowSuggestions(false);
-    // Move to next field
-    const nextField = document.getElementById('period-select');
+    // Move to next field (destination)
+    const nextField = document.getElementById('destination-select');
     if (nextField) {
       nextField.focus();
       if (nextField.getAttribute('role') === 'combobox') {
@@ -178,10 +192,10 @@ const StudentNameInput = ({
       }
     }
     
-    // If Enter is pressed and we have a selection, move to next field
+    // If Enter is pressed and we have a selection, move to next field (destination)
     if (e.key === 'Enter' && selectedStudent) {
       e.preventDefault();
-      onKeyDown?.(e, 'period-select');
+      onKeyDown?.(e, 'destination-select');
     }
   };
 
@@ -204,14 +218,15 @@ const StudentNameInput = ({
         ref={inputRef}
         id="studentName"
         type="text"
-        placeholder="Start typing student name..."
+        placeholder={disabled ? "Select a period first..." : "Start typing student name..."}
         value={inputValue}
         onChange={(e) => handleInputChange(e.target.value)}
-        onFocus={() => inputValue.trim().length > 0 && !showNotInList && setShowSuggestions(filteredStudents.length > 0)}
+        onFocus={() => !disabled && inputValue.trim().length > 0 && !showNotInList && setShowSuggestions(filteredStudents.length > 0)}
         onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
         onKeyDown={handleKeyDown}
         autoComplete="off"
-        className={selectedStudent ? "border-green-500 bg-green-50" : showNotInList ? "border-amber-500 bg-amber-50" : ""}
+        disabled={disabled}
+        className={disabled ? "bg-gray-100 cursor-not-allowed" : selectedStudent ? "border-green-500 bg-green-50" : showNotInList ? "border-amber-500 bg-amber-50" : ""}
       />
       {selectedStudent && (
         <p className="text-xs text-green-600">
@@ -270,6 +285,8 @@ const StudentNameInput = ({
       )}
     </div>
   );
-};
+});
+
+StudentNameInput.displayName = "StudentNameInput";
 
 export default StudentNameInput;
