@@ -148,10 +148,10 @@ async function fetchFromEnrollments(
     });
     
     if (!rosterRows || rosterRows.length === 0) {
-      // No enrollments found for this filter - fallback
+      // No enrollments found for this filter - return null to allow fallback logic
       if (import.meta.env.DEV) {
         console.warn(
-          `[roster] No enrollments found for ${context.schoolYear}/${context.semester}/${normalizedPeriod}${filter.course ? `/${filter.course}` : ""} - falling back to legacy roster`
+          `[roster] No enrollments found for ${context.schoolYear}/${context.semester}/${normalizedPeriod}${filter.course ? `/${filter.course}` : ""} - RPC returned 0 rows`
         );
       }
       return { students: null };
@@ -252,14 +252,17 @@ export async function fetchRosterStudentsWithMeta(
   // Try preferred path: student_enrollments
   const enrollmentResult = await fetchFromEnrollments(context, normalizedFilter);
   
+  // If RPC returned students, use them (regardless of semester)
   if (enrollmentResult.students && enrollmentResult.students.length > 0) {
+    // Debug logging: log successful RPC load
+    console.info(`[roster] Roster load strategy: rpc (${enrollmentResult.students.length} students)`);
     return {
       students: enrollmentResult.students,
       metadata: { source: 'supabase_rpc' }
     };
   }
   
-  // For S2, if RPC returns no data, don't fall back to legacy (RPC should have data)
+  // For S2, if RPC returns no data (but no error), don't fall back to legacy (RPC should have data)
   // Only use legacy fallback if RPC throws an error (not just empty result)
   if (context.semester === 'S2' && !enrollmentResult.error) {
     if (import.meta.env.DEV) {
@@ -267,6 +270,8 @@ export async function fetchRosterStudentsWithMeta(
         `[roster] RPC returned 0 students for S2 ${context.schoolYear}/${normalizedFilter.period} - not using legacy fallback`
       );
     }
+    // Debug logging: log RPC returned 0 rows (no error)
+    console.info(`[roster] Roster load strategy: rpc (0 students, no error)`);
     return {
       students: [],
       metadata: {
@@ -280,6 +285,9 @@ export async function fetchRosterStudentsWithMeta(
   const reason = enrollmentResult.error 
     ? `RPC error (${enrollmentResult.error.code || 'unknown'})`
     : 'No enrollments found for this period';
+  
+  // Debug logging: log legacy fallback
+  console.info(`[roster] Roster load strategy: legacy (reason: ${reason})`);
   
   if (import.meta.env.DEV) {
     console.warn(

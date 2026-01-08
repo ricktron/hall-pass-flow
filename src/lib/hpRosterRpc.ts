@@ -49,9 +49,26 @@ export async function hpGetRoster(
     payload.p_course = args.course;
   }
   
+  // Debug logging: log RPC call (only once per unique call to avoid spam)
+  if (import.meta.env.DEV) {
+    console.info('[hpGetRoster] Calling hp_get_roster RPC with payload:', payload);
+  }
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase.rpc as any)("hp_get_roster", payload);
-  if (error) throw error;
+  
+  if (error) {
+    if (import.meta.env.DEV) {
+      console.error('[hpGetRoster] RPC error:', error);
+    }
+    throw error;
+  }
+  
+  const rowCount = data?.length ?? 0;
+  if (import.meta.env.DEV) {
+    console.info(`[hpGetRoster] RPC returned ${rowCount} rows`);
+  }
+  
   return (data ?? []) as HpRosterRow[];
 }
 

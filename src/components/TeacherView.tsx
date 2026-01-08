@@ -217,7 +217,23 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     try {
       // Normalize period before querying (defense-in-depth, though fetchRosterStudentsWithMeta also normalizes)
       const normalizedPeriod = normalizePeriod(period);
+      const context = getAcademicContext();
+      
+      // Debug logging: log roster health check attempt
+      console.info('[TeacherView] checkRosterHealth: checking roster for period', normalizedPeriod, {
+        schoolYear: context.schoolYear,
+        semester: context.semester
+      });
+      
       const result = await fetchRosterStudentsWithMeta({ period: normalizedPeriod });
+      
+      // Debug logging: log result
+      console.info('[TeacherView] checkRosterHealth: result', {
+        source: result.metadata.source,
+        studentCount: result.students.length,
+        reason: result.metadata.reason
+      });
+      
       setRosterHealthMetadata({
         source: result.metadata.source,
         reason: result.metadata.reason,
@@ -235,11 +251,24 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     }
   };
 
+  // Check roster health when section is opened or period changes
   useEffect(() => {
     if (rosterHealthOpen && rosterHealthPeriod) {
       checkRosterHealth(rosterHealthPeriod);
     }
   }, [rosterHealthOpen, rosterHealthPeriod]);
+
+  // Auto-check roster health on dashboard mount (once)
+  useEffect(() => {
+    // Check roster health for default period "A" when dashboard first loads
+    // This ensures the RPC is called and network request is visible in devtools
+    const timer = setTimeout(() => {
+      checkRosterHealth(rosterHealthPeriod);
+    }, 500); // Small delay to avoid blocking initial render
+    
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   const handleRecordEarlyDismissal = async () => {
     if (!signoutStudentName.trim()) {
