@@ -1,8 +1,8 @@
 /**
  * hpRosterRpc.ts
  * 
- * RPC wrapper for hp_get_roster function.
- * Provides type-safe access to the Supabase RPC that fetches roster data.
+ * RPC wrappers for hp_get_roster and hp_get_roster_counts functions.
+ * Provides type-safe access to the Supabase RPCs that fetch roster data.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -71,5 +71,45 @@ export async function hpGetRoster(
   }
   
   return (data ?? []) as HpRosterRow[];
+}
+
+/**
+ * Calls the hp_get_roster_counts RPC function.
+ * 
+ * @param supabase - Supabase client instance
+ * @param schoolYear - School year (e.g., "2025-2026")
+ * @param semester - Semester (e.g., "S2")
+ * @returns Record mapping period to student count
+ * @throws Error if RPC call fails
+ */
+export async function hpGetRosterCounts(
+  supabase: SupabaseClient<Database>,
+  schoolYear: string,
+  semester: string
+): Promise<Record<string, number>> {
+  const payload = {
+    p_school_year: schoolYear,
+    p_semester: semester,
+  };
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)("hp_get_roster_counts", payload);
+  
+  if (error) {
+    console.error('[hpGetRosterCounts] RPC error:', error);
+    throw new Error(`Failed to fetch roster counts: ${error.message}`);
+  }
+  
+  // Convert array of { period, student_count } to Record<string, number>
+  const counts: Record<string, number> = {};
+  if (data && Array.isArray(data)) {
+    for (const row of data) {
+      if (row.period && typeof row.student_count === 'number') {
+        counts[row.period] = Number(row.student_count);
+      }
+    }
+  }
+  
+  return counts;
 }
 

@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchTodaySignouts, recordDaySignout, type DaySignoutRow } from "@/lib/earlyDismissalRepository";
 import { fetchRosterStudentsWithMeta, getAcademicContext, normalizePeriod } from "@/lib/roster";
+import { hpGetRosterCounts } from "@/lib/hpRosterRpc";
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
@@ -87,6 +88,11 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'supabase_rpc' | 'legacy'; reason?: string; errorCode?: string; errorStatus?: number } | null>(null);
   const [rosterHealthLoading, setRosterHealthLoading] = useState(false);
   const [rosterHealthStudentCount, setRosterHealthStudentCount] = useState<number | null>(null);
+  
+  // Roster counts state
+  const [rosterCounts, setRosterCounts] = useState<Record<string, number> | null>(null);
+  const [rosterCountsError, setRosterCountsError] = useState<string | null>(null);
+  const [rosterCountsLoading, setRosterCountsLoading] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
     if (DEBUG) console.log('[TeacherView] fetch reason:', reason);
@@ -280,6 +286,29 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
+
+  // Fetch roster counts when Roster Health section opens
+  useEffect(() => {
+    if (!rosterHealthOpen) return;
+    
+    const fetchCounts = async () => {
+      setRosterCountsLoading(true);
+      setRosterCountsError(null);
+      try {
+        const context = getAcademicContext();
+        const counts = await hpGetRosterCounts(supabase, context.schoolYear, context.semester);
+        setRosterCounts(counts);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to fetch roster counts';
+        setRosterCountsError(errorMessage);
+        setRosterCounts(null);
+      } finally {
+        setRosterCountsLoading(false);
+      }
+    };
+    
+    fetchCounts();
+  }, [rosterHealthOpen]);
 
   const handleRecordEarlyDismissal = async () => {
     if (!signoutStudentName.trim()) {
@@ -492,14 +521,20 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                         }}
                       >
                         <SelectTrigger id="roster-health-period" className="w-48">
-                          <SelectValue />
+                          <SelectValue>
+                            {rosterHealthPeriod} Period{rosterCounts?.[rosterHealthPeriod] !== undefined ? ` (${rosterCounts?.[rosterHealthPeriod]})` : ' (…)'}
+                          </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          {PERIODS.map((p) => (
-                            <SelectItem key={p} value={p}>
-                              {p} Period
-                            </SelectItem>
-                          ))}
+                          {PERIODS.map((p) => {
+                            const count = rosterCounts?.[p];
+                            const displayCount = count !== undefined ? count.toString() : '…';
+                            return (
+                              <SelectItem key={p} value={p}>
+                                {p} Period ({displayCount})
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     </div>
@@ -518,6 +553,17 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                             {rosterHealthMetadata.source === 'supabase_rpc' ? 'Supabase (RPC)' : 'Legacy Fallback'}
                           </span>
                         </div>
+                        {rosterCountsLoading ? (
+                          <div className="text-xs text-gray-500">Loading period counts...</div>
+                        ) : rosterCountsError ? (
+                          <div className="text-xs text-amber-600">
+                            Period counts unavailable: {rosterCountsError}
+                          </div>
+                        ) : rosterCounts ? (
+                          <div className="text-xs text-gray-600">
+                            Period counts loaded for {Object.keys(rosterCounts).length} period{Object.keys(rosterCounts).length !== 1 ? 's' : ''}
+                          </div>
+                        ) : null}
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">
                             Students: {rosterHealthStudentCount !== null ? rosterHealthStudentCount.toString() : '0'}
