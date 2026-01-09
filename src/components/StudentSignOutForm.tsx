@@ -2,12 +2,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Clock } from "lucide-react";
 import { getCurrentlyOutRecords, updateReturnTime } from "@/lib/supabaseDataManager";
 import { fetchRosterStudents, type RosterStudent } from "@/lib/roster";
+import { fetchActiveDestinations, type DestinationOption } from "@/lib/destinationsRepository";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import StudentNameInput, { type SelectedStudent, type StudentNameInputRef } from "./StudentNameInput";
-import PeriodDestinationSelects from "./PeriodDestinationSelects";
 import UnknownOverrideDialog from "./UnknownOverrideDialog";
 import { useStudentSignOut } from "@/hooks/useStudentSignOut";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +42,7 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
   const [currentlyOutStudents, setCurrentlyOutStudents] = useState<StudentRecord[]>([]);
   const [showCurrentlyOut, setShowCurrentlyOut] = useState(false);
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [destinations, setDestinations] = useState<DestinationOption[]>([]);
   
   // Unknown override state
   const [showOverrideDialog, setShowOverrideDialog] = useState(false);
@@ -54,6 +57,17 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
     onSignOut,
     onEarlyDismissal
   });
+
+  // Load destinations on mount
+  useEffect(() => {
+    let cancelled = false;
+    fetchActiveDestinations().then((data) => {
+      if (!cancelled) {
+        setDestinations(data);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Load last selected period from localStorage on mount
   useEffect(() => {
@@ -92,13 +106,6 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
         return;
       }
       
-      // House Small Group doesn't use roster - directory search is used instead
-      if (selectedPeriod === "House Small Group") {
-        setStudents([]);
-        setRosterLoading(false);
-        return;
-      }
-      
       setRosterLoading(true);
       try {
         // fetchRosterStudents calls hp_get_roster RPC internally
@@ -125,20 +132,16 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
     }
   }, [selectedPeriod]);
 
-  // Auto-focus student name input when period is selected and roster is loaded (or House Small Group)
+  // Auto-focus student name input when period is selected and roster is loaded
   useEffect(() => {
-    if (selectedPeriod && !rosterLoading) {
-      // For House Small Group, focus immediately (no roster to load)
-      // For normal periods, wait for roster to load
-      if (selectedPeriod === "House Small Group" || students.length > 0) {
-        // Small delay to ensure the input is rendered and enabled
-        const timer = setTimeout(() => {
-          if (studentNameInputRef.current) {
-            studentNameInputRef.current.focus();
-          }
-        }, 100);
-        return () => clearTimeout(timer);
-      }
+    if (selectedPeriod && !rosterLoading && students.length > 0) {
+      // Small delay to ensure the input is rendered and enabled
+      const timer = setTimeout(() => {
+        if (studentNameInputRef.current) {
+          studentNameInputRef.current.focus();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [selectedPeriod, rosterLoading, students.length]);
 
@@ -278,13 +281,24 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
             <div className="text-sm text-gray-500">Loading roster...</div>
           )}
           
-          <PeriodDestinationSelects
-            selectedPeriod={selectedPeriod}
-            selectedDestination={selectedDestination}
-            onPeriodChange={setSelectedPeriod}
-            onDestinationChange={setSelectedDestination}
-            onKeyDown={handleKeyDown}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="period">Class Period</Label>
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger id="period-select" onKeyDown={(e) => handleKeyDown(e, 'studentName')}>
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIOD_OPTIONS.map((period) => (
+                  <SelectItem key={period.value} value={period.value}>
+                    {period.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!selectedPeriod && (
+              <p className="text-xs text-gray-500">Select your period to load the roster.</p>
+            )}
+          </div>
 
           <StudentNameInput
             ref={studentNameInputRef}
@@ -296,6 +310,30 @@ const StudentSignOutForm = ({ onSignOut, onEarlyDismissal }: StudentSignOutFormP
             disabled={!selectedPeriod}
             period={selectedPeriod}
           />
+
+          <div className="space-y-2">
+            <Label htmlFor="destination">Destination</Label>
+            <Select 
+              value={selectedDestination} 
+              onValueChange={setSelectedDestination}
+              disabled={!selectedPeriod}
+            >
+              <SelectTrigger 
+                id="destination-select" 
+                onKeyDown={(e) => handleKeyDown(e, 'signOutButton')}
+                className={!selectedPeriod ? "bg-gray-100 cursor-not-allowed" : ""}
+              >
+                <SelectValue placeholder={!selectedPeriod ? "Select a period first..." : "Select destination"} />
+              </SelectTrigger>
+              <SelectContent>
+                {destinations.map((destination) => (
+                  <SelectItem key={destination.key} value={destination.key === "testing_center" ? "testing_center" : destination.label}>
+                    {destination.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <Button 
             type="button"

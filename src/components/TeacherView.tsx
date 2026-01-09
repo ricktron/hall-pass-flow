@@ -218,16 +218,6 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       // Normalize period before querying (defense-in-depth, though fetchRosterStudentsWithMeta also normalizes)
       const normalizedPeriod = normalizePeriod(period);
       
-      // House Small Group is not tracked in Supabase roster - show expected message
-      if (normalizedPeriod === "House Small Group") {
-        setRosterHealthMetadata({
-          source: 'supabase_rpc',
-          reason: 'House Small Group roster is not maintained in Supabase (expected).'
-        });
-        setRosterHealthLoading(false);
-        return;
-      }
-      
       const context = getAcademicContext();
       
       // Debug logging: log roster health check attempt
