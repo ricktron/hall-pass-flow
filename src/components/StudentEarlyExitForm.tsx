@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { fetchRosterStudents, type RosterStudent } from "@/lib/roster";
 import StudentNameInput, { type SelectedStudent, type StudentNameInputRef } from "./StudentNameInput";
-import PeriodDestinationSelects from "./PeriodDestinationSelects";
 import { useToast } from "@/hooks/use-toast";
 import { PERIOD_OPTIONS } from "@/constants/formOptions";
 import { recordDaySignout } from "@/lib/earlyDismissalRepository";
@@ -14,7 +15,6 @@ import { CLASSROOM_ID } from "@/config/classroom";
 const StudentEarlyExitForm = () => {
   const [selectedStudent, setSelectedStudent] = useState<SelectedStudent | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState("");
-  const [selectedDestination, setSelectedDestination] = useState("");
   const [students, setStudents] = useState<RosterStudent[]>([]);
   const [rosterLoading, setRosterLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -31,13 +31,6 @@ const StudentEarlyExitForm = () => {
       if (!selectedPeriod) {
         // If no period selected, don't load roster yet
         setStudents([]);
-        return;
-      }
-      
-      // House Small Group doesn't use roster - directory search is used instead
-      if (selectedPeriod === "House Small Group") {
-        setStudents([]);
-        setRosterLoading(false);
         return;
       }
       
@@ -63,24 +56,19 @@ const StudentEarlyExitForm = () => {
   useEffect(() => {
     if (selectedPeriod) {
       setSelectedStudent(null);
-      setSelectedDestination("");
     }
   }, [selectedPeriod]);
 
-  // Auto-focus student name input when period is selected and roster is loaded (or House Small Group)
+  // Auto-focus student name input when period is selected and roster is loaded
   useEffect(() => {
-    if (selectedPeriod && !rosterLoading) {
-      // For House Small Group, focus immediately (no roster to load)
-      // For normal periods, wait for roster to load
-      if (selectedPeriod === "House Small Group" || students.length > 0) {
-        // Small delay to ensure the input is rendered and enabled
-        const timer = setTimeout(() => {
-          if (studentNameInputRef.current) {
-            studentNameInputRef.current.focus();
-          }
-        }, 100);
-        return () => clearTimeout(timer);
-      }
+    if (selectedPeriod && !rosterLoading && students.length > 0) {
+      // Small delay to ensure the input is rendered and enabled
+      const timer = setTimeout(() => {
+        if (studentNameInputRef.current) {
+          studentNameInputRef.current.focus();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [selectedPeriod, rosterLoading, students.length]);
 
@@ -109,7 +97,7 @@ const StudentEarlyExitForm = () => {
       await recordDaySignout({
         classroom: CLASSROOM_ID,
         student_name: selectedStudent.name,
-        reason: selectedDestination || undefined,
+        reason: "Early Dismissal", // Fixed reason for early dismissal
         period: selectedPeriod,
         student_id: selectedStudent.id,
       });
@@ -169,13 +157,24 @@ const StudentEarlyExitForm = () => {
             <div className="text-sm text-gray-500">Loading roster...</div>
           )}
           
-          <PeriodDestinationSelects
-            selectedPeriod={selectedPeriod}
-            selectedDestination={selectedDestination}
-            onPeriodChange={setSelectedPeriod}
-            onDestinationChange={setSelectedDestination}
-            onKeyDown={handleKeyDown}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="period">Class Period</Label>
+            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+              <SelectTrigger id="period-select" onKeyDown={(e) => handleKeyDown(e, 'studentName')}>
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIOD_OPTIONS.map((period) => (
+                  <SelectItem key={period.value} value={period.value}>
+                    {period.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!selectedPeriod && (
+              <p className="text-xs text-gray-500">Select your period to load the roster.</p>
+            )}
+          </div>
 
           <StudentNameInput
             ref={studentNameInputRef}
