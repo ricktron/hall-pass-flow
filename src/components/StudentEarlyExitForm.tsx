@@ -61,7 +61,7 @@ const StudentEarlyExitForm = () => {
 
   // Auto-focus student name input when period is selected and roster is loaded
   useEffect(() => {
-    if (selectedPeriod && !rosterLoading && students.length > 0) {
+    if (selectedPeriod && !rosterLoading) {
       // Small delay to ensure the input is rendered and enabled
       const timer = setTimeout(() => {
         if (studentNameInputRef.current) {
@@ -70,7 +70,7 @@ const StudentEarlyExitForm = () => {
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [selectedPeriod, rosterLoading, students.length]);
+  }, [selectedPeriod, rosterLoading]);
 
   const handleFormSubmit = async () => {
     // Guard: require student selection

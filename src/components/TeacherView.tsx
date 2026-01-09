@@ -86,6 +86,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [rosterHealthPeriod, setRosterHealthPeriod] = useState<string>("A");
   const [rosterHealthMetadata, setRosterHealthMetadata] = useState<{ source: 'supabase_rpc' | 'legacy'; reason?: string; errorCode?: string; errorStatus?: number } | null>(null);
   const [rosterHealthLoading, setRosterHealthLoading] = useState(false);
+  const [rosterHealthStudentCount, setRosterHealthStudentCount] = useState<number | null>(null);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
     if (DEBUG) console.log('[TeacherView] fetch reason:', reason);
@@ -235,6 +236,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
         reason: result.metadata.reason
       });
       
+      setRosterHealthStudentCount(result.students.length);
       setRosterHealthMetadata({
         source: result.metadata.source,
         reason: result.metadata.reason,
@@ -248,6 +250,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
       // For non-S2, use legacy as fallback
       const source = context.semester === 'S2' ? 'supabase_rpc' : 'legacy';
       const errorDetails = error as { code?: string; status?: number; message?: string };
+      setRosterHealthStudentCount(null);
       setRosterHealthMetadata({
         source,
         reason: errorDetails?.message || 'Health check failed',
@@ -515,16 +518,13 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                             {rosterHealthMetadata.source === 'supabase_rpc' ? 'Supabase (RPC)' : 'Legacy Fallback'}
                           </span>
                         </div>
-                        {rosterHealthPeriod === "House Small Group" && rosterHealthMetadata.reason?.includes('not maintained') ? (
-                          <div className="p-2 bg-blue-50 border border-blue-200 rounded-md">
-                            <p className="text-xs text-blue-800 font-medium">
-                              {rosterHealthMetadata.reason}
-                            </p>
-                            <p className="text-xs text-blue-700 mt-1">
-                              House Small Group uses directory search instead of roster-based selection.
-                            </p>
-                          </div>
-                        ) : rosterHealthMetadata.source === 'supabase_rpc' && rosterHealthMetadata.reason && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">Students in roster:</span>
+                          <span className="text-sm font-medium">
+                            {rosterHealthStudentCount !== null ? rosterHealthStudentCount.toString() : '-'}
+                          </span>
+                        </div>
+                        {rosterHealthMetadata.source === 'supabase_rpc' && rosterHealthMetadata.reason && (
                           <div className={`p-2 border rounded-md ${
                             rosterHealthMetadata.errorCode
                               ? 'bg-red-50 border-red-200'

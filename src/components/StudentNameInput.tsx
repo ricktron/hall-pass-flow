@@ -97,8 +97,8 @@ const StudentNameInput = forwardRef<StudentNameInputRef, StudentNameInputProps>(
   const [directorySearchLoading, setDirectorySearchLoading] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Check if we should use directory search (House Small Group)
-  const useDirectorySearch = period === "House Small Group";
+  // House Small Group roster is now supplied via hp_get_roster; disable directory search (RLS-sensitive).
+  const useDirectorySearch = false;
 
   // Expose focus method via ref
   useImperativeHandle(ref, () => ({
