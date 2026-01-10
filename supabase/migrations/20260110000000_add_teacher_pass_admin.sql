@@ -304,7 +304,11 @@ COMMENT ON FUNCTION public.hp_admin_delete_pass IS
 -- PART F: Update Hall_Passes view to exclude deleted rows
 -- ============================================================================
 
-CREATE OR REPLACE VIEW public."Hall_Passes" AS
+-- Drop view first to avoid column type change error (Postgres won't allow
+-- CREATE OR REPLACE to change column types)
+DROP VIEW IF EXISTS public."Hall_Passes" CASCADE;
+
+CREATE VIEW public."Hall_Passes" AS
 SELECT 
   bp.id,
   bp.student_name AS "studentName",
@@ -318,6 +322,9 @@ SELECT
   bp.teacher_note
 FROM public.bathroom_passes bp
 WHERE bp.is_deleted = false;
+
+-- Re-grant permissions
+GRANT SELECT ON public."Hall_Passes" TO authenticated;
 
 -- ============================================================================
 -- PART G: Update hp_base view to exclude deleted rows (used by analytics)
