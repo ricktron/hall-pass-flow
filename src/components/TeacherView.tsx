@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, Users, BarChart3, UserCheck, UserCog, LogOut, Plus, UserX, ChevronDown, ChevronRight, Info } from "lucide-react";
+import { ArrowLeft, Users, BarChart3, UserCheck, UserCog, LogOut, Plus, UserX, ChevronDown, ChevronRight, Info, Edit, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import CurrentlyOutDisplay from "./CurrentlyOutDisplay";
 import AnalyticsView from "./AnalyticsView";
@@ -18,6 +18,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchTodaySignouts, recordDaySignout, type DaySignoutRow } from "@/lib/earlyDismissalRepository";
 import { fetchRosterStudentsWithMeta, getAcademicContext, normalizePeriod } from "@/lib/roster";
 import { hpGetRosterCounts } from "@/lib/hpRosterRpc";
+import { fetchActiveDestinations } from "@/lib/destinationsRepository";
+import { PERIOD_OPTIONS } from "@/constants/formOptions";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const PERIODS = ["A","B","C","D","E","F","G","H","House Small Group"];
 
@@ -35,6 +39,7 @@ interface TeacherViewProps {
 // Enhanced interface matching the optimized RPC function
 interface DashboardData {
   currentlyOutStudents: Array<{
+    id: string;
     studentName: string;
     period: string;
     timeOut: string;
@@ -93,6 +98,27 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [rosterCounts, setRosterCounts] = useState<Record<string, number> | null>(null);
   const [rosterCountsError, setRosterCountsError] = useState<string | null>(null);
   const [rosterCountsLoading, setRosterCountsLoading] = useState(false);
+  
+  // Pass edit/delete state
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingPass, setEditingPass] = useState<{
+    id: string;
+    studentName: string;
+    period: string;
+    destination: string;
+    timeOut: string;
+    timeIn: string | null;
+    teacherNote: string;
+  } | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingPass, setDeletingPass] = useState<{
+    id: string;
+    studentName: string;
+  } | null>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [isSubmittingDelete, setIsSubmittingDelete] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
     if (DEBUG) console.log('[TeacherView] fetch reason:', reason);
@@ -310,6 +336,101 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     fetchCounts();
   }, [rosterHealthOpen]);
 
+  const handleEditPass = async () => {
+    if (!editingPass) return;
+    
+    setIsSubmittingEdit(true);
+    try {
+                    const patch: Record<string, string | null> = {};
+      
+      if (editingPass.destination) patch.destination = editingPass.destination;
+      if (editingPass.timeOut) patch.timeout = editingPass.timeOut;
+      if (editingPass.timeIn) patch.timein = editingPass.timeIn;
+      if (editingPass.period) patch.period = editingPass.period;
+      if (editingPass.teacherNote !== undefined) patch.teacher_note = editingPass.teacherNote;
+      
+      const { data, error } = await supabase.rpc('hp_admin_update_pass', {
+        p_row_id: editingPass.id,
+        p_patch: patch,
+        p_actor: 'teacher', // Could be enhanced to use actual teacher name/ID
+        p_reason: null
+      });
+      
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Update failed",
+          description: error.message,
+        });
+        return;
+      }
+      
+      toast({
+        title: "Pass updated",
+        description: `Pass for ${editingPass.studentName} has been updated.`,
+      });
+      
+      setEditDialogOpen(false);
+      setEditingPass(null);
+      loadDashboardData('pass-edit');
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+      });
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleDeletePass = async () => {
+    if (!deletingPass || !deleteReason.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Reason required",
+        description: "Please provide a reason for deleting this pass.",
+      });
+      return;
+    }
+    
+    setIsSubmittingDelete(true);
+    try {
+      const { data, error } = await supabase.rpc('hp_admin_delete_pass', {
+        p_row_id: deletingPass.id,
+        p_actor: 'teacher', // Could be enhanced to use actual teacher name/ID
+        p_reason: deleteReason.trim()
+      });
+      
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Delete failed",
+          description: error.message,
+        });
+        return;
+      }
+      
+      toast({
+        title: "Pass deleted",
+        description: `Pass for ${deletingPass.studentName} has been deleted.`,
+      });
+      
+      setDeleteDialogOpen(false);
+      setDeletingPass(null);
+      setDeleteReason("");
+      loadDashboardData('pass-delete');
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+      });
+    } finally {
+      setIsSubmittingDelete(false);
+    }
+  };
+
   const handleRecordEarlyDismissal = async () => {
     if (!signoutStudentName.trim()) {
       toast({
@@ -411,7 +532,19 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
             </div>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            {activeView === 'overview' && (
+              <div className="flex items-center gap-2 mr-2">
+                <Checkbox
+                  id="show-deleted"
+                  checked={showDeleted}
+                  onCheckedChange={(checked) => setShowDeleted(checked === true)}
+                />
+                <Label htmlFor="show-deleted" className="text-sm cursor-pointer">
+                  Show deleted
+                </Label>
+              </div>
+            )}
             <Button
               variant={activeView === 'overview' ? 'default' : 'outline'}
               onClick={() => setActiveView('overview')}
@@ -642,6 +775,54 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                 }))}
                 onStudentReturn={handleStudentReturn}
                 onClose={handleCloseCurrentlyOut}
+                onEditPass={async (passId) => {
+                  // Fetch full pass data from database
+                  try {
+                    const { data, error } = await supabase
+                      .from('bathroom_passes')
+                      .select('id, student_name, period, destination, timeout, timein, teacher_note')
+                      .eq('id', passId)
+                      .eq('is_deleted', false)
+                      .single();
+                    
+                    if (error || !data) {
+                      toast({
+                        variant: "destructive",
+                        title: "Error",
+                        description: "Could not load pass data for editing.",
+                      });
+                      return;
+                    }
+                    
+                    setEditingPass({
+                      id: data.id,
+                      studentName: data.student_name || '',
+                      period: data.period || '',
+                      destination: data.destination || '',
+                      timeOut: data.timeout ? new Date(data.timeout).toISOString() : new Date().toISOString(),
+                      timeIn: data.timein ? new Date(data.timein).toISOString() : null,
+                      teacherNote: data.teacher_note || ''
+                    });
+                    setEditDialogOpen(true);
+                  } catch (error) {
+                    toast({
+                      variant: "destructive",
+                      title: "Error",
+                      description: "Could not load pass data for editing.",
+                    });
+                  }
+                }}
+                onDeletePass={(passId) => {
+                  // Find the pass and open delete dialog
+                  const pass = dashboardData.currentlyOutStudents.find(s => s.id === passId);
+                  if (pass) {
+                    setDeletingPass({
+                      id: passId,
+                      studentName: pass.studentName
+                    });
+                    setDeleteDialogOpen(true);
+                  }
+                }}
               />
             )}
 
@@ -790,9 +971,230 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
           <UnknownsQueue />
         )}
       </div>
+
+      {/* Edit Pass Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Pass Entry</DialogTitle>
+            <DialogDescription>
+              Update pass details for {editingPass?.studentName}
+            </DialogDescription>
+          </DialogHeader>
+          {editingPass && (
+            <EditPassForm
+              pass={editingPass}
+              onPassChange={setEditingPass}
+              destinations={[]} // Will be loaded
+            />
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEditDialogOpen(false);
+                setEditingPass(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleEditPass}
+              disabled={isSubmittingEdit}
+            >
+              {isSubmittingEdit ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Pass Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Delete Pass Entry</DialogTitle>
+            <DialogDescription>
+              This will soft delete the pass for {deletingPass?.studentName}. The pass will be hidden from the dashboard but preserved in the database.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="delete-reason">Reason for deletion *</Label>
+              <Textarea
+                id="delete-reason"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="e.g., Duplicate entry, incorrect information"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false);
+                setDeletingPass(null);
+                setDeleteReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeletePass}
+              disabled={isSubmittingDelete || !deleteReason.trim()}
+            >
+              {isSubmittingDelete ? "Deleting..." : "Delete Pass"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+
+// Edit Pass Form Component
+function EditPassForm({
+  pass,
+  onPassChange,
+  destinations,
+}: {
+  pass: {
+    id: string;
+    studentName: string;
+    period: string;
+    destination: string;
+    timeOut: string;
+    timeIn: string | null;
+    teacherNote: string;
+  };
+  onPassChange: (pass: typeof pass) => void;
+  destinations: Array<{ key: string; label: string }>;
+}) {
+  const [localDestinations, setLocalDestinations] = React.useState(destinations);
+  
+  React.useEffect(() => {
+    fetchActiveDestinations().then(setLocalDestinations);
+  }, []);
+
+  return (
+    <div className="grid gap-4 py-4">
+      <div className="grid gap-2">
+        <Label htmlFor="edit-destination">Destination</Label>
+        <Select
+          value={pass.destination}
+          onValueChange={(value) => onPassChange({ ...pass, destination: value })}
+        >
+          <SelectTrigger id="edit-destination">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {localDestinations.map((dest) => (
+              <SelectItem key={dest.key} value={dest.label}>
+                {dest.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="grid gap-2">
+        <Label htmlFor="edit-period">Period</Label>
+        <Select
+          value={pass.period}
+          onValueChange={(value) => onPassChange({ ...pass, period: value })}
+        >
+          <SelectTrigger id="edit-period">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_OPTIONS.map((period) => (
+              <SelectItem key={period.value} value={period.value}>
+                {period.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="edit-timeout">Time Out</Label>
+        <Input
+          id="edit-timeout"
+          type="datetime-local"
+          value={pass.timeOut ? new Date(pass.timeOut).toISOString().slice(0, 16) : ''}
+          onChange={(e) => {
+            const date = e.target.value ? new Date(e.target.value).toISOString() : pass.timeOut;
+            onPassChange({ ...pass, timeOut: date });
+          }}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const now = new Date().toISOString();
+            onPassChange({ ...pass, timeOut: now });
+          }}
+        >
+          Set to Now
+        </Button>
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="edit-timein">Time In (optional)</Label>
+        <Input
+          id="edit-timein"
+          type="datetime-local"
+          value={pass.timeIn ? new Date(pass.timeIn).toISOString().slice(0, 16) : ''}
+          onChange={(e) => {
+            const date = e.target.value ? new Date(e.target.value).toISOString() : null;
+            onPassChange({ ...pass, timeIn: date });
+          }}
+        />
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const now = new Date().toISOString();
+              onPassChange({ ...pass, timeIn: now });
+            }}
+          >
+            Set to Now
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              onPassChange({ ...pass, timeIn: null });
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="edit-teacher-note">Teacher Note (optional)</Label>
+        <Textarea
+          id="edit-teacher-note"
+          value={pass.teacherNote}
+          onChange={(e) => onPassChange({ ...pass, teacherNote: e.target.value })}
+          placeholder="Add a note about this pass"
+          rows={3}
+        />
+      </div>
+    </div>
+  );
+}
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (

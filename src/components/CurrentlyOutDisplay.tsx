@@ -1,11 +1,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, CheckCircle, X } from "lucide-react";
+import { Clock, CheckCircle, X, Edit, Trash2 } from "lucide-react";
 import { getElapsedMinutes } from "@/lib/timeUtils";
 import OutTimer from "./OutTimer";
 
 interface StudentRecord {
+  id: string;
   studentName: string;
   period: string;
   timeOut: Date;
@@ -16,9 +17,11 @@ interface CurrentlyOutDisplayProps {
   students: StudentRecord[];
   onStudentReturn: (studentName: string, period: string) => void;
   onClose: () => void;
+  onEditPass?: (passId: string) => void;
+  onDeletePass?: (passId: string) => void;
 }
 
-const CurrentlyOutDisplay = ({ students, onStudentReturn, onClose }: CurrentlyOutDisplayProps) => {
+const CurrentlyOutDisplay = ({ students, onStudentReturn, onClose, onEditPass, onDeletePass }: CurrentlyOutDisplayProps) => {
   const getBackgroundColor = (timeOut: Date) => {
     const elapsedMinutes = getElapsedMinutes(timeOut);
     if (elapsedMinutes < 5) return 'bg-green-100 border-green-300';
@@ -58,14 +61,37 @@ const CurrentlyOutDisplay = ({ students, onStudentReturn, onClose }: CurrentlyOu
                   <OutTimer timeOut={student.timeOut} />
                 </div>
               </div>
-              <Button
-                size="lg"
-                className="bg-green-600 hover:bg-green-700 text-white px-6 py-3"
-                onClick={() => onStudentReturn(student.studentName, student.period)}
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Returned
-              </Button>
+              <div className="flex items-center gap-2">
+                {onEditPass && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onEditPass(student.id)}
+                    title="Edit pass"
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                )}
+                {onDeletePass && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onDeletePass(student.id)}
+                    title="Delete pass"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+                <Button
+                  size="lg"
+                  className="bg-green-600 hover:bg-green-700 text-white px-6 py-3"
+                  onClick={() => onStudentReturn(student.studentName, student.period)}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Returned
+                </Button>
+              </div>
             </div>
           </div>
         ))}
