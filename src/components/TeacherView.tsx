@@ -118,7 +118,6 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
   const [deleteReason, setDeleteReason] = useState("");
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [isSubmittingDelete, setIsSubmittingDelete] = useState(false);
-  const [showDeleted, setShowDeleted] = useState(false);
 
   const loadDashboardData = async (reason: string = 'unknown') => {
     if (DEBUG) console.log('[TeacherView] fetch reason:', reason);
@@ -533,18 +532,6 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
           </div>
           
           <div className="flex gap-2 items-center">
-            {activeView === 'overview' && (
-              <div className="flex items-center gap-2 mr-2">
-                <Checkbox
-                  id="show-deleted"
-                  checked={showDeleted}
-                  onCheckedChange={(checked) => setShowDeleted(checked === true)}
-                />
-                <Label htmlFor="show-deleted" className="text-sm cursor-pointer">
-                  Show deleted
-                </Label>
-              </div>
-            )}
             <Button
               variant={activeView === 'overview' ? 'default' : 'outline'}
               onClick={() => setActiveView('overview')}

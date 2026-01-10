@@ -306,7 +306,7 @@ COMMENT ON FUNCTION public.hp_admin_delete_pass IS
 
 CREATE OR REPLACE VIEW public."Hall_Passes" AS
 SELECT 
-  bp.id::text AS id,
+  bp.id,
   bp.student_name AS "studentName",
   bp.student_id AS "studentId",
   bp.period,
