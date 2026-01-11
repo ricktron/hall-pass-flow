@@ -312,7 +312,7 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Fetch roster counts when Roster Health section opens
+  // Fetch roster counts when Roster Health section opens or academic context changes
   useEffect(() => {
     if (!rosterHealthOpen) return;
     
@@ -333,6 +333,8 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
     };
     
     fetchCounts();
+    // Note: getAcademicContext() reads from constants/env vars, so values are effectively stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rosterHealthOpen]);
 
   const handleEditPass = async () => {
@@ -657,6 +659,26 @@ const TeacherView = ({ onBack }: TeacherViewProps) => {
                           })}
                         </SelectContent>
                       </Select>
+                      {rosterCountsLoading ? (
+                        <div className="text-sm text-gray-500">Loading roster counts...</div>
+                      ) : rosterCountsError ? (
+                        <div className="text-sm text-amber-600">
+                          Roster size: unavailable ({rosterCountsError})
+                        </div>
+                      ) : (
+                        <div className="text-sm font-medium text-gray-700">
+                          {(() => {
+                            const count = rosterCounts?.[rosterHealthPeriod];
+                            if (count === undefined || count === null) {
+                              return 'Roster size: 0 students (no roster for this period)';
+                            }
+                            if (count === 0) {
+                              return 'Roster size: 0 students (no roster for this period)';
+                            }
+                            return `Roster size: ${count} student${count !== 1 ? 's' : ''}`;
+                          })()}
+                        </div>
+                      )}
                     </div>
 
                     {rosterHealthLoading ? (
